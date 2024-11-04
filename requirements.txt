@@ -1,0 +1,10 @@
+pandas
+numpy
+streamlit
+matplotlib
+scikit-learn
+xgboost
+tensorflow
+statsmodels
+newsapi-python
+yfinance
