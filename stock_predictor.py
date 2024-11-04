@@ -223,9 +223,68 @@ class MultiAlgorithmStockPredictor:
         try:
             # Fetch and prepare data
             df = self.fetch_historical_data()
+            
+            # Check if we have enough data
+            if len(df) < sequence_length + 20:  # Need extra days for technical indicators
+                st.error(f"Insufficient historical data. Need at least {sequence_length + 20} days of data.")
+                return None
+                
+            # Calculate technical indicators
             df = self.calculate_technical_indicators(df)
             
-            X_lstm, X_other, y = self.prepare_data(df, sequence_length)
+            # Check for NaN values and handle them
+            if df.isnull().any().any():
+                df = df.fillna(method='ffill').fillna(method='bfill')
+                
+            # Verify we have enough valid data after cleaning
+            if len(df.dropna()) < sequence_length:
+                st.error("Insufficient valid data after calculating indicators.")
+                return None
+                
+            # Prepare features
+            feature_columns = ['Close', 'MA5', 'MA20', 'MA50', 'MA200', 'RSI', 'MACD', 
+                            'ROC', 'ATR', 'BB_upper', 'BB_lower', 'Volume_Rate',
+                            'EMA12', 'EMA26', 'MOM', 'STOCH_K', 'WILLR']
+                            
+            # Verify all required features exist
+            missing_features = [col for col in feature_columns if col not in df.columns]
+            if missing_features:
+                st.error(f"Missing required features: {', '.join(missing_features)}")
+                return None
+                
+            # Ensure we have valid data for all features
+            df = df[feature_columns].dropna()
+            if len(df) < sequence_length:
+                st.error(f"Insufficient valid data points after cleaning. Need at least {sequence_length} points.")
+                st.write(f"Available data points: {len(df)}")
+                return None
+                
+            try:
+                # Scale features
+                scaled_data = self.scaler.fit_transform(df[feature_columns])
+            except ValueError as e:
+                st.error(f"Scaling error: {str(e)}")
+                st.write("This usually happens with newly listed stocks or stocks with insufficient trading history.")
+                return None
+                
+            # Prepare sequences for LSTM
+            X_lstm, y = [], []
+            for i in range(sequence_length, len(scaled_data)):
+                X_lstm.append(scaled_data[i-sequence_length:i])
+                y.append(scaled_data[i, 0])  # 0 index represents Close price
+                
+            # Verify we have enough sequences
+            if len(X_lstm) == 0 or len(y) == 0:
+                st.error("Could not create valid sequences for prediction.")
+                return None
+                
+            # Prepare data for other models
+            X_other = scaled_data[sequence_length:]
+            
+            # Convert to numpy arrays
+            X_lstm = np.array(X_lstm)
+            X_other = np.array(X_other)
+            y = np.array(y)
             
             # Split data
             split_idx = int(len(y) * 0.8)
@@ -438,7 +497,7 @@ try:
                     st.subheader("Individual Model Predictions")
                     model_predictions = pd.DataFrame({
                         'Model': results['individual_predictions'].keys(),
-                        'Predicted Price': [abs(v) for v in results['individual_predictions'].values()]
+                        'Predicted Price': [v for v in results['individual_predictions'].values()]
                     })
                     model_predictions['Deviation from Ensemble'] = (
                         model_predictions['Predicted Price'] - abs(results['prediction'])
