@@ -37,7 +37,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 # API setup
-NEWS_API_KEY = 'api here'
+NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
 newsapi = NewsApiClient(api_key=NEWS_API_KEY)
 
 # Cache functions remain the same as in original code
