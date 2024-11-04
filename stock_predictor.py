@@ -433,11 +433,6 @@ try:
                     
                     last_price = float(df['Close'].iloc[-1])
                     
-                    st.subheader("Ensemble Prediction Results")
-                    st.write(f"Current Price: ${abs(last_price):.2f}")
-                    st.write(f"Predicted Price: ${abs(results['prediction']):.2f}")
-                    st.write(f"Prediction Range: ${abs(results['lower_bound']):.2f} - ${abs(results['upper_bound']):.2f}")
-                    st.write(f"Ensemble Confidence Score: {abs(results['confidence_score']):.2%}")
                     
                     # Individual model predictions
                     st.subheader("Individual Model Predictions")
@@ -620,9 +615,9 @@ try:
                                 "value": f"{bullish_models}/{len(predictions)} Bullish",
                                 "delta": f"{(bullish_models/len(predictions)*100):.0f}% agreement",
                                 "description": "Agreement among models"
-                            },
+                            },               
                             "Prediction Range": {
-                                "value": f"${results['lower_bound']:.2f} - ${results['upper_bound']:.2f}",
+                                "value": f"${abs(results['lower_bound']):.2f} - ${abs(results['upper_bound']):.2f}",
                                 "delta": f"±{((results['upper_bound'] - results['lower_bound'])/2/pred_price*100):.1f}%",
                                 "description": "Expected price range"
                             },
@@ -645,23 +640,57 @@ try:
                         # Overall Analysis
                         st.write("📈 Combined Signal Analysis")
 
-                        technical_bullish = ma_bullish  
-                        model_bullish = bullish_models > (len(predictions) / 2)  
+                        # Get trading signal strength based on price_change
+                        def get_trading_signal_strength(price_change, confidence_score):
+                            if abs(price_change) > 10:
+                                return "strong_buy" if price_change > 0 else "strong_sell"
+                            elif abs(price_change) > 3 and confidence_score > 0.8:
+                                return "buy" if price_change > 0 else "sell"
+                            elif abs(price_change) > 2 and confidence_score > 0.6:
+                                return "moderate_buy" if price_change > 0 else "moderate_sell"
+                            elif abs(price_change) < 1:
+                                return "hold"
+                            else:
+                                return "weak_buy" if price_change > 0 else "weak_sell"
+
+                        # Get signals from different sources
+                        technical_bullish = ma_bullish
+                        trading_signal = get_trading_signal_strength(price_change, results['confidence_score'])
                         model_confidence = results['confidence_score'] > 0.6
 
-                        if technical_bullish and model_bullish:
-                            st.success("Strong Buy Signal 💹: Both technical analysis and model predictions are bullish")
-                        elif technical_bullish and not model_bullish:
-                            st.warning("Mixed Signal 🤔: Technical analysis shows bullish trend but models predict decline")
-                        elif not technical_bullish and model_bullish:
-                            st.warning("Mixed Signal 🤔: Models predict upside but technical analysis shows weakness")
-                        elif not technical_bullish and not model_bullish:
-                            st.error("Strong Sell Signal 📉: Both technical analysis and models indicate bearish trend")
+                        # Determine overall signal
+                        if technical_bullish and trading_signal in ['strong_buy', 'buy']:
+                            st.success("🚀 Very Strong Buy Signal: Technical analysis is bullish and models show strong upward momentum")
+                        elif technical_bullish and trading_signal in ['moderate_buy', 'weak_buy']:
+                            st.success("💹 Strong Buy Signal: Technical analysis is bullish with moderate model support")
+                        elif not technical_bullish and trading_signal in ['strong_buy', 'buy']:
+                            st.warning("📈 Cautious Buy Signal: Models show strong upward potential but technical indicators suggest caution")
+                        elif technical_bullish and trading_signal in ['hold']:
+                            st.info("⚖️ Hold with Bullish Bias: Technical analysis is positive but models suggest consolidation")
+                        elif not technical_bullish and trading_signal in ['hold']:
+                            st.info("⚖️ Hold with Bearish Bias: Technical analysis is negative and models suggest consolidation")
+                        elif technical_bullish and trading_signal in ['weak_sell', 'moderate_sell']:
+                            st.warning("🤔 Mixed Signal: Technical analysis is bullish but models show weakness")
+                        elif not technical_bullish and trading_signal in ['weak_sell', 'moderate_sell']:
+                            st.error("📉 Strong Sell Signal: Both technical analysis and models show weakness")
+                        elif not technical_bullish and trading_signal in ['strong_sell', 'sell']:
+                            st.error("🔻 Very Strong Sell Signal: Technical analysis is bearish and models show strong downward momentum")
+                        else:
+                            st.warning("🔄 Mixed Signals: Conflicting indicators suggest caution")
 
-                        # Display confidence level
+                        # Display confidence metrics
                         confidence_text = "High" if model_confidence else "Low"
                         st.info(f"Model Prediction Confidence: {confidence_text}")
-                    
+
+                        # Additional context based on signals
+                        if model_confidence:
+                            if technical_bullish:
+                                st.write("💡 Technical indicators support the model predictions, suggesting higher reliability")
+                            else:
+                                st.write("💡 Technical indicators contrast with model predictions, suggesting careful monitoring")
+                        else:
+                            st.write("💡 Lower model confidence suggests waiting for clearer signals before making decisions")
+                                            
                 else:
                     st.warning("Insufficient data points for technical analysis. Please ensure you have at least 50 days of historical data.")
             else:
