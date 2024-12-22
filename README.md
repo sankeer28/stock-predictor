@@ -3,7 +3,15 @@
 ## 🚀 Overview
 The Multi-Algorithm Stock Predictor is an advanced stock price prediction system that leverages multiple machine learning algorithms and technical indicators to generate ensemble predictions for stock market movements. Built with Streamlit, this application combines seven different prediction models, technical analysis, and real-time news sentiment to provide comprehensive trading insights.
 
-# ⚠️Stock price prediction is inherently difficult and no model can consistently predict market movements accurately⚠️
+## ⚠️Stock price prediction is inherently difficult and no model can consistently predict market movements accurately
+## ⚠️Weight configs for models need significant tweaks
+#### Example for $TNXP, on 2024-12-22
+![image](https://github.com/user-attachments/assets/ffd38a01-f036-48dd-9d3d-d137584d6948)
+![image](https://github.com/user-attachments/assets/b0250476-2f97-41aa-b777-f3dd73045dfd)
+![image](https://github.com/user-attachments/assets/512090b2-37b5-4195-99b7-81307bc5b628)
+![image](https://github.com/user-attachments/assets/542cc772-c040-428c-b086-e0ad5d4ca43e)
+
+
 ## ✨ Key Features
 - Ensemble predictions from 7 different algorithms
 - Real-time stock data integration via yfinance
