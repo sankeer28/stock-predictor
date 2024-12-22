@@ -5,7 +5,7 @@ The Multi-Algorithm Stock Predictor is an advanced stock price prediction system
 
 ## ⚠️Stock price prediction is inherently difficult and no model can consistently predict market movements accurately
 ## ⚠️Weight configs for models need significant tweaks
-#### Example for $TNXP, on 2024-12-22
+#### Example for $TNXP, on 2024-12-22 with the price of 0.61 USD. Models LSTM, GBM, XGBoost and Random Forest seem more realistic in this scenerio.
 ![image](https://github.com/user-attachments/assets/ffd38a01-f036-48dd-9d3d-d137584d6948)
 ![image](https://github.com/user-attachments/assets/b0250476-2f97-41aa-b777-f3dd73045dfd)
 ![image](https://github.com/user-attachments/assets/512090b2-37b5-4195-99b7-81307bc5b628)
