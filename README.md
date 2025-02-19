@@ -103,7 +103,7 @@ pip install streamlit pandas numpy matplotlib sklearn xgboost tensorflow yfinanc
 
 ### Configuration
 1. Get a News API key from https://newsapi.org
-2. Replace the `NEWS_API_KEY` in the code with your API key
+2. create a file called secrets.toml with your api key like NEWS_API_KEY='api key'
 
 ### Running the Application
 ```bash
