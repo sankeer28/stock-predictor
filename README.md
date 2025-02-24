@@ -22,6 +22,20 @@ The Multi-Algorithm Stock Predictor is an advanced stock price prediction system
 - Interactive web interface
 - Customizable timeframe analysis
 
+### Moving Average Controls
+1. Use the checkboxes in the Chart Controls section to toggle 20-day and 50-day moving averages
+2. SMAs help identify trends - when price crosses above an SMA it may indicate bullish momentum, below may indicate bearish momentum
+3. The 20-day SMA responds faster to price changes while the 50-day shows longer-term trends
+
+### Prophet Forecast Controls
+1. Use the "Forecast Horizon" slider to adjust how far into the future the model predicts (7-365 days)
+2. View the forecast line (red dashed line) and confidence interval (shaded red area)
+3. Expand the "Prophet Forecast Details" section to see:
+   - 7-day and 30-day price targets with expected percentage changes
+   - Trend direction (upward/downward)
+   - Weekly pattern information showing which day of the week historically performs best
+   - Seasonal factor analysis
+
 ## 🤖 Prediction Models
 The system employs seven different prediction models, each with its own strengths:
 
@@ -98,7 +112,7 @@ Note: Accuracy varies based on market conditions, volatility, and the specific s
 
 ### Prerequisites
 ```bash
-pip install streamlit pandas numpy matplotlib sklearn xgboost tensorflow yfinance newsapi-python statsmodels
+pip install -r requirements.txt
 ```
 
 ### Configuration
