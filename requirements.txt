@@ -8,3 +8,5 @@ tensorflow
 statsmodels
 newsapi-python
 yfinance
+plotly
+prophet

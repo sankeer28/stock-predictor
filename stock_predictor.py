@@ -16,6 +16,10 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional
 from tensorflow.keras.callbacks import EarlyStopping
 from newsapi import NewsApiClient
 import yfinance as yf
+from prophet import Prophet
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from sklearn.linear_model import LinearRegression
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -40,7 +44,7 @@ st.markdown(
 NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
 newsapi = NewsApiClient(api_key=NEWS_API_KEY)
 
-# Cache functions remain the same as in original code
+# Move the forecast_with_prophet function to be with the other cache functions
 @st.cache_data(ttl=3600)
 def fetch_stock_data(symbol, days):
     end_date = datetime.now()
@@ -62,31 +66,178 @@ def get_news_headlines(symbol):
     except Exception as e:
         print(f"News API error: {str(e)}")
         return []
+
+# Completely revise the Prophet forecast function
+@st.cache_data(ttl=3600)
+def forecast_with_prophet(df, forecast_days=30):
+    try:
+        # Check if we have enough data points
+        if len(df) < 30:
+            st.warning("Not enough historical data for reliable forecasting (< 30 data points)")
+            return simple_forecast_fallback(df, forecast_days)
+            
+        # Make a copy to avoid modifying the original dataframe
+        df_copy = df.copy()
+        
+        # Check for MultiIndex columns and handle appropriately
+        has_multiindex = isinstance(df_copy.columns, pd.MultiIndex)
+        
+        # Reset index to make Date a column
+        df_copy = df_copy.reset_index()
+        
+        # Find the date column
+        date_col = None
+        for col in df_copy.columns:
+            # Handle both string and tuple column names
+            col_str = col if isinstance(col, str) else col[0]
+            if isinstance(col_str, str) and col_str.lower() in ['date', 'datetime', 'time', 'index']:
+                date_col = col
+                break
+        
+        if date_col is None:
+            st.warning("No date column found - using simple forecast")
+            return simple_forecast_fallback(df, forecast_days)
+        
+        # Prepare data for Prophet with careful handling of column types
+        prophet_df = pd.DataFrame()
+        
+        # Extract the date and price columns safely
+        date_values = df_copy[date_col]
+        
+        # For Close column, check if we're dealing with a MultiIndex
+        if has_multiindex:
+            # If MultiIndex, find the column with 'Close' as first element
+            close_col = None
+            for col in df_copy.columns:
+                if isinstance(col, tuple) and col[0] == 'Close':
+                    close_col = col
+                    break
+            
+            if close_col is None:
+                st.warning("No Close column found - using simple forecast")
+                return simple_forecast_fallback(df, forecast_days)
+            
+            close_values = df_copy[close_col]
+        else:
+            # Standard columns
+            close_values = df_copy['Close']
+        
+        # Assign to prophet dataframe
+        prophet_df['ds'] = pd.to_datetime(date_values)
+        prophet_df['y'] = close_values.astype(float)
+        
+        # Drop any NaN values
+        prophet_df = prophet_df.dropna()
+        
+        # Create and fit the model
+        model = Prophet(
+            daily_seasonality=False, 
+            yearly_seasonality=True,
+            weekly_seasonality=True
+        )
+        model.fit(prophet_df)
+        
+        # Create future dataframe for prediction
+        future = model.make_future_dataframe(periods=forecast_days)
+        
+        # Make predictions
+        forecast = model.predict(future)
+        
+        return forecast
+        
+    except Exception as e:
+        st.warning(f"Prophet model failed: {str(e)}. Using simple forecast instead.")
+        return simple_forecast_fallback(df, forecast_days)
+
+# Fix the simple forecast fallback
+def simple_forecast_fallback(df, forecast_days=30):
+    """A simple linear regression forecast as fallback when Prophet fails"""
+    try:
+        # Get the closing prices as a simple 1D array
+        close_prices = df['Close'].values.flatten()
+        
+        # Create a sequence for x values (0, 1, 2, ...)
+        x = np.arange(len(close_prices)).reshape(-1, 1)
+        y = close_prices
+        
+        # Fit a simple linear regression
+        model = LinearRegression()
+        model.fit(x, y)
+        
+        # Create future dates for forecasting
+        last_date = df.index[-1]
+        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=forecast_days)
+        
+        # Historical dates and all dates together
+        historical_dates = df.index
+        all_dates = historical_dates.append(future_dates)
+        
+        # Predict future values
+        future_x = np.arange(len(close_prices), len(close_prices) + forecast_days).reshape(-1, 1)
+        future_y = model.predict(future_x)
+        
+        # Predict historical values for context
+        historical_y = model.predict(x)
+        
+        # Calculate confidence interval (simple approach)
+        mse = np.mean((y - historical_y) ** 2)
+        sigma = np.sqrt(mse)
+        
+        # Create separate arrays for each column to ensure they're 1D
+        ds_array = np.array(all_dates, dtype='datetime64')
+        
+        # Concatenate historical and future predictions
+        yhat_array = np.concatenate([historical_y, future_y])
+        yhat_lower_array = yhat_array - 1.96 * sigma
+        yhat_upper_array = yhat_array + 1.96 * sigma
+        
+        # For trend/weekly/yearly, create simple placeholders
+        trend_array = yhat_array.copy()  # Use the prediction as the trend
+        weekly_array = np.zeros(len(yhat_array))  # No weekly component
+        yearly_array = np.zeros(len(yhat_array))  # No yearly component
+        
+        # Create a forecast dataframe similar to Prophet's output
+        forecast = pd.DataFrame({
+            'ds': ds_array,
+            'yhat': yhat_array,
+            'yhat_lower': yhat_lower_array,
+            'yhat_upper': yhat_upper_array,
+            'trend': trend_array,
+            'weekly': weekly_array,
+            'yearly': yearly_array
+        })
+        
+        return forecast
+        
+    except Exception as e:
+        st.error(f"Simple forecast also failed: {str(e)}. No forecast will be shown.")
+        return None
+
 def calculate_technical_indicators_for_summary(df):
-        analysis_df = df.copy()
-        
-        # Calculate Moving Averages
-        analysis_df['MA20'] = analysis_df['Close'].rolling(window=20).mean()
-        analysis_df['MA50'] = analysis_df['Close'].rolling(window=50).mean()
-        
-        # Calculate RSI
-        delta = analysis_df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        analysis_df['RSI'] = 100 - (100 / (1 + rs))
-        
-        # Calculate Volume MA
-        analysis_df['Volume_MA'] = analysis_df['Volume'].rolling(window=20).mean()
-        
-        # Calculate Bollinger Bands
-        ma20 = analysis_df['Close'].rolling(window=20).mean()
-        std20 = analysis_df['Close'].rolling(window=20).std()
-        analysis_df['BB_upper'] = ma20 + (std20 * 2)
-        analysis_df['BB_lower'] = ma20 - (std20 * 2)
-        analysis_df['BB_middle'] = ma20
-        
-        return analysis_df
+    analysis_df = df.copy()
+    
+    # Calculate Moving Averages
+    analysis_df['MA20'] = analysis_df['Close'].rolling(window=20).mean()
+    analysis_df['MA50'] = analysis_df['Close'].rolling(window=50).mean()
+    
+    # Calculate RSI
+    delta = analysis_df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    analysis_df['RSI'] = 100 - (100 / (1 + rs))
+    
+    # Calculate Volume MA
+    analysis_df['Volume_MA'] = analysis_df['Volume'].rolling(window=20).mean()
+    
+    # Calculate Bollinger Bands
+    ma20 = analysis_df['Close'].rolling(window=20).mean()
+    std20 = analysis_df['Close'].rolling(window=20).std()
+    analysis_df['BB_upper'] = ma20 + (std20 * 2)
+    analysis_df['BB_lower'] = ma20 - (std20 * 2)
+    analysis_df['BB_middle'] = ma20
+    
+    return analysis_df
 
 class MultiAlgorithmStockPredictor:
     def __init__(self, symbol, training_years=5, weights=None):
@@ -474,7 +625,208 @@ try:
     
     # Display stock price chart
     st.subheader("Stock Price History")
-    st.line_chart(df['Close'])
+    try:
+        # Create a new DataFrame specifically for plotting
+        plot_data = pd.DataFrame(index=df.index)
+        
+        # Add the Close price data
+        plot_data['Close'] = df['Close'].values
+        
+        # Calculate and add SMA values if we have enough data
+        if len(df) >= 20:
+            plot_data['SMA_20'] = df['Close'].rolling(window=20).mean().values
+        if len(df) >= 50:
+            plot_data['SMA_50'] = df['Close'].rolling(window=50).mean().values
+        
+        # Add forecast days control under the chart controls
+        st.write("#### Chart Controls")
+        toggle_col1, toggle_col2, forecast_col = st.columns(3)
+
+        with toggle_col1:
+            show_sma20 = st.checkbox("Show 20-Day SMA", value=True)
+
+        with toggle_col2:
+            show_sma50 = st.checkbox("Show 50-Day SMA", value=True)
+
+        with forecast_col:
+            forecast_days = st.slider("Forecast Horizon (Days)", min_value=7, max_value=365, value=30, step=1)
+
+        # Generate forecast with user-selected horizon
+        with st.spinner("Generating forecast..."):
+            forecast = forecast_with_prophet(df, forecast_days=forecast_days)
+            
+            # Create plotly figure
+            fig = make_subplots(specs=[[{"secondary_y": False}]])
+            
+            # Add Close price (always shown)
+            fig.add_trace(
+                go.Scatter(x=plot_data.index, y=plot_data['Close'], name="Close Price", line=dict(color="blue"))
+            )
+            
+            # Add SMA lines based on toggle state
+            if 'SMA_20' in plot_data.columns and show_sma20:
+                fig.add_trace(
+                    go.Scatter(x=plot_data.index, y=plot_data['SMA_20'], name="20-Day SMA", line=dict(color="orange"))
+                )
+            if 'SMA_50' in plot_data.columns and show_sma50:
+                fig.add_trace(
+                    go.Scatter(x=plot_data.index, y=plot_data['SMA_50'], name="50-Day SMA", line=dict(color="green"))
+                )
+            
+            # Always add forecast if valid
+            if forecast is not None and len(forecast) > 0:
+                try:
+                    # Add Prophet forecast
+                    forecast_dates = pd.to_datetime(forecast['ds'])
+                    historical_dates = plot_data.index
+                    last_date = historical_dates[-1]
+                    
+                    # Create a boolean mask for future dates
+                    future_mask = forecast_dates > last_date
+                    
+                    # Only proceed if we have future dates
+                    if any(future_mask):
+                        # Extract forecast values and convert to lists to avoid indexing issues
+                        forecast_x = forecast_dates[future_mask].tolist()
+                        forecast_y = forecast['yhat'][future_mask].tolist()
+                        forecast_upper = forecast['yhat_upper'][future_mask].tolist()
+                        forecast_lower = forecast['yhat_lower'][future_mask].tolist()
+                        
+                        # Add the forecast line
+                        fig.add_trace(
+                            go.Scatter(
+                                x=forecast_x, 
+                                y=forecast_y,
+                                name="Price Forecast", 
+                                line=dict(color="red", dash="dash")
+                            )
+                        )
+                        
+                        # Add confidence interval
+                        fig.add_trace(
+                            go.Scatter(
+                                x=forecast_x,
+                                y=forecast_upper,
+                                name="Upper Bound",
+                                line=dict(width=0),
+                                showlegend=False
+                            )
+                        )
+                        fig.add_trace(
+                            go.Scatter(
+                                x=forecast_x,
+                                y=forecast_lower,
+                                name="Lower Bound",
+                                fill='tonexty',
+                                fillcolor='rgba(255, 0, 0, 0.1)',
+                                line=dict(width=0),
+                                showlegend=False
+                            )
+                        )
+                except Exception as forecast_trace_err:
+                    st.warning(f"Could not add forecast to chart: {str(forecast_trace_err)}")
+            
+            fig.update_layout(
+                title=f"{symbol} Stock Price with Forecast",
+                xaxis_title="Date",
+                yaxis_title="Price ($)",
+                hovermode="x unified",
+                legend=dict(y=0.99, x=0.01, orientation="h"),
+                template="plotly_white",
+                autosize=True,
+                height=500,
+                margin=dict(l=50, r=50, t=80, b=50),
+                xaxis=dict(
+                    autorange=True,
+                    rangeslider=dict(visible=False)
+                ),
+                yaxis=dict(
+                    autorange=True,
+                    fixedrange=False
+                ),
+                dragmode='pan'  # Set default drag mode to pan instead of select
+            )
+            
+            # Update the chart configuration to fix zoom toggle issues
+            st.plotly_chart(fig, use_container_width=True, config={
+                'displayModeBar': True,
+                'scrollZoom': True,
+                'displaylogo': False,
+                # Don't remove zoom buttons, but add a reset view button and make toggle possible
+                'modeBarButtonsToRemove': ['autoScale2d', 'select2d', 'lasso2d'],
+                'modeBarButtonsToAdd': ['resetScale2d', 'toImage'],
+                'dragmode': 'pan'
+            })
+            
+            # Display forecast metrics
+            with st.expander("Prophet Forecast Details"):
+                # Get last historical date and first forecast date
+                if forecast is not None and len(forecast) > 0:
+                    next_date_mask = forecast_dates > last_date
+                    
+                    if any(next_date_mask):
+                        next_date_idx = next_date_mask.argmax()
+                        last_close_price = float(plot_data['Close'].iloc[-1])
+                        
+                        # Calculate short-term forecast (7 days)
+                        short_term_idx = min(next_date_idx + 7, len(forecast) - 1)
+                        short_term_price = float(forecast['yhat'].iloc[short_term_idx])
+                        short_term_change = (short_term_price - last_close_price) / last_close_price * 100
+                        
+                        # Calculate medium-term forecast (30 days)
+                        medium_term_idx = min(next_date_idx + 30, len(forecast) - 1) 
+                        medium_term_price = float(forecast['yhat'].iloc[medium_term_idx])
+                        medium_term_change = (medium_term_price - last_close_price) / last_close_price * 100
+                        
+                        # Create metrics
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric(
+                                label="7-Day Forecast", 
+                                value=f"${short_term_price:.2f}", 
+                                delta=f"{short_term_change:.2f}%"
+                            )
+                        with col2:
+                            st.metric(
+                                label="30-Day Forecast", 
+                                value=f"${medium_term_price:.2f}", 
+                                delta=f"{medium_term_change:.2f}%"
+                            )
+                        
+                        # Display trend and seasonality info
+                        st.write("#### Forecast Components")
+                        st.write("Prophet identifies the following patterns in the data:")
+                        
+                        try:
+                            # Get components for analysis
+                            trend_values = forecast['trend'][next_date_idx:medium_term_idx].values
+                            weekly_values = forecast['weekly'][next_date_idx:medium_term_idx].values
+                            yearly_values = forecast['yearly'][next_date_idx:medium_term_idx].values
+                            
+                            # Determine trend direction
+                            trend_direction = "Upward" if np.mean(trend_values) > 0 else "Downward"
+                            
+                            # Find day with maximum weekly effect
+                            forecast_subset = forecast.iloc[next_date_idx:medium_term_idx]
+                            max_weekly_idx = forecast_subset['weekly'].idxmax()
+                            max_weekly_day = pd.to_datetime(forecast_subset.loc[max_weekly_idx, 'ds']).strftime('%A')
+                            
+                            # Determine seasonal factor
+                            seasonal_factor = "Positive" if np.mean(yearly_values) > 0 else "Negative"
+                            
+                            st.write(f"- **Trend**: {trend_direction}")
+                            st.write(f"- **Weekly Pattern**: Most positive on {max_weekly_day}")
+                            st.write(f"- **Seasonal Factor**: Currently {seasonal_factor}")
+                        except Exception as component_err:
+                            st.warning(f"Could not analyze forecast components: {str(component_err)}")
+                            
+    except Exception as e:
+        st.error(f"Error creating enhanced chart: {str(e)}")
+        # Fall back to simple chart
+        try:
+            st.line_chart(df['Close'])
+        except:
+            st.error("Unable to display chart. Please check your data.")
     
     col1, col2 = st.columns([1, 1])
     
