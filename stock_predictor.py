@@ -640,13 +640,19 @@ try:
         
         # Add forecast days control under the chart controls
         st.write("#### Chart Controls")
-        toggle_col1, toggle_col2, forecast_col = st.columns(3)
+        toggle_col1, toggle_col2, toggle_col3, toggle_col4, forecast_col = st.columns(5)
 
         with toggle_col1:
             show_sma20 = st.checkbox("Show 20-Day SMA", value=True)
 
         with toggle_col2:
             show_sma50 = st.checkbox("Show 50-Day SMA", value=True)
+            
+        with toggle_col3:
+            show_bb = st.checkbox("Show Bollinger Bands", value=False)
+            
+        with toggle_col4:
+            show_indicators = st.checkbox("Show RSI/MACD", value=False)
 
         with forecast_col:
             forecast_days = st.slider("Forecast Horizon (Days)", min_value=7, max_value=365, value=30, step=1)
@@ -655,8 +661,41 @@ try:
         with st.spinner("Generating forecast..."):
             forecast = forecast_with_prophet(df, forecast_days=forecast_days)
             
+            # Calculate Bollinger Bands
+            if show_bb and len(df) >= 20:
+                ma20 = df['Close'].rolling(window=20).mean()
+                std20 = df['Close'].rolling(window=20).std()
+                df['BB_upper'] = ma20 + (std20 * 2)
+                df['BB_lower'] = ma20 - (std20 * 2)
+                df['BB_middle'] = ma20
+            
+            # Calculate RSI and MACD if needed
+            if show_indicators:
+                # Calculate RSI
+                delta = df['Close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                df['RSI'] = 100 - (100 / (1 + rs))
+                
+                # Calculate MACD
+                df['EMA12'] = df['Close'].ewm(span=12, adjust=False).mean()
+                df['EMA26'] = df['Close'].ewm(span=26, adjust=False).mean()
+                df['MACD'] = df['EMA12'] - df['EMA26']
+                df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+            
             # Create plotly figure
-            fig = make_subplots(specs=[[{"secondary_y": False}]])
+            if show_indicators:
+                # Create subplot with price and indicators
+                fig = make_subplots(rows=3, cols=1, 
+                                   shared_xaxes=True, 
+                                   vertical_spacing=0.05,
+                                   row_heights=[0.6, 0.2, 0.2],
+                                   specs=[[{"secondary_y": False}],
+                                          [{"secondary_y": False}],
+                                          [{"secondary_y": False}]])
+            else:
+                fig = make_subplots(specs=[[{"secondary_y": False}]])
             
             # Add Close price (always shown)
             fig.add_trace(
@@ -671,6 +710,58 @@ try:
             if 'SMA_50' in plot_data.columns and show_sma50:
                 fig.add_trace(
                     go.Scatter(x=plot_data.index, y=plot_data['SMA_50'], name="50-Day SMA", line=dict(color="green"))
+                )
+            
+            # Add Bollinger Bands if enabled
+            if show_bb and 'BB_upper' in df.columns:
+                fig.add_trace(
+                    go.Scatter(x=df.index, y=df['BB_upper'], name="BB Upper", line=dict(color="purple", width=1, dash='dash'))
+                )
+                fig.add_trace(
+                    go.Scatter(x=df.index, y=df['BB_lower'], name="BB Lower", 
+                              line=dict(color="purple", width=1, dash='dash'),
+                              fill='tonexty', fillcolor='rgba(128, 0, 128, 0.1)')
+                )
+            
+            # Add RSI and MACD if enabled
+            if show_indicators and 'RSI' in df.columns and 'MACD' in df.columns:
+                # Add RSI trace to second subplot
+                fig.add_trace(
+                    go.Scatter(x=df.index, y=df['RSI'], name="RSI", line=dict(color="orange")),
+                    row=2, col=1
+                )
+                
+                # Add reference lines for RSI
+                fig.add_trace(
+                    go.Scatter(x=[df.index[0], df.index[-1]], y=[70, 70], 
+                              name="Overbought", line=dict(color="red", width=1, dash='dash'),
+                              showlegend=False),
+                    row=2, col=1
+                )
+                
+                fig.add_trace(
+                    go.Scatter(x=[df.index[0], df.index[-1]], y=[30, 30], 
+                              name="Oversold", line=dict(color="green", width=1, dash='dash'),
+                              showlegend=False),
+                    row=2, col=1
+                )
+                
+                # Add MACD traces to third subplot
+                fig.add_trace(
+                    go.Scatter(x=df.index, y=df['MACD'], name="MACD", line=dict(color="blue")),
+                    row=3, col=1
+                )
+                
+                fig.add_trace(
+                    go.Scatter(x=df.index, y=df['Signal'], name="Signal", line=dict(color="red")),
+                    row=3, col=1
+                )
+                
+                # Add MACD histogram
+                fig.add_trace(
+                    go.Bar(x=df.index, y=df['MACD']-df['Signal'], name="Histogram", 
+                          marker=dict(color='rgba(0,0,255,0.5)')),
+                    row=3, col=1
                 )
             
             # Always add forecast if valid
@@ -726,26 +817,54 @@ try:
                 except Exception as forecast_trace_err:
                     st.warning(f"Could not add forecast to chart: {str(forecast_trace_err)}")
             
-            fig.update_layout(
-                title=f"{symbol} Stock Price with Forecast",
-                xaxis_title="Date",
-                yaxis_title="Price ($)",
-                hovermode="x unified",
-                legend=dict(y=0.99, x=0.01, orientation="h"),
-                template="plotly_white",
-                autosize=True,
-                height=500,
-                margin=dict(l=50, r=50, t=80, b=50),
-                xaxis=dict(
-                    autorange=True,
-                    rangeslider=dict(visible=False)
-                ),
-                yaxis=dict(
-                    autorange=True,
-                    fixedrange=False
-                ),
-                dragmode='pan'  # Set default drag mode to pan instead of select
-            )
+            # Update layout for both chart types
+            title = f"{symbol} Stock Price with Forecast"
+            if show_indicators:
+                # Add titles for subplots
+                fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+                fig.update_yaxes(title_text="RSI", row=2, col=1)
+                fig.update_yaxes(title_text="MACD", row=3, col=1)
+                
+                fig.update_layout(
+                    title=title,
+                    xaxis_title="Date",
+                    hovermode="x unified",
+                    legend=dict(y=0.99, x=0.01, orientation="h"),
+                    template="plotly_white",
+                    autosize=True,
+                    height=700,  # Increase height for multiple subplots
+                    margin=dict(l=50, r=50, t=80, b=50),
+                    xaxis=dict(
+                        autorange=True,
+                        rangeslider=dict(visible=False)
+                    ),
+                    yaxis=dict(
+                        autorange=True,
+                        fixedrange=False
+                    ),
+                    dragmode='pan'
+                )
+            else:
+                fig.update_layout(
+                    title=title,
+                    xaxis_title="Date",
+                    yaxis_title="Price ($)",
+                    hovermode="x unified",
+                    legend=dict(y=0.99, x=0.01, orientation="h"),
+                    template="plotly_white",
+                    autosize=True,
+                    height=500,
+                    margin=dict(l=50, r=50, t=80, b=50),
+                    xaxis=dict(
+                        autorange=True,
+                        rangeslider=dict(visible=False)
+                    ),
+                    yaxis=dict(
+                        autorange=True,
+                        fixedrange=False
+                    ),
+                    dragmode='pan'
+                )
             
             # Update the chart configuration to fix zoom toggle issues
             st.plotly_chart(fig, use_container_width=True, config={
