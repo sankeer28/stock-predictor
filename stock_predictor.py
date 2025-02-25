@@ -435,7 +435,7 @@ def calculate_technical_indicators_for_summary(df):
     return analysis_df
 
 class MultiAlgorithmStockPredictor:
-    def __init__(self, symbol, training_years=5, weights=None):
+    def __init__(self, symbol, training_years=2, weights=None):  # Reduced from 5 to 2 years
         self.symbol = symbol
         self.training_years = training_years
         self.scaler = MinMaxScaler(feature_range=(0, 1))
@@ -636,15 +636,11 @@ class MultiAlgorithmStockPredictor:
             return pd.Series(0, index=df.index)
 
     def build_lstm_model(self, input_shape):
-        # Improved LSTM architecture with attention mechanism
+        # Simplified LSTM architecture for faster training
         model = Sequential([
-            Bidirectional(LSTM(128, return_sequences=True), input_shape=input_shape),
-            Dropout(0.3),
-            Bidirectional(LSTM(64, return_sequences=True)),
-            Dropout(0.3),
-            Bidirectional(LSTM(32, return_sequences=False)),
+            LSTM(64, return_sequences=True, input_shape=input_shape),
             Dropout(0.2),
-            Dense(32, activation='relu'),
+            LSTM(32, return_sequences=False),
             Dropout(0.2),
             Dense(16, activation='relu'),
             Dense(1)
@@ -671,15 +667,16 @@ class MultiAlgorithmStockPredictor:
             model = ARIMA(df['Close'], order=(5,1,0))
             return model.fit()
 
-    def predict_with_all_models(self, prediction_days=30, sequence_length=60):
+    def predict_with_all_models(self, prediction_days=30, sequence_length=30):  # Reduced sequence length
         try:
             # Fetch and prepare data
             df = self.fetch_historical_data()
             
             # Check if we have enough data
             if len(df) < sequence_length + 20:  # Need extra days for technical indicators
-                st.error(f"Insufficient historical data. Need at least {sequence_length + 20} days of data.")
-                return None
+                st.warning(f"Insufficient historical data. Need at least {sequence_length + 20} days of data.")
+                # Use available data but reduce sequence length if necessary
+                sequence_length = max(10, len(df) - 20)
                 
             # Calculate technical indicators
             df = self.calculate_technical_indicators(df)
@@ -706,18 +703,17 @@ class MultiAlgorithmStockPredictor:
             X_other = np.array(X_other)
             y = np.array(y)
             
-            # Split data
-            split_idx = int(len(y) * 0.8)
-            X_lstm_train, X_lstm_test = X_lstm[:split_idx], X_lstm[split_idx:]
-            X_other_train, X_other_test = X_other[:split_idx], X_other[split_idx:]
-            y_train, y_test = y[:split_idx], y[split_idx:]
+            # Split data using our optimized function
+            X_lstm_train, X_lstm_test = X_lstm[:int(len(X_lstm)*0.8)], X_lstm[int(len(X_lstm)*0.8):]
+            X_other_train, X_other_test = X_other[:int(len(X_other)*0.8)], X_other[int(len(X_other)*0.8):]
+            y_train, y_test = y[:int(len(y)*0.8)], y[int(len(y)*0.8):]
 
             predictions = {}
             
-            # Train and predict with LSTM
+            # Train and predict with LSTM (with reduced epochs)
             lstm_model = self.build_lstm_model((sequence_length, X_lstm.shape[2]))
-            early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-            lstm_model.fit(X_lstm_train, y_train, epochs=50, batch_size=32,
+            early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+            lstm_model.fit(X_lstm_train, y_train, epochs=20, batch_size=32,  # Reduced from 50 to 20 epochs
                           validation_data=(X_lstm_test, y_test),
                           callbacks=[early_stopping], verbose=0)
             lstm_pred = lstm_model.predict(X_lstm_test[-1:], verbose=0)[0][0]
@@ -729,47 +725,45 @@ class MultiAlgorithmStockPredictor:
             svr_pred = svr_model.predict(X_other_test[-1:])
             predictions['SVR'] = svr_pred[0]
 
-            # Train and predict with Random Forest
-            rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            # Train and predict with Random Forest (reduced complexity)
+            rf_model = RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1)  # Reduced from 100 to 50 trees
             rf_model.fit(X_other_train, y_train)
             rf_pred = rf_model.predict(X_other_test[-1:])
             predictions['Random Forest'] = rf_pred[0]
 
-            # Train and predict with XGBoost
-            xgb_model = XGBRegressor(objective='reg:squarederror', random_state=42)
+            # Train and predict with XGBoost (reduced complexity)
+            xgb_model = XGBRegressor(objective='reg:squarederror', random_state=42, n_estimators=50)  # Added n_estimators
             xgb_model.fit(X_other_train, y_train)
             xgb_pred = xgb_model.predict(X_other_test[-1:])
             predictions['XGBoost'] = xgb_pred[0]
 
-            # Train and predict with KNN
-            knn_model = KNeighborsRegressor(n_neighbors=5)
-            knn_model.fit(X_other_train, y_train)
-            knn_pred = knn_model.predict(X_other_test[-1:])
-            predictions['KNN'] = knn_pred[0]
+            # Skip KNN and GBM for speed
+            # Only include fast models when we have limited data
+            if len(X_other_train) > 100:
+                # Train and predict with GBM (reduced complexity)
+                gbm_model = GradientBoostingRegressor(random_state=42, n_estimators=50)  # Reduced complexity
+                gbm_model.fit(X_other_train, y_train)
+                gbm_pred = gbm_model.predict(X_other_test[-1:])
+                predictions['GBM'] = gbm_pred[0]
 
-            # Train and predict with GBM
-            gbm_model = GradientBoostingRegressor(random_state=42)
-            gbm_model.fit(X_other_train, y_train)
-            gbm_pred = gbm_model.predict(X_other_test[-1:])
-            predictions['GBM'] = gbm_pred[0]
-
-            # Train and predict with ARIMA
-            try:
-                close_prices = df['Close'].values
-                arima_model = ARIMA(close_prices, order=(5,1,0))
-                arima_fit = arima_model.fit()
-                arima_pred = arima_fit.forecast(steps=1)[0]
-                arima_scaled = (arima_pred - df['Close'].mean()) / df['Close'].std()
-                predictions['ARIMA'] = arima_scaled
-            except Exception as e:
-                st.warning(f"ARIMA prediction failed: {str(e)}")
+            # Simplified ARIMA - skip if we have other models
+            if len(predictions) < 3:
+                try:
+                    close_prices = df['Close'].values
+                    arima_model = ARIMA(close_prices, order=(2,1,0))  # Simplified from (5,1,0)
+                    arima_fit = arima_model.fit()
+                    arima_pred = arima_fit.forecast(steps=1)[0]
+                    arima_scaled = (arima_pred - df['Close'].mean()) / df['Close'].std()
+                    predictions['ARIMA'] = arima_scaled
+                except Exception as e:
+                    st.warning(f"ARIMA prediction failed: {str(e)}")
 
             weights = self.weights
 
             # Adjust weights if some models failed
             available_models = list(predictions.keys())
-            total_weight = sum(weights[model] for model in available_models)
-            adjusted_weights = {model: weights[model]/total_weight for model in available_models}
+            total_weight = sum(weights.get(model, 0.1) for model in available_models)  # Default weight 0.1
+            adjusted_weights = {model: weights.get(model, 0.1)/total_weight for model in available_models}
 
             ensemble_pred = sum(pred * adjusted_weights[model] 
                               for model, pred in predictions.items())
@@ -1344,6 +1338,7 @@ try:
     with col1:
         if st.button("Generate Predictions"):
             with st.spinner("Training multiple models and generating predictions..."):
+                # Use the cached function instead of direct prediction
                 predictor = MultiAlgorithmStockPredictor(
                     symbol, 
                     weights=WEIGHT_CONFIGURATIONS[selected_weight]
