@@ -2,9 +2,7 @@
 
 ## 🚀 Overview
 The Multi-Algorithm Stock Predictor is an advanced stock price prediction system that leverages multiple machine learning algorithms and technical indicators to generate ensemble predictions for stock market movements. Built with Streamlit, this application combines seven different prediction models, technical analysis, and real-time news sentiment to provide comprehensive trading insights.
-
 ## ⚠️Stock price prediction is inherently difficult and no model can consistently predict market movements accurately
-## ⚠️Weight configs for models need significant tweaks
 #### Example
 
 ![Multi-Algorithm Stock Predictor 1 of 5](https://github.com/user-attachments/assets/1d2dc92d-cb80-41ca-a97e-626add935d31)
@@ -38,77 +36,7 @@ The Multi-Algorithm Stock Predictor is an advanced stock price prediction system
    - Weekly pattern information showing which day of the week historically performs best
    - Seasonal factor analysis
 
-## 🤖 Prediction Models
-The system employs seven different prediction models, each with its own strengths:
-
-1. **LSTM (Long Short-Term Memory)** - Weight: 30%
-   - Specializes in identifying long-term patterns and dependencies
-   - Uses bidirectional layers for enhanced sequence learning
-   - Best for capturing complex market dynamics
-   - Most effective for 1-7 day predictions
-
-2. **XGBoost** - Weight: 15%
-   - Excellent for handling non-linear relationships
-   - Strong performance with technical indicators
-   - Robust against overfitting
-   - Optimal for 1-5 day predictions
-
-3. **Random Forest** - Weight: 15%
-   - Great for handling market volatility
-   - Resistant to outliers
-   - Good for capturing market regime changes
-   - Best for 1-3 day predictions
-
-4. **ARIMA** - Weight: 10%
-   - Specialized in time series forecasting
-   - Captures seasonal patterns
-   - Strong with trend-following markets
-   - Effective for 1-5 day predictions
-
-5. **SVR (Support Vector Regression)** - Weight: 10%
-   - Effective for non-linear price movements
-   - Good at handling high-dimensional data
-   - Robust against noise
-   - Best for 1-3 day predictions
-
-6. **GBM (Gradient Boosting Machine)** - Weight: 10%
-   - Strong performance with feature interactions
-   - Good at capturing market momentum
-   - Handles missing data well
-   - Optimal for 1-3 day predictions
-
-7. **KNN (K-Nearest Neighbors)** - Weight: 10%
-   - Simple but effective for similar pattern recognition
-   - Good for sideways markets
-   - Pattern-based predictions
-   - Best for 1-2 day predictions
-
-## 📊 Technical Indicators
-The system calculates and utilizes multiple technical indicators:
-- Moving Averages (5, 20, 50, 200 days)
-- RSI (Relative Strength Index)
-- MACD (Moving Average Convergence Divergence)
-- Bollinger Bands
-- ROC (Rate of Change)
-- ATR (Average True Range)
-- Stochastic Oscillator
-- Williams %R
-- Volume Analysis
-- EMA (Exponential Moving Average)
-- Momentum Indicators
-
-## 🎯 Prediction Accuracy
-- Short-term (1-3 days): 65-75% directional accuracy
-- Medium-term (4-7 days): 60-70% directional accuracy
-- Long-term (8+ days): 55-65% directional accuracy
-
 Note: Accuracy varies based on market conditions, volatility, and the specific stock being analyzed.
-
-## ⚡ Performance Considerations
-- Best suited for liquid stocks with high trading volume
-- More accurate during normal market conditions vs extreme volatility
-- Higher accuracy for large-cap stocks vs small-cap stocks
-- Performance improves with longer training periods (recommended: 5+ years of historical data)
 
 ## 🛠️ Setup and Installation
 
