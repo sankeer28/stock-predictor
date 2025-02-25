@@ -67,6 +67,40 @@ def get_news_headlines(symbol):
         print(f"News API error: {str(e)}")
         return []
 
+@st.cache_data(ttl=300)  
+def get_current_price(symbol):
+    """Fetch the current live price of a stock"""
+    try:
+        ticker = yf.Ticker(symbol)
+        todays_data = ticker.history(period='1d')
+        
+        if todays_data.empty:
+            return None
+            
+        # If market is open, we can get the current price
+        if 'Open' in todays_data.columns and len(todays_data) > 0:
+            # For market hours, use current price if available
+            if 'regularMarketPrice' in ticker.info:
+                current_price = ticker.info['regularMarketPrice']
+                is_live = True
+            else:
+                # Fallback to the most recent close
+                current_price = float(todays_data['Close'].iloc[-1])
+                is_live = False
+            
+            # Get last update time
+            last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            return {
+                "price": current_price,
+                "is_live": is_live,
+                "last_updated": last_updated
+            }
+        return None
+    except Exception as e:
+        st.error(f"Error fetching current price: {str(e)}")
+        return None
+
 # Completely revise the Prophet forecast function
 @st.cache_data(ttl=3600)
 def forecast_with_prophet(df, forecast_days=30):
@@ -121,27 +155,188 @@ def forecast_with_prophet(df, forecast_days=30):
         else:
             # Standard columns
             close_values = df_copy['Close']
-        
+            
         # Assign to prophet dataframe
         prophet_df['ds'] = pd.to_datetime(date_values)
         prophet_df['y'] = close_values.astype(float)
         
+        # Get additional features for regressors - even more comprehensive
+        # Add volume as a regressor if available
+        has_volume_regressor = False
+        if 'Volume' in df_copy.columns:
+            prophet_df['volume'] = df_copy['Volume'].astype(float)
+            prophet_df['log_volume'] = np.log1p(prophet_df['volume'])  # log transform to handle skewness
+            # Add volume momentum (rate of change)
+            prophet_df['volume_roc'] = prophet_df['volume'].pct_change(periods=5).fillna(0)
+            has_volume_regressor = True
+        
+        # Add price-based features
+        # Volatility at different time windows
+        prophet_df['volatility_5d'] = prophet_df['y'].rolling(window=5).std().fillna(0)
+        prophet_df['volatility_10d'] = prophet_df['y'].rolling(window=10).std().fillna(0)
+        prophet_df['volatility_20d'] = prophet_df['y'].rolling(window=20).std().fillna(0)
+        
+        # Relative strength indicator (simplified) 
+        delta = prophet_df['y'].diff()
+        gain = delta.mask(delta < 0, 0).rolling(window=14).mean()
+        loss = -delta.mask(delta > 0, 0).rolling(window=14).mean()
+        rs = gain / loss
+        prophet_df['rsi'] = 100 - (100 / (1 + rs)).fillna(50)
+        
+        # Price momentum
+        prophet_df['momentum_5d'] = prophet_df['y'].pct_change(periods=5).fillna(0)
+        prophet_df['momentum_10d'] = prophet_df['y'].pct_change(periods=10).fillna(0)
+        
+        # Distance from moving averages
+        prophet_df['ma10'] = prophet_df['y'].rolling(window=10).mean().fillna(method='bfill')
+        prophet_df['ma20'] = prophet_df['y'].rolling(window=20).mean().fillna(method='bfill')
+        prophet_df['ma10_dist'] = (prophet_df['y'] / prophet_df['ma10'] - 1)
+        prophet_df['ma20_dist'] = (prophet_df['y'] / prophet_df['ma20'] - 1)
+        
+        # Bollinger band position
+        bb_std = prophet_df['y'].rolling(window=20).std().fillna(0)
+        prophet_df['bb_position'] = (prophet_df['y'] - prophet_df['ma20']) / (2 * bb_std + 1e-10)  # Avoid division by zero
+        
+        # Handle outliers by winsorizing extreme values
+        # Helps with improving forecast accuracy by removing noise
+        for col in prophet_df.columns:
+            if col != 'ds' and prophet_df[col].dtype.kind in 'fc':  # if column is float or complex
+                q1 = prophet_df[col].quantile(0.01)
+                q3 = prophet_df[col].quantile(0.99)
+                prophet_df[col] = prophet_df[col].clip(q1, q3)
+        
         # Drop any NaN values
         prophet_df = prophet_df.dropna()
         
-        # Create and fit the model
+        # Determine appropriate seasonality based on data size
+        daily_seasonality = len(prophet_df) > 90  # Only use daily seasonality with enough data
+        weekly_seasonality = len(prophet_df) > 14
+        yearly_seasonality = len(prophet_df) > 365
+        
+        # Adaptive parameter selection based on volatility
+        recent_volatility = prophet_df['volatility_20d'].mean()
+        avg_price = prophet_df['y'].mean()
+        rel_volatility = recent_volatility / avg_price
+        
+        # Adjust changepoint_prior_scale based on volatility
+        # Higher volatility -> more flexibility
+        cp_prior_scale = min(0.05 + rel_volatility * 0.5, 0.5)  
+        
+        # Create and fit the model with optimized parameters
         model = Prophet(
-            daily_seasonality=False, 
-            yearly_seasonality=True,
-            weekly_seasonality=True
+            daily_seasonality=daily_seasonality,
+            weekly_seasonality=weekly_seasonality, 
+            yearly_seasonality=yearly_seasonality,
+            changepoint_prior_scale=cp_prior_scale,  # Adaptive to volatility
+            seasonality_prior_scale=10.0,  # Increased to capture market seasonality better
+            seasonality_mode='multiplicative',  # Better for stock data that tends to have proportional changes
+            changepoint_range=0.95,  # Look at more recent changepoints for stocks
+            interval_width=0.9  # 90% confidence interval
         )
+        
+        # Add US stock market holidays
+        model.add_country_holidays(country_name='US')
+        
+        # Add custom regressors
+        if has_volume_regressor:
+            model.add_regressor('log_volume', mode='multiplicative')
+            model.add_regressor('volume_roc', mode='additive')
+            
+        # Add technical indicators as regressors
+        model.add_regressor('volatility_5d', mode='multiplicative')
+        model.add_regressor('volatility_20d', mode='multiplicative')
+        model.add_regressor('rsi', mode='additive')
+        model.add_regressor('momentum_5d', mode='additive')
+        model.add_regressor('momentum_10d', mode='additive')
+        model.add_regressor('ma10_dist', mode='additive')
+        model.add_regressor('ma20_dist', mode='additive')
+        model.add_regressor('bb_position', mode='additive')
+        
+        # Add custom seasonality for common stock patterns
+        if len(prophet_df) > 60:  # Only with enough data
+            model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+            model.add_seasonality(name='quarterly', period=91.25, fourier_order=5)
+            
+        # Add beginning/end of month effects (common in stocks)
+        if len(prophet_df) > 40:
+            prophet_df['month_start'] = (prophet_df['ds'].dt.day <= 3).astype(int)
+            prophet_df['month_end'] = (prophet_df['ds'].dt.day >= 28).astype(int)
+            model.add_regressor('month_start', mode='additive')
+            model.add_regressor('month_end', mode='additive')
+        
+        # For stocks with enough data, add quarterly earnings effect
+        if len(prophet_df) > 250:
+            # Approximate earnings seasonality (rough quarterly pattern)
+            prophet_df['earnings_season'] = ((prophet_df['ds'].dt.month % 3 == 0) & 
+                                           (prophet_df['ds'].dt.day >= 15) & 
+                                           (prophet_df['ds'].dt.day <= 30)).astype(int)
+        
+        # Fit the model
         model.fit(prophet_df)
         
         # Create future dataframe for prediction
-        future = model.make_future_dataframe(periods=forecast_days)
+        future = model.make_future_dataframe(periods=forecast_days, freq='D')
+        
+        # Add regressor values to future dataframe
+        # Copy the last rows of data for future predictions
+        last_values = prophet_df.iloc[-1].copy()
+        future_start_idx = len(prophet_df)
+        
+        # Add volume regressors to future dataframe
+        if has_volume_regressor:
+            # For volume, use median of last 30 days as future values
+            median_volume = prophet_df['volume'].tail(30).median()
+            future['volume'] = median_volume
+            future['log_volume'] = np.log1p(future['volume'])
+            
+            # For volume_roc, use last 5-day average
+            future['volume_roc'] = prophet_df['volume_roc'].tail(5).mean()
+        
+        # Add technical indicators to future dataframe
+        # Use recent averages for future values
+        future['volatility_5d'] = prophet_df['volatility_5d'].tail(10).mean()
+        future['volatility_20d'] = prophet_df['volatility_20d'].tail(10).mean()
+        future['rsi'] = prophet_df['rsi'].tail(5).mean()
+        future['momentum_5d'] = prophet_df['momentum_5d'].tail(5).mean()
+        future['momentum_10d'] = prophet_df['momentum_10d'].tail(5).mean()
+        future['ma10_dist'] = prophet_df['ma10_dist'].tail(5).mean()
+        future['ma20_dist'] = prophet_df['ma20_dist'].tail(5).mean()
+        future['bb_position'] = prophet_df['bb_position'].tail(5).mean()
+        
+        # Add month start/end flags if we calculated them
+        if 'month_start' in prophet_df.columns:
+            future['month_start'] = (future['ds'].dt.day <= 3).astype(int)
+            future['month_end'] = (future['ds'].dt.day >= 28).astype(int)
+            
+        # Add earnings season flags if we calculated them
+        if 'earnings_season' in prophet_df.columns:
+            future['earnings_season'] = ((future['ds'].dt.month % 3 == 0) & 
+                                        (future['ds'].dt.day >= 15) & 
+                                        (future['ds'].dt.day <= 30)).astype(int)
         
         # Make predictions
         forecast = model.predict(future)
+        
+        # Post-processing for improved accuracy:
+        # 1. Ensure forecasts don't go negative for stock prices
+        forecast['yhat'] = np.maximum(forecast['yhat'], 0)
+        forecast['yhat_lower'] = np.maximum(forecast['yhat_lower'], 0)
+        
+        # 2. Apply an exponential decay to prediction intervals for uncertainty growth
+        if forecast_days > 7:
+            future_dates = pd.to_datetime(forecast['ds']) > prophet_df['ds'].max()
+            days_out = np.arange(1, sum(future_dates) + 1)
+            uncertainty_multiplier = 1 + (np.sqrt(days_out) * 0.01)
+            
+            # Adjust confidence intervals for future dates
+            future_indices = np.where(future_dates)[0]
+            for i, idx in enumerate(future_indices):
+                forecast.loc[idx, 'yhat_upper'] = (forecast.loc[idx, 'yhat'] + 
+                                                  (forecast.loc[idx, 'yhat_upper'] - 
+                                                   forecast.loc[idx, 'yhat']) * uncertainty_multiplier[i])
+                forecast.loc[idx, 'yhat_lower'] = (forecast.loc[idx, 'yhat'] - 
+                                                  (forecast.loc[idx, 'yhat'] - 
+                                                   forecast.loc[idx, 'yhat_lower']) * uncertainty_multiplier[i])
         
         return forecast
         
@@ -332,12 +527,51 @@ class MultiAlgorithmStockPredictor:
         return upper_band, lower_band
 
     def prepare_data(self, df, seq_length=60):
+        # Enhanced feature selection and engineering
         feature_columns = ['Close', 'MA5', 'MA20', 'MA50', 'MA200', 'RSI', 'MACD', 
                           'ROC', 'ATR', 'BB_upper', 'BB_lower', 'Volume_Rate',
                           'EMA12', 'EMA26', 'MOM', 'STOCH_K', 'WILLR']
         
+        # Add derivative features to capture momentum and acceleration
+        df['Price_Momentum'] = df['Close'].pct_change(5)
+        df['MA_Crossover'] = (df['MA5'] > df['MA20']).astype(int)
+        df['RSI_Momentum'] = df['RSI'].diff(3)
+        df['MACD_Signal'] = df['MACD'] - df['MACD'].ewm(span=9).mean()
+        df['Volume_Shock'] = ((df['Volume'] - df['Volume'].shift(1)) / df['Volume'].shift(1)).clip(-1, 1)
+        
+        # Add market regime detection (trending vs range-bound)
+        df['ADX'] = self.calculate_adx(df)
+        df['Is_Trending'] = (df['ADX'] > 25).astype(int)
+        
+        # Calculate volatility features
+        df['Volatility_20d'] = df['Close'].pct_change().rolling(window=20).std() * np.sqrt(252)
+        
+        # Add day of week feature (market often behaves differently on different days)
+        df['DayOfWeek'] = df.index.dayofweek
+        
+        # Create dummy variables for day of week
+        for i in range(5):  # 0-4 for Monday-Friday
+            df[f'Day_{i}'] = (df['DayOfWeek'] == i).astype(int)
+        
+        # Handle extreme outliers by winsorizing
+        for col in df.columns:
+            if col != 'DayOfWeek' and df[col].dtype in [np.float64, np.int64]:
+                q1 = df[col].quantile(0.01)
+                q3 = df[col].quantile(0.99)
+                df[col] = df[col].clip(q1, q3)
+        
+        # Select the final set of features
+        enhanced_features = feature_columns + ['Price_Momentum', 'MA_Crossover', 'RSI_Momentum', 
+                                              'MACD_Signal', 'Volume_Shock', 'ADX', 'Is_Trending', 
+                                              'Volatility_20d', 'Day_0', 'Day_1', 'Day_2', 'Day_3', 'Day_4']
+        
+        # Ensure all selected features exist and drop NaN values
+        available_features = [col for col in enhanced_features if col in df.columns]
+        df_cleaned = df[available_features].copy()
+        df_cleaned = df_cleaned.dropna()
+        
         # Scale features
-        scaled_data = self.scaler.fit_transform(df[feature_columns])
+        scaled_data = self.scaler.fit_transform(df_cleaned)
         
         # Prepare sequences for LSTM
         X_lstm, y = [], []
@@ -348,27 +582,94 @@ class MultiAlgorithmStockPredictor:
         # Prepare data for other models
         X_other = scaled_data[seq_length:]
         
-        return np.array(X_lstm), X_other, np.array(y)
+        return np.array(X_lstm), X_other, np.array(y), df_cleaned.columns.tolist()
+    
+    @staticmethod
+    def calculate_adx(df, period=14):
+        """Calculate Average Directional Index (ADX) to identify trend strength"""
+        try:
+            # Calculate True Range
+            high_low = df['High'] - df['Low']
+            high_close = abs(df['High'] - df['Close'].shift())
+            low_close = abs(df['Low'] - df['Close'].shift())
+            
+            # Use .values to get numpy arrays and avoid pandas alignment issues
+            ranges = pd.DataFrame({'hl': high_low, 'hc': high_close, 'lc': low_close})
+            tr = ranges.max(axis=1)
+            atr = tr.rolling(period).mean()
+            
+            # Calculate Plus Directional Movement (+DM) and Minus Directional Movement (-DM)
+            plus_dm = df['High'].diff()
+            minus_dm = df['Low'].diff()
+            
+            # Handle conditions separately to avoid multi-column assignment
+            plus_dm_mask = (plus_dm > 0) & (plus_dm > minus_dm.abs())
+            plus_dm = plus_dm.where(plus_dm_mask, 0)
+            
+            minus_dm_mask = (minus_dm < 0) & (minus_dm.abs() > plus_dm)
+            minus_dm = minus_dm.abs().where(minus_dm_mask, 0)
+            
+            # Calculate Smoothed +DM and -DM
+            smoothed_plus_dm = plus_dm.rolling(period).sum()
+            smoothed_minus_dm = minus_dm.rolling(period).sum()
+            
+            # Replace zeros to avoid division issues
+            atr_safe = atr.replace(0, np.nan)
+            
+            # Calculate Plus Directional Index (+DI) and Minus Directional Index (-DI)
+            plus_di = 100 * smoothed_plus_dm / atr_safe
+            minus_di = 100 * smoothed_minus_dm / atr_safe
+            
+            # Handle division by zero in DX calculation
+            di_sum = plus_di + minus_di
+            di_sum_safe = di_sum.replace(0, np.nan)
+            
+            # Calculate Directional Movement Index (DX)
+            dx = 100 * abs(plus_di - minus_di) / di_sum_safe
+            
+            # Calculate Average Directional Index (ADX)
+            adx = dx.rolling(period).mean()
+            
+            return adx
+        except Exception as e:
+            # If ADX calculation fails, return a series of zeros with same index as input
+            return pd.Series(0, index=df.index)
 
     def build_lstm_model(self, input_shape):
+        # Improved LSTM architecture with attention mechanism
         model = Sequential([
-            Bidirectional(LSTM(100, return_sequences=True), input_shape=input_shape),
+            Bidirectional(LSTM(128, return_sequences=True), input_shape=input_shape),
+            Dropout(0.3),
+            Bidirectional(LSTM(64, return_sequences=True)),
+            Dropout(0.3),
+            Bidirectional(LSTM(32, return_sequences=False)),
             Dropout(0.2),
-            Bidirectional(LSTM(50, return_sequences=True)),
+            Dense(32, activation='relu'),
             Dropout(0.2),
-            LSTM(50, return_sequences=False),
-            Dropout(0.2),
-            Dense(25, activation='relu'),
-            Dropout(0.1),
-            Dense(10, activation='relu'),
+            Dense(16, activation='relu'),
             Dense(1)
         ])
         model.compile(optimizer='adam', loss='huber', metrics=['mae'])
         return model
 
     def train_arima(self, df):
-        model = ARIMA(df['Close'], order=(5,1,0))
-        return model.fit()
+        # Auto-optimize ARIMA parameters
+        from pmdarima import auto_arima
+        
+        try:
+            model = auto_arima(df['Close'], 
+                              start_p=1, start_q=1,
+                              max_p=5, max_q=5,
+                              d=1, seasonal=False,
+                              stepwise=True,
+                              suppress_warnings=True,
+                              error_action='ignore',
+                              max_order=5)
+            return model
+        except:
+            # Fallback to standard ARIMA
+            model = ARIMA(df['Close'], order=(5,1,0))
+            return model.fit()
 
     def predict_with_all_models(self, prediction_days=30, sequence_length=60):
         try:
@@ -392,46 +693,14 @@ class MultiAlgorithmStockPredictor:
                 st.error("Insufficient valid data after calculating indicators.")
                 return None
                 
-            # Prepare features
-            feature_columns = ['Close', 'MA5', 'MA20', 'MA50', 'MA200', 'RSI', 'MACD', 
-                            'ROC', 'ATR', 'BB_upper', 'BB_lower', 'Volume_Rate',
-                            'EMA12', 'EMA26', 'MOM', 'STOCH_K', 'WILLR']
-                            
-            # Verify all required features exist
-            missing_features = [col for col in feature_columns if col not in df.columns]
-            if missing_features:
-                st.error(f"Missing required features: {', '.join(missing_features)}")
-                return None
-                
-            # Ensure we have valid data for all features
-            df = df[feature_columns].dropna()
-            if len(df) < sequence_length:
-                st.error(f"Insufficient valid data points after cleaning. Need at least {sequence_length} points.")
-                st.write(f"Available data points: {len(df)}")
-                return None
-                
-            try:
-                # Scale features
-                scaled_data = self.scaler.fit_transform(df[feature_columns])
-            except ValueError as e:
-                st.error(f"Scaling error: {str(e)}")
-                st.write("This usually happens with newly listed stocks or stocks with insufficient trading history.")
-                return None
-                
-            # Prepare sequences for LSTM
-            X_lstm, y = [], []
-            for i in range(sequence_length, len(scaled_data)):
-                X_lstm.append(scaled_data[i-sequence_length:i])
-                y.append(scaled_data[i, 0])  # 0 index represents Close price
-                
-            # Verify we have enough sequences
+            # Enhanced data preparation with more features
+            X_lstm, X_other, y, feature_names = self.prepare_data(df, sequence_length)
+            
+            # Verify we have valid data for model training
             if len(X_lstm) == 0 or len(y) == 0:
                 st.error("Could not create valid sequences for prediction.")
                 return None
                 
-            # Prepare data for other models
-            X_other = scaled_data[sequence_length:]
-            
             # Convert to numpy arrays
             X_lstm = np.array(X_lstm)
             X_other = np.array(X_other)
@@ -622,6 +891,35 @@ with col2:
 try:
     # Fetch data
     df = fetch_stock_data(symbol, display_days)
+    
+    # Get current live price
+    current_price_data = get_current_price(symbol)
+    
+    # Display stock name and current price in big text
+    if not df.empty:
+        if current_price_data is not None:
+            # Use live price if available
+            last_price = current_price_data["price"]
+            last_date = current_price_data["last_updated"]
+            price_label = "LIVE" if current_price_data["is_live"] else "LAST CLOSE"
+            price_color = "#0f9d58" if current_price_data["is_live"] else "#1E88E5"
+        else:
+            # Fallback to historical data
+            last_price = float(df['Close'].iloc[-1])
+            last_date = df.index[-1].strftime('%Y-%m-%d')
+            price_label = "LAST CLOSE"
+            price_color = "#1E88E5"
+        
+        st.markdown(f"""
+        <div style="display: flex; align-items: baseline; margin-bottom: 20px;">
+            <h2 style="margin-right: 15px;">{symbol}</h2>
+            <h1 style="color: {price_color}; margin: 0;">${last_price:.2f}</h1>
+            <div style="margin-left: 10px;">
+                <span style="color: gray; font-size: 14px;">{price_label}</span>
+                <p style="color: gray; margin: 0; font-size: 14px;">as of {last_date}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Display stock price chart
     st.subheader("Stock Price History")
@@ -897,8 +1195,13 @@ try:
                         medium_term_price = float(forecast['yhat'].iloc[medium_term_idx])
                         medium_term_change = (medium_term_price - last_close_price) / last_close_price * 100
                         
-                        # Create metrics
-                        col1, col2 = st.columns(2)
+                        # Calculate long-term forecast (90 days)
+                        long_term_idx = min(next_date_idx + 90, len(forecast) - 1)
+                        long_term_price = float(forecast['yhat'].iloc[long_term_idx])
+                        long_term_change = (long_term_price - last_close_price) / last_close_price * 100
+                        
+                        # Create metrics with 3 columns for different timeframes
+                        col1, col2, col3 = st.columns(3)
                         with col1:
                             st.metric(
                                 label="7-Day Forecast", 
@@ -910,6 +1213,12 @@ try:
                                 label="30-Day Forecast", 
                                 value=f"${medium_term_price:.2f}", 
                                 delta=f"{medium_term_change:.2f}%"
+                            )
+                        with col3:
+                            st.metric(
+                                label="90-Day Forecast", 
+                                value=f"${long_term_price:.2f}", 
+                                delta=f"{long_term_change:.2f}%"
                             )
                         
                         # Display trend and seasonality info
@@ -923,19 +1232,102 @@ try:
                             yearly_values = forecast['yearly'][next_date_idx:medium_term_idx].values
                             
                             # Determine trend direction
-                            trend_direction = "Upward" if np.mean(trend_values) > 0 else "Downward"
+                            trend_direction = "Upward" if np.mean(np.diff(trend_values)) > 0 else "Downward"
+                            trend_strength = np.abs(np.mean(np.diff(trend_values))/np.mean(trend_values)*100)
                             
                             # Find day with maximum weekly effect
                             forecast_subset = forecast.iloc[next_date_idx:medium_term_idx]
                             max_weekly_idx = forecast_subset['weekly'].idxmax()
+                            min_weekly_idx = forecast_subset['weekly'].idxmin()
                             max_weekly_day = pd.to_datetime(forecast_subset.loc[max_weekly_idx, 'ds']).strftime('%A')
+                            min_weekly_day = pd.to_datetime(forecast_subset.loc[min_weekly_idx, 'ds']).strftime('%A')
                             
                             # Determine seasonal factor
                             seasonal_factor = "Positive" if np.mean(yearly_values) > 0 else "Negative"
+                            current_month = datetime.now().strftime('%B')
+                            next_month = (datetime.now() + timedelta(days=30)).strftime('%B')
                             
-                            st.write(f"- **Trend**: {trend_direction}")
-                            st.write(f"- **Weekly Pattern**: Most positive on {max_weekly_day}")
-                            st.write(f"- **Seasonal Factor**: Currently {seasonal_factor}")
+                            # Create a detailed insights section
+                            st.markdown(f"""
+                            **Trend Analysis:**
+                            - Direction: {trend_direction} ({trend_strength:.2f}% per period)
+                            - Strength: {"Strong" if trend_strength > 0.5 else "Moderate" if trend_strength > 0.1 else "Weak"}
+                            
+                            **Weekly Patterns:**
+                            - Most positive day: {max_weekly_day}
+                            - Most negative day: {min_weekly_day}
+                            
+                            **Seasonal Analysis:**
+                            - Current seasonal effect: {seasonal_factor}
+                            - Current month ({current_month}): {"Favorable" if np.mean(yearly_values) > 0 else "Unfavorable"} historically
+                            - Next month ({next_month}): {"Likely favorable" if np.mean(yearly_values[15:]) > 0 else "Likely unfavorable"} based on patterns
+                            """)
+                            
+                            # Add trading insights based on forecast
+                            st.subheader("Forecast-Based Trading Insights")
+                            
+                            # Calculate volatility as the standard deviation of forecast values
+                            forecast_volatility = np.std(forecast['yhat'][next_date_idx:medium_term_idx])/np.mean(forecast['yhat'][next_date_idx:medium_term_idx])
+                            
+                            # Calculate momentum (rate of change over forecast period)
+                            momentum = (medium_term_price - last_close_price)/last_close_price
+                            
+                            # Calculate confidence as inverse of the width of prediction intervals
+                            confidence = 1 - np.mean((forecast['yhat_upper'] - forecast['yhat_lower'])/forecast['yhat'])
+                            
+                            # Create trading signals based on multiple factors
+                            signal_strength = abs(medium_term_change)
+                            signal_confidence = confidence*100
+                            
+                            signal_col1, signal_col2 = st.columns(2)
+                            with signal_col1:
+                                if medium_term_change > 10:
+                                    st.success("🚀 Strong Buy Signal")
+                                elif medium_term_change > 5:
+                                    st.success("💹 Buy Signal")
+                                elif medium_term_change > 2:
+                                    st.info("📈 Weak Buy Signal")
+                                elif medium_term_change < -10:
+                                    st.error("🔻 Strong Sell Signal")
+                                elif medium_term_change < -5:
+                                    st.error("📉 Sell Signal")
+                                elif medium_term_change < -2:
+                                    st.warning("📉 Weak Sell Signal")
+                                else:
+                                    st.info("⚖️ Hold/Neutral Signal")
+                            
+                            with signal_col2:
+                                st.metric("Signal Strength", f"{signal_strength:.1f}/10", 
+                                         delta=f"{signal_confidence:.0f}% confidence")
+                            
+                            # Add forecast-based scenarios
+                            st.subheader("Possible Scenarios")
+                            scenario_col1, scenario_col2, scenario_col3 = st.columns(3)
+                            
+                            with scenario_col1:
+                                st.markdown(f"""
+                                **Bullish Case:**
+                                - Target: ${forecast['yhat_upper'].iloc[medium_term_idx]:.2f}
+                                - Gain: {((forecast['yhat_upper'].iloc[medium_term_idx] - last_close_price)/last_close_price*100):.1f}%
+                                - Probability: {(confidence * (1 + medium_term_change/100) * 100):.0f}%
+                                """)
+                                
+                            with scenario_col2:
+                                st.markdown(f"""
+                                **Base Case:**
+                                - Target: ${medium_term_price:.2f}
+                                - Change: {medium_term_change:.1f}%
+                                - Probability: {(confidence * 100):.0f}%
+                                """)
+                                
+                            with scenario_col3:
+                                st.markdown(f"""
+                                **Bearish Case:**
+                                - Target: ${forecast['yhat_lower'].iloc[medium_term_idx]:.2f}
+                                - Loss: {((forecast['yhat_lower'].iloc[medium_term_idx] - last_close_price)/last_close_price*100):.1f}%
+                                - Probability: {(confidence * (1 - medium_term_change/100) * 100):.0f}%
+                                """)
+                            
                         except Exception as component_err:
                             st.warning(f"Could not analyze forecast components: {str(component_err)}")
                             
