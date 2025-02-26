@@ -12,3 +12,5 @@ prophet
 plotly
 arch
 ta
+nltk
+textblob
