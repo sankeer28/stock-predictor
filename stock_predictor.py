@@ -20,8 +20,19 @@ from prophet import Prophet
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.linear_model import LinearRegression
+from textblob import TextBlob
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+import re
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
+# Download required NLTK data (add near other initialization code)
+try:
+    nltk.data.find('vader_lexicon')
+except LookupError:
+    nltk.download('vader_lexicon')
+    nltk.download('punkt')
 
 st.set_page_config(page_title="Multi-Algorithm Stock Predictor", layout="wide")
 st.markdown(
@@ -100,6 +111,134 @@ def get_current_price(symbol):
     except Exception as e:
         st.error(f"Error fetching current price: {str(e)}")
         return None
+
+@st.cache_data(ttl=3600)
+def analyze_sentiment(text):
+    """
+    Analyze sentiment using both VADER and TextBlob, with financial context
+    """
+    # Check if text is None or empty
+    if not text or not isinstance(text, str):
+        return {
+            'sentiment': "⚖️ Neutral",
+            'confidence': 0,
+            'color': "gray",
+            'score': 0
+        }
+        
+    # Clean the text
+    text = re.sub(r'[^\w\s]', '', text)
+    
+    # VADER analysis
+    sia = SentimentIntensityAnalyzer()
+    vader_scores = sia.polarity_scores(text)
+    
+    # TextBlob analysis
+    blob = TextBlob(text)
+    textblob_polarity = blob.sentiment.polarity
+    
+    # Enhanced financial context keywords with weights
+    financial_pos = {
+        'strong': 1.2,
+        'climbed': 1.3,
+        'up': 1.1,
+        'higher': 1.1,
+        'beat': 1.2,
+        'exceeded': 1.2,
+        'growth': 1.1,
+        'profit': 1.1,
+        'gain': 1.1,
+        'positive': 1.1,
+        'bullish': 1.3,
+        'outperform': 1.2,
+        'buy': 1.1,
+        'upgrade': 1.2,
+        'recovers': 1.3,
+        'rose': 1.3,
+        'closed higher': 1.4
+    }
+    
+    financial_neg = {
+        'weak': 1.2,
+        'fell': 1.3,
+        'down': 1.1,
+        'lower': 1.1,
+        'miss': 1.2,
+        'missed': 1.2,
+        'decline': 1.1,
+        'loss': 1.1,
+        'negative': 1.1,
+        'bearish': 1.3,
+        'underperform': 1.2,
+        'sell': 1.1,
+        'downgrade': 1.2,
+        'sell-off': 1.4,
+        'rattled': 1.3,
+        'correction': 1.3,
+        'crossed below': 1.4,
+        'pain': 1.3
+    }
+    
+    # Add financial context with weighted scoring
+    financial_score = 0
+    words = text.lower().split()
+    
+    # Look for percentage changes with context
+    percent_pattern = r'(\d+(?:\.\d+)?)\s*%'
+    percentages = re.findall(percent_pattern, text)
+    for pct in percentages:
+        if any(term in text.lower() for term in ["rose", "up", "climb", "gain", "higher"]):
+            financial_score += float(pct) * 0.15
+        elif any(term in text.lower() for term in ["down", "fall", "drop", "lower", "decline"]):
+            financial_score -= float(pct) * 0.15
+    
+    # Look for technical indicators
+    if "moving average" in text.lower():
+        if "crossed below" in text.lower() or "below" in text.lower():
+            financial_score -= 1.2
+        elif "crossed above" in text.lower() or "above" in text.lower():
+            financial_score += 1.2
+    
+    # Look for market action terms
+    if "sell-off" in text.lower() or "selloff" in text.lower():
+        financial_score -= 1.3
+    if "recovery" in text.lower() or "recovers" in text.lower():
+        financial_score += 1.3
+    
+    # Calculate weighted keyword scores
+    pos_score = sum(financial_pos.get(word, 0) for word in words)
+    neg_score = sum(financial_neg.get(word, 0) for word in words)
+    
+    if pos_score or neg_score:
+        financial_score += (pos_score - neg_score) / (pos_score + neg_score)
+    
+    # Combine scores with adjusted weights
+    combined_score = (
+        vader_scores['compound'] * 0.3 +     # VADER
+        textblob_polarity * 0.2 +            # TextBlob
+        financial_score * 0.5                 # Enhanced financial context (increased weight)
+    )
+    
+    # Adjust thresholds and confidence calculation
+    if combined_score >= 0.15:
+        sentiment = "📈 Positive"
+        confidence = min(abs(combined_score) * 150, 100)  # Increased multiplier
+        color = "green"
+    elif combined_score <= -0.15:
+        sentiment = "📉 Negative"
+        confidence = min(abs(combined_score) * 150, 100)
+        color = "red"
+    else:
+        sentiment = "⚖️ Neutral"
+        confidence = (1 - abs(combined_score)) * 100
+        color = "gray"
+        
+    return {
+        'sentiment': sentiment,
+        'confidence': confidence,
+        'color': color,
+        'score': combined_score
+    }
 
 # Completely revise the Prophet forecast function
 @st.cache_data(ttl=3600)
@@ -1357,19 +1496,21 @@ try:
                     symbol, 
                     weights=WEIGHT_CONFIGURATIONS[selected_weight]
                 )
-                results = predictor.predict_with_all_models()
+                results = predictor.predict_with_all_models(prediction_days=30)
                 
                 if results is not None:
-                    
+                    # Calculate target date here since it's not in results
+                    target_date = datetime.now() + timedelta(days=30)
+                    st.write(f"#### Predictions for {target_date.strftime('%B %d, %Y')}")
                     
                     last_price = float(df['Close'].iloc[-1])
-                    
                     
                     # Individual model predictions
                     st.subheader("Individual Model Predictions")
                     model_predictions = pd.DataFrame({
                         'Model': results['individual_predictions'].keys(),
-                        'Predicted Price': [v for v in results['individual_predictions'].values()]
+                        'Predicted Price': [v for v in results['individual_predictions'].values()],
+                        'Target Date': target_date.strftime('%Y-%m-%d')  # Add target date to DataFrame
                     })
                     model_predictions['Deviation from Ensemble'] = (
                         model_predictions['Predicted Price'] - abs(results['prediction'])
@@ -1457,15 +1598,128 @@ try:
     
     with col2:
         st.subheader("Latest News & Market Sentiment")
-        news_headlines = get_news_headlines(symbol)
-        
-        if news_headlines:
-            for title, description, url in news_headlines:
-                with st.expander(title):
-                    st.write(description)
-                    st.markdown(f"[Read full article]({url})")
-        else:
-            st.write("No recent news available for this stock.")
+        try:
+            news_headlines = get_news_headlines(symbol)
+            
+            if news_headlines and len(news_headlines) > 0:
+                # Initialize sentiment tracking
+                sentiment_scores = []
+                sentiment_weights = []
+                
+                for title, description, url in news_headlines:
+                    # Ensure title and description are strings
+                    title = str(title) if title else ""
+                    description = str(description) if description else ""
+                    
+                    # Analyze both title and description with different weights
+                    title_analysis = analyze_sentiment(title)
+                    desc_analysis = analyze_sentiment(description)
+                    
+                    # Combined analysis (title has more weight)
+                    combined_score = title_analysis['score'] * 0.6 + desc_analysis['score'] * 0.4
+                    sentiment_scores.append(combined_score)
+                    
+                    # Weight more recent news higher
+                    sentiment_weights.append(1.0)
+                    
+                    # Determine display properties
+                    if combined_score >= 0.2:
+                        sentiment = "📈 Positive"
+                        color = "green"
+                        confidence = min(abs(combined_score) * 100, 100)
+                    elif combined_score <= -0.2:
+                        sentiment = "📉 Negative"
+                        color = "red"
+                        confidence = min(abs(combined_score) * 100, 100)
+                    else:
+                        sentiment = "⚖️ Neutral"
+                        color = "gray"
+                        confidence = (1 - abs(combined_score)) * 100
+                    
+                    with st.expander(f"{title} ({sentiment})"):
+                        st.write(description)
+                        st.markdown(f"[Read full article]({url})")
+                        st.markdown(
+                            f"<span style='color: {color}'>Sentiment: {sentiment} "
+                            f"(Confidence: {confidence:.1f}%)</span>",
+                            unsafe_allow_html=True
+                        )
+                
+                # Calculate weighted average sentiment
+                total_weight = sum(sentiment_weights)
+                weighted_sentiment = sum(score * weight for score, weight in zip(sentiment_scores, sentiment_weights)) / total_weight
+                
+                # Display overall sentiment consensus
+                st.write("### News Sentiment Consensus")
+                
+                # Calculate sentiment distribution
+                positive_scores = sum(1 for score in sentiment_scores if score >= 0.2)
+                negative_scores = sum(1 for score in sentiment_scores if score <= -0.2)
+                neutral_scores = len(sentiment_scores) - positive_scores - negative_scores
+                
+                # Create metrics columns
+                consensus_col1, consensus_col2, consensus_col3 = st.columns(3)
+                total_articles = len(sentiment_scores)
+                
+                with consensus_col1:
+                    pos_pct = (positive_scores / total_articles) * 100
+                    st.metric("Positive News", 
+                             f"{positive_scores}/{total_articles}",
+                             f"{pos_pct:.1f}%")
+                    
+                with consensus_col2:
+                    neg_pct = (negative_scores / total_articles) * 100
+                    st.metric("Negative News", 
+                             f"{negative_scores}/{total_articles}",
+                             f"{neg_pct:.1f}%")
+                    
+                with consensus_col3:
+                    neu_pct = (neutral_scores / total_articles) * 100
+                    st.metric("Neutral News", 
+                             f"{neutral_scores}/{total_articles}",
+                             f"{neu_pct:.1f}%")
+                
+                # Overall sentiment conclusion with confidence
+                sentiment_strength = abs(weighted_sentiment)
+                confidence = min(sentiment_strength * 100, 100)
+                
+                if weighted_sentiment >= 0.2:
+                    st.success(
+                        f"📈 Strong Bullish Sentiment "
+                        f"(Confidence: {confidence:.1f}%)\n\n"
+                        f"Market news suggests positive momentum with {positive_scores} supportive articles."
+                    )
+                elif weighted_sentiment >= 0.1:
+                    st.success(
+                        f"📈 Moderately Bullish Sentiment "
+                        f"(Confidence: {confidence:.1f}%)\n\n"
+                        f"Market news leans positive with mixed signals."
+                    )
+                elif weighted_sentiment <= -0.2:
+                    st.error(
+                        f"📉 Strong Bearish Sentiment "
+                        f"(Confidence: {confidence:.1f}%)\n\n"
+                        f"Market news suggests negative pressure with {negative_scores} concerning articles."
+                    )
+                elif weighted_sentiment <= -0.1:
+                    st.error(
+                        f"📉 Moderately Bearish Sentiment "
+                        f"(Confidence: {confidence:.1f}%)\n\n"
+                        f"Market news leans negative with mixed signals."
+                    )
+                else:
+                    st.info(
+                        f"⚖️ Neutral Market Sentiment "
+                        f"(Confidence: {(1 - sentiment_strength) * 100:.1f}%)\n\n"
+                        f"Market news shows balanced or unclear direction."
+                    )
+                    
+            else:
+                st.info("No recent news available for this stock.")
+                
+        except Exception as e:
+            st.error(f"Error fetching news: {str(e)}")
+            st.info("No recent news available for this stock.")
         
         # Technical Analysis Summary
         st.subheader("Technical Analysis Summary")
