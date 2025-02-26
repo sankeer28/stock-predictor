@@ -35,11 +35,6 @@ Note: Accuracy varies based on market conditions, volatility, and the specific s
 ```bash
 pip install -r requirements.txt
 ```
-
-### Configuration
-1. Get a News API key from https://newsapi.org
-2. create a file called secrets.toml with your api key like NEWS_API_KEY='api key'
-
 ### Running the Application
 ```bash
 streamlit run stock_predictor.py
