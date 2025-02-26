@@ -41,7 +41,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 # API setup
-NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
+NEWS_API_KEY = '0de37ca8af9748898518daf699189abf'
 newsapi = NewsApiClient(api_key=NEWS_API_KEY)
 
 # Move the forecast_with_prophet function to be with the other cache functions
