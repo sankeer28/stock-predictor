@@ -27,7 +27,7 @@ import re
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
-# Download required NLTK data (add near other initialization code)
+# Download required NLTK data 
 try:
     nltk.data.find('vader_lexicon')
 except LookupError:
@@ -55,7 +55,6 @@ st.markdown(
 NEWS_API_KEY = '0de37ca8af9748898518daf699189abf'
 newsapi = NewsApiClient(api_key=NEWS_API_KEY)
 
-# Move the forecast_with_prophet function to be with the other cache functions
 @st.cache_data(ttl=3600)
 def fetch_stock_data(symbol, days):
     end_date = datetime.now()
