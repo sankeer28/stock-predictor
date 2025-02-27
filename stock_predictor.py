@@ -299,7 +299,7 @@ def forecast_with_prophet(df, forecast_days=30):
         prophet_df['ds'] = pd.to_datetime(date_values)
         prophet_df['y'] = close_values.astype(float)
         
-        # Get additional features for regressors - even more comprehensive
+        # Add additional features for regressors - even more comprehensive
         # Add volume as a regressor if available
         has_volume_regressor = False
         if 'Volume' in df_copy.columns:
@@ -349,7 +349,7 @@ def forecast_with_prophet(df, forecast_days=30):
         
         # Determine appropriate seasonality based on data size
         daily_seasonality = len(prophet_df) > 90  # Only use daily seasonality with enough data
-        weekly_seasonality = len(prophet_df) > 14
+        weekly_seasonality = False  # Explicitly disable weekly seasonality for stocks
         yearly_seasonality = len(prophet_df) > 365
         
         # Adaptive parameter selection based on volatility
@@ -364,7 +364,7 @@ def forecast_with_prophet(df, forecast_days=30):
         # Create and fit the model with optimized parameters
         model = Prophet(
             daily_seasonality=daily_seasonality,
-            weekly_seasonality=weekly_seasonality, 
+            weekly_seasonality=weekly_seasonality,  # Disabled to prevent weekend spikes
             yearly_seasonality=yearly_seasonality,
             changepoint_prior_scale=cp_prior_scale,  # Adaptive to volatility
             seasonality_prior_scale=10.0,  # Increased to capture market seasonality better
@@ -413,8 +413,18 @@ def forecast_with_prophet(df, forecast_days=30):
         # Fit the model
         model.fit(prophet_df)
         
-        # Create future dataframe for prediction
-        future = model.make_future_dataframe(periods=forecast_days, freq='D')
+        # Create future dataframe for prediction using business days only
+        # This is critical to avoid weekend predictions for stock markets
+        last_date = prophet_df['ds'].max()
+        # Use business day frequency (weekdays only)
+        future_dates = pd.date_range(
+            start=last_date + pd.Timedelta(days=1), 
+            periods=forecast_days * 1.4,  # Add extra days to account for weekends
+            freq='B'  # Business day frequency - weekdays only
+        )[:forecast_days]  # Limit to requested forecast days
+        
+        # Create the future dataframe with correct dates
+        future = pd.DataFrame({'ds': future_dates})
         
         # Add regressor values to future dataframe
         # Copy the last rows of data for future predictions
@@ -477,6 +487,10 @@ def forecast_with_prophet(df, forecast_days=30):
                                                   (forecast.loc[idx, 'yhat'] - 
                                                    forecast.loc[idx, 'yhat_lower']) * uncertainty_multiplier[i])
         
+        # Make sure there are no weekend forecasts by checking the day of week
+        # 5 = Saturday, 6 = Sunday
+        forecast = forecast[forecast['ds'].dt.dayofweek < 5]
+        
         return forecast
         
     except Exception as e:
@@ -498,16 +512,22 @@ def simple_forecast_fallback(df, forecast_days=30):
         model = LinearRegression()
         model.fit(x, y)
         
-        # Create future dates for forecasting
+        # Create future dates for forecasting - using business days only
         last_date = df.index[-1]
-        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=forecast_days)
+        
+        # Generate business days only (exclude weekends)
+        future_dates = pd.date_range(
+            start=last_date + pd.Timedelta(days=1), 
+            periods=forecast_days * 1.4,  # Add extra days to account for weekends
+            freq='B'  # Business day frequency - weekdays only
+        )[:forecast_days]  # Limit to requested forecast days
         
         # Historical dates and all dates together
         historical_dates = df.index
         all_dates = historical_dates.append(future_dates)
         
         # Predict future values
-        future_x = np.arange(len(close_prices), len(close_prices) + forecast_days).reshape(-1, 1)
+        future_x = np.arange(len(close_prices), len(close_prices) + len(future_dates)).reshape(-1, 1)
         future_y = model.predict(future_x)
         
         # Predict historical values for context
@@ -1359,40 +1379,68 @@ try:
                         try:
                             # Get components for analysis
                             trend_values = forecast['trend'][next_date_idx:medium_term_idx].values
-                            weekly_values = forecast['weekly'][next_date_idx:medium_term_idx].values
-                            yearly_values = forecast['yearly'][next_date_idx:medium_term_idx].values
+                            
+                            # Check if we have weekly component (we disabled it, but check just in case)
+                            has_weekly_component = 'weekly' in forecast.columns and not all(forecast['weekly'] == 0)
+                            
+                            # Check if we have yearly component
+                            has_yearly_component = 'yearly' in forecast.columns and not all(forecast['yearly'] == 0)
                             
                             # Determine trend direction
                             trend_direction = "Upward" if np.mean(np.diff(trend_values)) > 0 else "Downward"
                             trend_strength = np.abs(np.mean(np.diff(trend_values))/np.mean(trend_values)*100)
                             
-                            # Find day with maximum weekly effect
-                            forecast_subset = forecast.iloc[next_date_idx:medium_term_idx]
-                            max_weekly_idx = forecast_subset['weekly'].idxmax()
-                            min_weekly_idx = forecast_subset['weekly'].idxmin()
-                            max_weekly_day = pd.to_datetime(forecast_subset.loc[max_weekly_idx, 'ds']).strftime('%A')
-                            min_weekly_day = pd.to_datetime(forecast_subset.loc[min_weekly_idx, 'ds']).strftime('%A')
-                            
-                            # Determine seasonal factor
-                            seasonal_factor = "Positive" if np.mean(yearly_values) > 0 else "Negative"
-                            current_month = datetime.now().strftime('%B')
-                            next_month = (datetime.now() + timedelta(days=30)).strftime('%B')
-                            
-                            # Create a detailed insights section
+                            # Create a detailed insights section for trend analysis
                             st.markdown(f"""
                             **Trend Analysis:**
                             - Direction: {trend_direction} ({trend_strength:.2f}% per period)
                             - Strength: {"Strong" if trend_strength > 0.5 else "Moderate" if trend_strength > 0.1 else "Weak"}
-                            
-                            **Weekly Patterns:**
-                            - Most positive day: {max_weekly_day}
-                            - Most negative day: {min_weekly_day}
-                            
-                            **Seasonal Analysis:**
-                            - Current seasonal effect: {seasonal_factor}
-                            - Current month ({current_month}): {"Favorable" if np.mean(yearly_values) > 0 else "Unfavorable"} historically
-                            - Next month ({next_month}): {"Likely favorable" if np.mean(yearly_values[15:]) > 0 else "Likely unfavorable"} based on patterns
                             """)
+                            
+                            # Only show weekly patterns if weekly component exists
+                            if has_weekly_component:
+                                weekly_values = forecast['weekly'][next_date_idx:medium_term_idx].values
+                                # Find day with maximum weekly effect
+                                forecast_subset = forecast.iloc[next_date_idx:medium_term_idx]
+                                max_weekly_idx = forecast_subset['weekly'].idxmax()
+                                min_weekly_idx = forecast_subset['weekly'].idxmin()
+                                max_weekly_day = pd.to_datetime(forecast_subset.loc[max_weekly_idx, 'ds']).strftime('%A')
+                                min_weekly_day = pd.to_datetime(forecast_subset.loc[min_weekly_idx, 'ds']).strftime('%A')
+                                
+                                st.markdown(f"""
+                                **Weekly Patterns:**
+                                - Most positive day: {max_weekly_day}
+                                - Most negative day: {min_weekly_day}
+                                """)
+                            else:
+                                # No weekly component was used (correctly disabled for stock prices)
+                                st.markdown("""
+                                **Weekly Patterns:**
+                                - None detected (weekly seasonality disabled for stock market data)
+                                - Stock markets are closed on weekends, so no trading patterns exist
+                                """)
+                            
+                            # Only show yearly patterns if yearly component exists
+                            if has_yearly_component:
+                                yearly_values = forecast['yearly'][next_date_idx:medium_term_idx].values
+                                # Determine seasonal factor
+                                seasonal_factor = "Positive" if np.mean(yearly_values) > 0 else "Negative"
+                                current_month = datetime.now().strftime('%B')
+                                next_month = (datetime.now() + timedelta(days=30)).strftime('%B')
+                                
+                                st.markdown(f"""
+                                **Seasonal Analysis:**
+                                - Current seasonal effect: {seasonal_factor}
+                                - Current month ({current_month}): {"Favorable" if np.mean(yearly_values) > 0 else "Unfavorable"} historically
+                                - Next month ({next_month}): {"Likely favorable" if np.mean(yearly_values[15:]) > 0 else "Likely unfavorable"} based on patterns
+                                """)
+                            else:
+                                # No yearly component or not enough data
+                                st.markdown("""
+                                **Seasonal Analysis:**
+                                - No significant yearly patterns detected
+                                - Not enough historical data for reliable yearly seasonality detection
+                                """)
                             
                             # Add trading insights based on forecast
                             st.subheader("Forecast-Based Trading Insights")
@@ -1840,7 +1888,7 @@ try:
 
                         # Get signals from different sources
                         technical_bullish = ma_bullish
-                        trading_signal = get_trading_signal_strength(price_change, results['confidence_score'])
+                        trading_signal = get_trading_signal_strength(price_change_pct, results['confidence_score'])
                         model_confidence = results['confidence_score'] > 0.6
 
                         # Determine overall signal
