@@ -6,6 +6,7 @@ import StockChart from '@/components/StockChart';
 import TechnicalIndicatorsChart from '@/components/TechnicalIndicatorsChart';
 import NewsPanel from '@/components/NewsPanel';
 import TradingSignals from '@/components/TradingSignals';
+import Sidebar, { SearchHistoryItem } from '@/components/Sidebar';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { analyzeSentiment } from '@/lib/sentiment';
@@ -27,6 +28,7 @@ export default function Home() {
   const [newsSentiments, setNewsSentiments] = useState<any[]>([]);
   const [tradingSignal, setTradingSignal] = useState<any>(null);
   const [forecastInsights, setForecastInsights] = useState<any>(null);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
 
   // Chart display options
   const [showMA20, setShowMA20] = useState(true);
@@ -35,6 +37,44 @@ export default function Home() {
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
+
+  // Load search history from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('stockSearchHistory');
+    if (savedHistory) {
+      try {
+        setSearchHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error('Failed to parse search history', e);
+      }
+    }
+  }, []);
+
+  // Save search history to localStorage
+  const saveSearchHistory = (history: SearchHistoryItem[]) => {
+    localStorage.setItem('stockSearchHistory', JSON.stringify(history));
+    setSearchHistory(history);
+  };
+
+  // Add to search history
+  const addToHistory = (stockSymbol: string, price?: number) => {
+    const newItem: SearchHistoryItem = {
+      symbol: stockSymbol,
+      timestamp: Date.now(),
+      price
+    };
+
+    // Remove duplicates and add to top
+    const filteredHistory = searchHistory.filter(item => item.symbol !== stockSymbol);
+    const newHistory = [newItem, ...filteredHistory].slice(0, 20); // Keep last 20
+
+    saveSearchHistory(newHistory);
+  };
+
+  // Clear search history
+  const clearHistory = () => {
+    saveSearchHistory([]);
+  };
 
   const fetchData = async (stockSymbol: string) => {
     setLoading(true);
@@ -53,7 +93,11 @@ export default function Home() {
       }
 
       setStockData(stockResult.data);
-      setCurrentPrice(stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close);
+      const price = stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close;
+      setCurrentPrice(price);
+
+      // Add to search history
+      addToHistory(stockSymbol, price);
 
       // Calculate technical indicators
       const indicators = calculateAllIndicators(stockResult.data);
@@ -166,6 +210,17 @@ export default function Home() {
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--bg-4)' }}>
+      {/* Sidebar - Fixed in left margin */}
+      <Sidebar
+        searchHistory={searchHistory}
+        onSelectSymbol={(sym) => {
+          setInputSymbol(sym);
+          fetchData(sym);
+        }}
+        onClearHistory={clearHistory}
+        currentSymbol={symbol}
+      />
+
       {/* Navbar */}
       <div className="max-w-7xl mx-auto px-4 pt-4 pb-0">
         {/* Top Bar */}

@@ -8,7 +8,6 @@ import {
   MinusCircle,
   AlertCircle,
   Target,
-  Activity,
 } from 'lucide-react';
 
 interface TradingSignalsProps {

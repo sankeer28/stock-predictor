@@ -1,0 +1,150 @@
+'use client';
+
+import React, { useState } from 'react';
+import { History, Clock, TrendingUp, X, Menu } from 'lucide-react';
+
+export interface SearchHistoryItem {
+  symbol: string;
+  timestamp: number;
+  price?: number;
+}
+
+interface SidebarProps {
+  searchHistory: SearchHistoryItem[];
+  onSelectSymbol: (symbol: string) => void;
+  onClearHistory: () => void;
+  currentSymbol?: string;
+}
+
+export default function Sidebar({
+  searchHistory,
+  onSelectSymbol,
+  onClearHistory,
+  currentSymbol
+}: SidebarProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const formatTimestamp = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <>
+      {/* Mobile Toggle Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-3 border-2 xl:hidden"
+        style={{
+          position: 'fixed',
+          left: '1rem',
+          top: '1rem',
+          zIndex: 50,
+          background: 'var(--bg-4)',
+          borderColor: 'var(--accent)',
+          color: 'var(--accent)'
+        }}
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Sidebar */}
+      <div
+        className={`card w-64 h-[calc(100vh-2rem)] overflow-y-auto transition-transform xl:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
+        } xl:block`}
+        style={{
+          position: 'fixed',
+          left: '1rem',
+          top: '1rem',
+          zIndex: 40
+        }}
+      >
+        <span className="card-label">Search History</span>
+
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <History className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+            <h2 className="font-semibold" style={{ color: 'var(--text-2)' }}>Recent</h2>
+          </div>
+          {searchHistory.length > 0 && (
+            <button
+              onClick={onClearHistory}
+              className="text-xs px-2 py-1 border transition-colors"
+              style={{
+                color: 'var(--text-4)',
+                borderColor: 'var(--bg-1)',
+                background: 'var(--bg-3)'
+              }}
+              title="Clear history"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+      <div className="space-y-2">
+        {searchHistory.length === 0 ? (
+          <div className="text-center py-8">
+            <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-4)' }} />
+            <p className="text-xs" style={{ color: 'var(--text-4)' }}>
+              No search history yet
+            </p>
+          </div>
+        ) : (
+          searchHistory.map((item, index) => (
+            <button
+              key={`${item.symbol}-${item.timestamp}-${index}`}
+              onClick={() => {
+                onSelectSymbol(item.symbol);
+                setIsOpen(false);
+              }}
+              className="w-full p-3 border-2 text-left transition-all hover:border-l-4"
+              style={{
+                background: item.symbol === currentSymbol ? 'var(--bg-2)' : 'var(--bg-3)',
+                borderColor: item.symbol === currentSymbol ? 'var(--accent)' : 'var(--bg-1)',
+                borderLeftColor: item.symbol === currentSymbol ? 'var(--accent)' : 'var(--bg-1)',
+                borderLeftWidth: item.symbol === currentSymbol ? '3px' : '2px'
+              }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold font-mono" style={{ color: 'var(--text-2)' }}>
+                  {item.symbol}
+                </span>
+                {item.price && (
+                  <span className="text-xs font-mono" style={{ color: 'var(--accent)' }}>
+                    ${item.price.toFixed(2)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-4)' }}>
+                <Clock className="w-3 h-3" />
+                <span>{formatTimestamp(item.timestamp)}</span>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+
+    {/* Mobile Overlay */}
+    {isOpen && (
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-30 xl:hidden"
+        onClick={() => setIsOpen(false)}
+      />
+    )}
+    </>
+  );
+}
