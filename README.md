@@ -1,5 +1,4 @@
-# Stock Predictor - Serverless Edition
-
+# Stock Predictor 
 A professional, real-time stock analysis platform built with Next.js 14, TypeScript, and deployed on Vercel. Features technical indicators, price forecasting, and news sentiment analysis - all running serverless with zero server costs.
 
 ## Features
@@ -208,10 +207,7 @@ MIT License - see LICENSE file for details
 
 This tool is for educational and research purposes only. Stock predictions are inherently uncertain and should not be considered financial advice. Always conduct your own research and consult with a financial advisor before making investment decisions.
 
-## Support
 
-For issues and questions:
-- GitHub Issues: [https://github.com/sankeer28/stock-predictor/issues](https://github.com/sankeer28/stock-predictor/issues)
 
 ---
 
