@@ -199,16 +199,8 @@ Unlike the Python version with ML models:
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
-
-MIT License - see LICENSE file for details
 
 ## Disclaimer
 
 This tool is for educational and research purposes only. Stock predictions are inherently uncertain and should not be considered financial advice. Always conduct your own research and consult with a financial advisor before making investment decisions.
 
-
-
----
-
-Made with ❤️ by [Sankeer](https://github.com/sankeer28)
