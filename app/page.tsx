@@ -7,6 +7,7 @@ import TechnicalIndicatorsChart from '@/components/TechnicalIndicatorsChart';
 import NewsPanel from '@/components/NewsPanel';
 import TradingSignals from '@/components/TradingSignals';
 import Sidebar, { SearchHistoryItem } from '@/components/Sidebar';
+import CompanyInfo from '@/components/CompanyInfo';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { analyzeSentiment } from '@/lib/sentiment';
@@ -22,6 +23,9 @@ export default function Home() {
 
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [companyName, setCompanyName] = useState<string>('');
+  const [marketState, setMarketState] = useState<string>('');
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [forecastData, setForecastData] = useState<any[]>([]);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
@@ -40,13 +44,17 @@ export default function Home() {
 
   // Load search history from localStorage on mount
   useEffect(() => {
-    const savedHistory = localStorage.getItem('stockSearchHistory');
-    if (savedHistory) {
-      try {
-        setSearchHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error('Failed to parse search history', e);
+    try {
+      const savedHistory = localStorage.getItem('stockSearchHistory');
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        console.log('Loaded search history from localStorage:', parsed);
+        setSearchHistory(parsed);
+      } else {
+        console.log('No search history found in localStorage');
       }
+    } catch (e) {
+      console.error('Failed to load search history from localStorage:', e);
     }
   }, []);
 
@@ -64,16 +72,33 @@ export default function Home() {
       price
     };
 
-    // Remove duplicates and add to top
-    const filteredHistory = searchHistory.filter(item => item.symbol !== stockSymbol);
-    const newHistory = [newItem, ...filteredHistory].slice(0, 20); // Keep last 20
+    // Use functional update to ensure we have the latest state
+    setSearchHistory(prevHistory => {
+      // Remove duplicates and add to top
+      const filteredHistory = prevHistory.filter(item => item.symbol !== stockSymbol);
+      const newHistory = [newItem, ...filteredHistory].slice(0, 20); // Keep last 20
 
-    saveSearchHistory(newHistory);
+      // Save to localStorage
+      try {
+        localStorage.setItem('stockSearchHistory', JSON.stringify(newHistory));
+        console.log('Saved search history to localStorage:', newHistory);
+      } catch (e) {
+        console.error('Failed to save search history to localStorage:', e);
+      }
+
+      return newHistory;
+    });
   };
 
   // Clear search history
   const clearHistory = () => {
-    saveSearchHistory([]);
+    try {
+      localStorage.removeItem('stockSearchHistory');
+      setSearchHistory([]);
+      console.log('Cleared search history from localStorage');
+    } catch (e) {
+      console.error('Failed to clear search history from localStorage:', e);
+    }
   };
 
   const fetchData = async (stockSymbol: string) => {
@@ -95,6 +120,9 @@ export default function Home() {
       setStockData(stockResult.data);
       const price = stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close;
       setCurrentPrice(price);
+      setCompanyName(stockResult.companyName || stockSymbol);
+      setMarketState(stockResult.marketState || 'UNKNOWN');
+      setCompanyInfo(stockResult.companyInfo || null);
 
       // Add to search history
       addToHistory(stockSymbol, price);
@@ -229,7 +257,7 @@ export default function Home() {
           background: 'transparent'
         }}>
           <span className="card-label">Stock Predictor</span>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <TrendingUp className="w-8 h-8" style={{ color: 'var(--accent)' }} />
               <div>
@@ -256,6 +284,9 @@ export default function Home() {
               <span className="hidden sm:inline">GitHub</span>
             </a>
           </div>
+          <p className="text-xs" style={{ color: 'var(--text-5)' }}>
+            ⚠ Educational purposes only. Not financial advice. Conduct your own research.
+          </p>
         </div>
 
         {/* Search Bar Panel */}
@@ -264,15 +295,17 @@ export default function Home() {
           background: 'transparent'
         }}>
             <span className="card-label">Search Stock</span>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 flex gap-3">
+
+            <div className="flex items-center gap-6 flex-wrap">
+              {/* Search Input */}
+              <div className="flex gap-3 items-center flex-1">
                 <input
                   type="text"
                   value={inputSymbol}
                   onChange={(e) => setInputSymbol(e.target.value.toUpperCase())}
                   onKeyPress={handleKeyPress}
-                  placeholder="Enter symbol (e.g., AAPL, TSLA, MSFT)"
-                  className="flex-1 px-4 py-3 border transition-all font-mono"
+                  placeholder="Symbol (e.g., AAPL)"
+                  className="flex-1 max-w-md px-4 py-3 border transition-all font-mono"
                   style={{
                     background: 'var(--bg-3)',
                     borderColor: 'var(--bg-1)',
@@ -306,34 +339,23 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Current Price Display */}
+              {/* Market Status */}
               {!loading && stockData.length > 0 && (
-                <div className="flex items-center gap-4 px-6 py-3 border-l-2 sm:border-l-2 border-t-2 sm:border-t-0" style={{
-                  borderLeftColor: 'var(--accent)',
-                  borderTopColor: 'var(--accent)',
-                  minWidth: '200px'
+                <div className="flex items-center gap-2 px-3 py-2 border-2" style={{
+                  borderColor: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)',
+                  background: 'var(--bg-3)',
                 }}>
-                  <div className="flex items-baseline gap-3">
-                    <div>
-                      <div className="text-xs font-mono" style={{ color: 'var(--text-4)' }}>
-                        {symbol}
-                      </div>
-                      <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>
-                        ${currentPrice.toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>
-                      CURRENT
-                    </div>
-                  </div>
+                  <div className={`w-2 h-2 rounded-full ${marketState === 'REGULAR' ? 'animate-pulse' : ''}`} style={{
+                    background: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
+                  }} />
+                  <span className="text-xs font-semibold" style={{
+                    color: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
+                  }}>
+                    {marketState === 'REGULAR' ? 'OPEN' : marketState === 'CLOSED' ? 'CLOSED' : marketState === 'PRE' ? 'PRE' : marketState === 'POST' ? 'POST' : 'CLOSED'}
+                  </span>
                 </div>
               )}
             </div>
-
-          {/* Disclaimer */}
-          <p className="text-xs mt-3" style={{ color: 'var(--text-5)' }}>
-            ⚠ Educational purposes only. Not financial advice. Conduct your own research.
-          </p>
         </div>
       </div>
 
@@ -361,6 +383,18 @@ export default function Home() {
 
         {!loading && stockData.length > 0 && (
           <>
+            {/* Company Overview */}
+            {companyInfo && (
+              <div className="mb-6">
+                <CompanyInfo
+                  symbol={symbol}
+                  companyName={companyName}
+                  currentPrice={currentPrice}
+                  companyInfo={companyInfo}
+                />
+              </div>
+            )}
+
             {/* Chart Controls */}
             <div className="card mb-6">
               <span className="card-label">Chart Controls</span>

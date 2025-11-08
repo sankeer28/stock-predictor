@@ -18,9 +18,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Calculate date range
-    const endDate = Math.floor(Date.now() / 1000);
-    const startDate = endDate - (days * 24 * 60 * 60);
+    // Calculate date range - add a day buffer to ensure we get the latest data
+    const endDate = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+    const startDate = endDate - ((days + 1) * 24 * 60 * 60);
 
     // Fetch from Yahoo Finance
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=1d`;
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'User-Agent': 'Mozilla/5.0',
       },
+      cache: 'no-store', // Disable caching to get fresh data
     });
 
     if (!response.ok) {
@@ -51,26 +52,64 @@ export async function GET(request: NextRequest) {
     const adjClose = result.indicators.adjclose?.[0]?.adjclose || [];
 
     // Transform to our format
-    const stockData: StockData[] = timestamps.map((timestamp: number, index: number) => ({
-      date: new Date(timestamp * 1000).toISOString().split('T')[0],
-      open: quotes.open[index] || 0,
-      high: quotes.high[index] || 0,
-      low: quotes.low[index] || 0,
-      close: quotes.close[index] || 0,
-      volume: quotes.volume[index] || 0,
-      adjClose: adjClose[index] || quotes.close[index] || 0,
-    }));
+    const stockData: StockData[] = timestamps.map((timestamp: number, index: number) => {
+      // Convert timestamp to date string in UTC to avoid timezone issues
+      const date = new Date(timestamp * 1000);
+      const dateStr = date.toISOString().split('T')[0];
 
-    // Filter out invalid data points
-    const validData = stockData.filter(d =>
-      d.close > 0 && d.open > 0 && d.high > 0 && d.low > 0
-    );
+      return {
+        date: dateStr,
+        open: quotes.open[index] || 0,
+        high: quotes.high[index] || 0,
+        low: quotes.low[index] || 0,
+        close: quotes.close[index] || 0,
+        volume: quotes.volume[index] || 0,
+        adjClose: adjClose[index] || quotes.close[index] || 0,
+      };
+    });
+
+    // Filter out invalid data points and sort by date
+    const validData = stockData
+      .filter(d => d.close > 0 && d.open > 0 && d.high > 0 && d.low > 0)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Log the most recent date for debugging
+    if (validData.length > 0) {
+      console.log(`Latest data for ${symbol}: ${validData[validData.length - 1].date}`);
+    }
+
+    // Fetch additional company info from multiple endpoints
+    let companyInfo: any = {
+      fiftyTwoWeekHigh: null,
+      fiftyTwoWeekLow: null,
+      averageVolume: null,
+    };
+
+    try {
+      // Extract only the data available from chart meta (Yahoo Finance blocks other endpoints)
+      const meta = result.meta;
+
+      // Use what we can get from chart API
+      companyInfo.fiftyTwoWeekHigh = meta.fiftyTwoWeekHigh || null;
+      companyInfo.fiftyTwoWeekLow = meta.fiftyTwoWeekLow || null;
+      companyInfo.averageVolume = meta.regularMarketVolume || null;
+
+      // Note: Yahoo Finance now requires authentication for detailed company info
+      // The quote and quoteSummary endpoints return 401 Unauthorized
+      // We can only use the limited data from the chart API
+      console.log('Company info limited to chart API data due to Yahoo Finance restrictions');
+    } catch (err) {
+      console.error('Failed to fetch company info:', err);
+    }
 
     return NextResponse.json({
       symbol: result.meta.symbol,
       currency: result.meta.currency,
       exchangeName: result.meta.exchangeName,
       currentPrice: result.meta.regularMarketPrice,
+      companyName: result.meta.longName || result.meta.shortName || result.meta.symbol,
+      marketState: result.meta.marketState || 'UNKNOWN',
+      companyInfo,
       data: validData,
     });
 

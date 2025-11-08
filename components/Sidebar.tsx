@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { History, Clock, TrendingUp, X, Menu } from 'lucide-react';
+import { History, TrendingUp, X, Menu } from 'lucide-react';
 
 export interface SearchHistoryItem {
   symbol: string;
@@ -23,22 +23,6 @@ export default function Sidebar({
   currentSymbol
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
-
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
 
   return (
     <>
@@ -118,7 +102,7 @@ export default function Sidebar({
                 borderLeftWidth: item.symbol === currentSymbol ? '3px' : '2px'
               }}
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between">
                 <span className="font-bold font-mono" style={{ color: 'var(--text-2)' }}>
                   {item.symbol}
                 </span>
@@ -127,10 +111,6 @@ export default function Sidebar({
                     ${item.price.toFixed(2)}
                   </span>
                 )}
-              </div>
-              <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-4)' }}>
-                <Clock className="w-3 h-3" />
-                <span>{formatTimestamp(item.timestamp)}</span>
               </div>
             </button>
           ))

@@ -41,7 +41,6 @@ export default function StockChart({
     ...data.map(d => ({ ...d, isForecast: false })),
     ...forecastData.map(f => ({
       date: f.date,
-      close: f.predicted,
       predicted: f.predicted,
       upper: f.upper,
       lower: f.lower,
