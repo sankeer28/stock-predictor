@@ -3,8 +3,5 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "NEWS_API_KEY": "@news_api_key"
-  }
+  "regions": ["iad1"]
 }
