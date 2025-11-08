@@ -96,56 +96,36 @@ export default function TradingSignals({ signal, currentPrice }: TradingSignalsP
             <div className="text-sm opacity-90">Confidence: {signal.confidence.toFixed(1)}%</div>
           </div>
         </div>
-        {signal.priceTarget && (
-          <div className="text-right">
-            <div className="text-sm opacity-90">Target Price</div>
-            <div className="text-2xl font-bold">${signal.priceTarget.toFixed(2)}</div>
-            {signal.priceChange && (
-              <div className="text-sm opacity-90">
-                {signal.priceChange > 0 ? '+' : ''}
-                {signal.priceChange.toFixed(2)}%
-              </div>
-            )}
-          </div>
-        )}
+        <div className="text-right">
+          <div className="text-sm opacity-90">Current Price</div>
+          <div className="text-2xl font-bold">${currentPrice.toFixed(2)}</div>
+        </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="p-4 border-2" style={{
+      {/* Price Target */}
+      {signal.priceTarget && (
+        <div className="p-4 border-2 mb-6" style={{
           background: 'var(--bg-2)',
-          borderColor: 'var(--info)',
+          borderColor: 'var(--accent)',
           borderLeftWidth: '3px'
         }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="w-5 h-5" style={{ color: 'var(--info)' }} />
-            <span className="text-sm font-medium" style={{ color: 'var(--text-3)' }}>Current Price</span>
-          </div>
-          <div className="text-2xl font-bold" style={{ color: 'var(--info)' }}>
-            ${currentPrice.toFixed(2)}
-          </div>
-        </div>
-
-        {signal.priceTarget && (
-          <div className="p-4 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: 'var(--accent)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Target className="w-5 h-5" style={{ color: 'var(--accent)' }} />
               <span className="text-sm font-medium" style={{ color: 'var(--text-3)' }}>Price Target</span>
             </div>
-            <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>
-              ${signal.priceTarget.toFixed(2)}
-            </div>
-            <div className="text-sm" style={{ color: 'var(--accent)' }}>
-              {signal.priceChange && signal.priceChange > 0 ? '+' : ''}
-              {signal.priceChange?.toFixed(2)}%
+            <div className="text-right">
+              <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>
+                ${signal.priceTarget.toFixed(2)}
+              </div>
+              <div className="text-sm" style={{ color: 'var(--accent)' }}>
+                {signal.priceChange && signal.priceChange > 0 ? '+' : ''}
+                {signal.priceChange?.toFixed(2)}%
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Signal Reasons */}
       <div className="mb-4">
