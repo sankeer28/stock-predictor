@@ -8,8 +8,17 @@ import NewsPanel from '@/components/NewsPanel';
 import TradingSignals from '@/components/TradingSignals';
 import Sidebar, { SearchHistoryItem } from '@/components/Sidebar';
 import CompanyInfo from '@/components/CompanyInfo';
+import MLPredictions from '@/components/MLPredictions';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
+import { generateMLForecast, getMLForecastInsights, MLForecast } from '@/lib/mlForecasting';
+import {
+  generateLinearRegression,
+  generatePolynomialRegression,
+  generateMovingAverageForecast,
+  generateEMAForecast,
+  MLPrediction
+} from '@/lib/mlAlgorithms';
 import { analyzeSentiment } from '@/lib/sentiment';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
@@ -41,6 +50,16 @@ export default function Home() {
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
+
+  // ML predictions state
+  const [mlPredictions, setMlPredictions] = useState<{
+    lstm?: MLForecast[];
+    linearRegression?: MLPrediction[];
+    polynomialRegression?: MLPrediction[];
+    movingAverage?: MLPrediction[];
+    ema?: MLPrediction[];
+  }>({});
+  const [mlTraining, setMlTraining] = useState(false);
 
   // Load search history from localStorage on mount
   useEffect(() => {
@@ -147,26 +166,61 @@ export default function Home() {
 
       setChartData(preparedChartData);
 
-      // Generate forecast
+      // Generate simple forecast first (non-blocking)
       try {
-        const forecast = generateForecast(stockResult.data, forecastHorizon);
-        setForecastData(forecast);
-
-        const insights = getForecastInsights(
+        const simpleForecast = generateForecast(stockResult.data, forecastHorizon);
+        const simpleInsights = getForecastInsights(
           stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close,
-          forecast
+          simpleForecast
         );
-        setForecastInsights(insights);
 
-        // Generate trading signal with forecast
+        setForecastData(simpleForecast);
+        setForecastInsights(simpleInsights);
+
+        // Generate trading signal with simple forecast
         const signal = generateTradingSignal(
           stockResult.data,
           indicators,
-          insights?.mediumTerm.change
+          simpleInsights?.mediumTerm.change
         );
         setTradingSignal(signal);
+
+        // Run all ML algorithms in background
+        setMlTraining(true);
+        setTimeout(async () => {
+          try {
+            // Fast algorithms (run immediately)
+            const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
+            const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
+            const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
+            const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
+
+            setMlPredictions({
+              linearRegression: linearReg,
+              polynomialRegression: polyReg,
+              movingAverage: maForecast,
+              ema: emaForecast,
+            });
+
+            // LSTM (slower, train last)
+            console.log('Starting LSTM training...');
+            const lstmForecast = await generateMLForecast(stockResult.data, forecastHorizon);
+
+            setMlPredictions(prev => ({
+              ...prev,
+              lstm: lstmForecast,
+            }));
+
+            setMlTraining(false);
+            console.log('All ML algorithms completed!');
+          } catch (mlError) {
+            console.error('ML algorithms error:', mlError);
+            setMlTraining(false);
+          }
+        }, 100);
       } catch (forecastError) {
         console.error('Forecast error:', forecastError);
+        setMlTraining(false);
         // Generate trading signal without forecast
         const signal = generateTradingSignal(stockResult.data, indicators);
         setTradingSignal(signal);
@@ -203,24 +257,61 @@ export default function Home() {
   // Update forecast when horizon changes
   useEffect(() => {
     if (stockData.length > 0) {
-      try {
-        const forecast = generateForecast(stockData, forecastHorizon);
-        setForecastData(forecast);
+      const updateForecast = async () => {
+        try {
+          // Always generate simple forecast first
+          const simpleForecast = generateForecast(stockData, forecastHorizon);
+          const simpleInsights = getForecastInsights(currentPrice, simpleForecast);
 
-        const insights = getForecastInsights(currentPrice, forecast);
-        setForecastInsights(insights);
+          setForecastData(simpleForecast);
+          setForecastInsights(simpleInsights);
 
-        // Regenerate trading signal with new forecast
-        const indicators = calculateAllIndicators(stockData);
-        const signal = generateTradingSignal(
-          stockData,
-          indicators,
-          insights?.mediumTerm.change
-        );
-        setTradingSignal(signal);
-      } catch (forecastError) {
-        console.error('Forecast update error:', forecastError);
-      }
+          const indicators = calculateAllIndicators(stockData);
+          const simpleSignal = generateTradingSignal(
+            stockData,
+            indicators,
+            simpleInsights?.mediumTerm.change
+          );
+          setTradingSignal(simpleSignal);
+
+          // Run all ML algorithms in background
+          setMlTraining(true);
+          setTimeout(async () => {
+            try {
+              // Fast algorithms
+              const linearReg = generateLinearRegression(stockData, forecastHorizon);
+              const polyReg = generatePolynomialRegression(stockData, forecastHorizon);
+              const maForecast = generateMovingAverageForecast(stockData, forecastHorizon);
+              const emaForecast = generateEMAForecast(stockData, forecastHorizon);
+
+              setMlPredictions({
+                linearRegression: linearReg,
+                polynomialRegression: polyReg,
+                movingAverage: maForecast,
+                ema: emaForecast,
+              });
+
+              // LSTM (slower)
+              const lstmForecast = await generateMLForecast(stockData, forecastHorizon);
+
+              setMlPredictions(prev => ({
+                ...prev,
+                lstm: lstmForecast,
+              }));
+
+              setMlTraining(false);
+            } catch (mlError) {
+              console.error('ML algorithms error:', mlError);
+              setMlTraining(false);
+            }
+          }, 100);
+        } catch (forecastError) {
+          console.error('Forecast update error:', forecastError);
+          setMlTraining(false);
+        }
+      };
+
+      updateForecast();
     }
   }, [forecastHorizon]);
 
@@ -237,66 +328,52 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen" style={{ background: 'var(--bg-4)' }}>
-      {/* Sidebar - Fixed in left margin */}
-      <Sidebar
-        searchHistory={searchHistory}
-        onSelectSymbol={(sym) => {
-          setInputSymbol(sym);
-          fetchData(sym);
-        }}
-        onClearHistory={clearHistory}
-        currentSymbol={symbol}
-      />
+    <main className="min-h-screen p-4" style={{ background: 'var(--bg-4)' }}>
+      <div className="flex gap-4 items-start">
+        {/* Left Sidebar - Search History */}
+        <div className="hidden xl:block flex-shrink-0">
+          <Sidebar
+            searchHistory={searchHistory}
+            onSelectSymbol={(sym) => {
+              setInputSymbol(sym);
+              fetchData(sym);
+            }}
+            onClearHistory={clearHistory}
+            currentSymbol={symbol}
+          />
+        </div>
 
-      {/* Navbar */}
-      <div className="max-w-7xl mx-auto px-4 pt-4 pb-0">
-        {/* Top Bar */}
-        <div className="border-2 p-4 mb-4 relative" style={{
-          borderColor: 'var(--accent)',
-          background: 'transparent'
-        }}>
-          <span className="card-label">Stock Predictor</span>
+        {/* Main Content Area */}
+        <div className="flex-1 min-w-0">
+          {/* Header with Search */}
+          <div className="card mb-4">
+            <span className="card-label">Stock Market Analysis</span>
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="w-8 h-8" style={{ color: 'var(--accent)' }} />
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent)' }} />
               <div>
-                <h1 className="text-xl font-bold" style={{ color: 'var(--text-1)' }}>
+                <h1 className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
                   Stock Market Analysis
                 </h1>
-                <p className="text-xs" style={{ color: 'var(--text-4)' }}>
-                  Real-time analysis with technical indicators & forecasting
-                </p>
               </div>
             </div>
             <a
               href="https://github.com/sankeer28/stock-predictor"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 transition-colors px-4 py-2 border"
+              className="flex items-center gap-2 transition-colors px-3 py-1 border"
               style={{
                 color: 'var(--text-3)',
                 borderColor: 'var(--bg-1)',
-                background: 'var(--bg-3)'
+                background: 'var(--bg-2)'
               }}
             >
-              <Github className="w-5 h-5" />
-              <span className="hidden sm:inline">GitHub</span>
+              <Github className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm">GitHub</span>
             </a>
           </div>
-          <p className="text-xs" style={{ color: 'var(--text-5)' }}>
-            ⚠ Educational purposes only. Not financial advice. Conduct your own research.
-          </p>
-        </div>
 
-        {/* Search Bar Panel */}
-        <div className="border-2 p-4 mb-4 relative" style={{
-          borderColor: 'var(--accent)',
-          background: 'transparent'
-        }}>
-            <span className="card-label">Search Stock</span>
-
-            <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
               {/* Search Input */}
               <div className="flex gap-3 items-center flex-1">
                 <input
@@ -356,11 +433,8 @@ export default function Home() {
                 </div>
               )}
             </div>
-        </div>
-      </div>
+          </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
         {error && (
           <div className="mb-6 p-4 border-2 flex items-start gap-3" style={{
             background: 'var(--bg-2)',
@@ -566,6 +640,18 @@ export default function Home() {
               <NewsPanel articles={newsArticles} sentiments={newsSentiments} />
             </div>
           </>
+        )}
+        </div>
+
+        {/* ML Predictions Sidebar - Right Side */}
+        {!loading && stockData.length > 0 && (
+          <div className="hidden xl:block flex-shrink-0">
+            <MLPredictions
+              currentPrice={currentPrice}
+              predictions={mlPredictions}
+              isTraining={mlTraining}
+            />
+          </div>
         )}
       </div>
     </main>

@@ -45,14 +45,16 @@ export default function Sidebar({
 
       {/* Sidebar */}
       <div
-        className={`card w-64 h-[calc(100vh-2rem)] overflow-y-auto transition-transform xl:translate-x-0 ${
+        className={`card w-64 transition-transform xl:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
         } xl:block`}
         style={{
-          position: 'fixed',
-          left: '1rem',
-          top: '1rem',
-          zIndex: 40
+          position: isOpen ? 'fixed' : 'relative',
+          left: isOpen ? 0 : 'auto',
+          top: isOpen ? 0 : 'auto',
+          zIndex: isOpen ? 40 : 'auto',
+          maxHeight: isOpen ? '100vh' : 'none',
+          overflowY: isOpen ? 'auto' : 'visible',
         }}
       >
         <span className="card-label">Search History</span>
