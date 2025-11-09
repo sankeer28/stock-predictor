@@ -1,58 +1,11 @@
-import Sentiment from 'sentiment';
 import { SentimentResult } from '@/types';
-
-const sentiment = new Sentiment();
-
-// Financial keywords with custom weights
-const financialTerms: { [key: string]: number } = {
-  // Positive terms
-  'bullish': 3,
-  'buy': 2,
-  'upgrade': 3,
-  'outperform': 3,
-  'beat': 2,
-  'exceeded': 2,
-  'growth': 2,
-  'profit': 2,
-  'gain': 2,
-  'surge': 3,
-  'rally': 3,
-  'soar': 3,
-  'climb': 2,
-  'rose': 2,
-  'jump': 2,
-  'strong': 2,
-  'recovery': 2,
-
-  // Negative terms
-  'bearish': -3,
-  'sell': -2,
-  'downgrade': -3,
-  'underperform': -3,
-  'miss': -2,
-  'missed': -2,
-  'loss': -2,
-  'decline': -2,
-  'fall': -2,
-  'drop': -2,
-  'plunge': -3,
-  'crash': -3,
-  'tumble': -3,
-  'weak': -2,
-  'concern': -2,
-  'warning': -2,
-  'risk': -2,
-};
-
-// Register custom financial terms
-sentiment.registerLanguage('en', {
-  labels: financialTerms,
-});
+import { analyzeSentimentWithTransformers } from './sentimentPipeline';
 
 /**
- * Analyze sentiment of text with financial context
+ * Analyze sentiment of text using transformers.js
+ * This function uses a pre-trained BERT model for accurate sentiment analysis
  */
-export function analyzeSentiment(text: string): SentimentResult {
+export async function analyzeSentiment(text: string): Promise<SentimentResult> {
   if (!text || text.trim().length === 0) {
     return {
       sentiment: 'neutral',
@@ -61,58 +14,48 @@ export function analyzeSentiment(text: string): SentimentResult {
     };
   }
 
-  // Clean text
-  const cleanText = text.toLowerCase().trim();
+  try {
+    // Use transformers.js for sentiment analysis (DistilBERT)
+    const result = await analyzeSentimentWithTransformers(text);
 
-  // Get base sentiment
-  const result = sentiment.analyze(cleanText);
+    // Map model output to our format
+    // Returns: "positive", "negative", or "neutral" (lowercase)
+    let sentimentCategory: 'positive' | 'negative' | 'neutral';
+    let normalizedScore: number;
 
-  // Look for percentage changes
-  const percentagePattern = /(\d+(?:\.\d+)?)\s*%/g;
-  const percentages = cleanText.match(percentagePattern);
+    if (result.label === 'positive') {
+      sentimentCategory = 'positive';
+      normalizedScore = result.score; // 0-1 range
+    } else if (result.label === 'negative') {
+      sentimentCategory = 'negative';
+      normalizedScore = -result.score; // Negative for our format
+    } else {
+      sentimentCategory = 'neutral';
+      normalizedScore = 0;
+    }
 
-  let percentageScore = 0;
-  if (percentages) {
-    percentages.forEach(match => {
-      const value = parseFloat(match);
-      if (cleanText.includes('up') || cleanText.includes('gain') || cleanText.includes('rose')) {
-        percentageScore += value * 0.1;
-      } else if (cleanText.includes('down') || cleanText.includes('loss') || cleanText.includes('fell')) {
-        percentageScore -= value * 0.1;
-      }
-    });
+    // Calculate confidence (0-100)
+    const confidence = Math.round(result.score * 100);
+
+    return {
+      sentiment: sentimentCategory,
+      score: normalizedScore,
+      confidence,
+    };
+  } catch (error) {
+    console.error('Sentiment analysis error:', error);
+    return {
+      sentiment: 'neutral',
+      score: 0,
+      confidence: 0,
+    };
   }
-
-  // Calculate combined score
-  const combinedScore = result.score + percentageScore;
-
-  // Normalize score to -1 to 1 range
-  const normalizedScore = Math.max(-1, Math.min(1, combinedScore / 10));
-
-  // Determine sentiment category
-  let sentimentCategory: 'positive' | 'negative' | 'neutral';
-  if (normalizedScore >= 0.1) {
-    sentimentCategory = 'positive';
-  } else if (normalizedScore <= -0.1) {
-    sentimentCategory = 'negative';
-  } else {
-    sentimentCategory = 'neutral';
-  }
-
-  // Calculate confidence (0-100)
-  const confidence = Math.min(100, Math.abs(normalizedScore) * 100);
-
-  return {
-    sentiment: sentimentCategory,
-    score: normalizedScore,
-    confidence,
-  };
 }
 
 /**
  * Aggregate sentiment from multiple texts
  */
-export function aggregateSentiment(texts: string[]): SentimentResult {
+export async function aggregateSentiment(texts: string[]): Promise<SentimentResult> {
   if (texts.length === 0) {
     return {
       sentiment: 'neutral',
@@ -121,7 +64,7 @@ export function aggregateSentiment(texts: string[]): SentimentResult {
     };
   }
 
-  const sentiments = texts.map(text => analyzeSentiment(text));
+  const sentiments = await Promise.all(texts.map(text => analyzeSentiment(text)));
 
   // Calculate weighted average (more recent = higher weight)
   let totalScore = 0;

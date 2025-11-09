@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NewsArticle } from '@/types';
+import { analyzeSentiment } from '@/lib/sentiment';
 
 /**
- * Fetch news articles from NewsAPI
+ * Fetch news articles from NewsAPI with AI-powered sentiment analysis
  * GET /api/news?symbol=AAPL
  */
 export async function GET(request: NextRequest) {
@@ -37,16 +38,27 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
-    // Transform to our format
-    const articles: NewsArticle[] = (data.articles || []).map((article: any) => ({
-      title: article.title,
-      description: article.description || '',
-      url: article.url,
-      publishedAt: article.publishedAt,
-      source: article.source?.name || 'Unknown',
-    }));
+    // Transform to our format and add sentiment analysis
+    const articlesWithSentiment: NewsArticle[] = await Promise.all(
+      (data.articles || []).map(async (article: any) => {
+        const combinedText = `${article.title || ''} ${article.description || ''}`;
 
-    return NextResponse.json({ articles });
+        // Perform sentiment analysis using transformers.js
+        const sentiment = await analyzeSentiment(combinedText);
+
+
+        return {
+          title: article.title,
+          description: article.description || '',
+          url: article.url,
+          publishedAt: article.publishedAt,
+          source: article.source?.name || 'Unknown',
+          sentiment, // AI-powered sentiment analysis
+        };
+      })
+    );
+
+    return NextResponse.json({ articles: articlesWithSentiment });
 
   } catch (error) {
     console.error('Error fetching news:', error);

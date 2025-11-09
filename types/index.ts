@@ -37,6 +37,7 @@ export interface NewsArticle {
   url: string;
   publishedAt: string;
   source: string;
+  sentiment?: SentimentResult; // AI-powered sentiment analysis
 }
 
 export interface SentimentResult {

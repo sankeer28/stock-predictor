@@ -19,7 +19,6 @@ import {
   generateEMAForecast,
   MLPrediction
 } from '@/lib/mlAlgorithms';
-import { analyzeSentiment } from '@/lib/sentiment';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
 
@@ -226,17 +225,16 @@ export default function Home() {
         setTradingSignal(signal);
       }
 
-      // Fetch news
+      // Fetch news (now includes AI-powered sentiment analysis from server)
       const newsResponse = await fetch(`/api/news?symbol=${stockSymbol}`);
       if (newsResponse.ok) {
         const newsResult = await newsResponse.json();
         setNewsArticles(newsResult.articles || []);
 
-        // Analyze sentiment for each article
-        const sentiments = (newsResult.articles || []).map((article: NewsArticle) => {
-          const combinedText = `${article.title} ${article.description}`;
-          return analyzeSentiment(combinedText);
-        });
+        // Extract sentiments from articles (already analyzed server-side with transformers.js)
+        const sentiments = (newsResult.articles || []).map((article: NewsArticle) =>
+          article.sentiment || { sentiment: 'neutral' as const, score: 0, confidence: 0 }
+        );
         setNewsSentiments(sentiments);
       }
 

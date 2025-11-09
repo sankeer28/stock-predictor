@@ -113,8 +113,8 @@ export function generatePolynomialRegression(
     let predicted = a * x * x + b * x + c;
 
     // Apply reasonable bounds to prevent crazy extrapolations
-    // Don't allow prediction to deviate more than 50% from current price
-    const maxDeviation = currentPrice * 0.5;
+    // Don't allow prediction to deviate more than 20% from current price
+    const maxDeviation = currentPrice * 0.2;
     predicted = Math.max(currentPrice - maxDeviation, Math.min(currentPrice + maxDeviation, predicted));
 
     // Ensure positive price

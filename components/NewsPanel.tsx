@@ -63,7 +63,10 @@ export default function NewsPanel({ articles, sentiments }: NewsPanelProps) {
         borderColor: 'var(--info)',
         borderLeftWidth: '3px'
       }}>
-        <h4 className="font-semibold mb-3" style={{ color: 'var(--text-1)' }}>News Sentiment Consensus</h4>
+        <h4 className="font-semibold mb-1" style={{ color: 'var(--text-1)' }}>News Sentiment Consensus</h4>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-4)', fontStyle: 'italic' }}>
+          AI-powered sentiment analysis. Results may not always be accurate and should be used as one of many factors in decision-making.
+        </p>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center">
             <div className="text-2xl font-bold" style={{ color: 'var(--success)' }}>
