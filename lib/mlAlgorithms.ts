@@ -7,30 +7,42 @@ export interface MLPrediction {
 }
 
 /**
- * Linear Regression - Fast and simple trend-based prediction
+ * Linear Regression - Weighted regression favoring recent data
  */
 export function generateLinearRegression(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
-  const n = closePrices.length;
 
-  // Calculate linear regression: y = mx + b
+  // Use recent 120 days for better trend capture
+  const recentWindow = Math.min(120, closePrices.length);
+  const recentPrices = closePrices.slice(-recentWindow);
+  const n = recentPrices.length;
+
+  // Weighted linear regression: more recent data has higher weight
   let sumX = 0;
   let sumY = 0;
   let sumXY = 0;
   let sumX2 = 0;
+  let sumW = 0;
 
   for (let i = 0; i < n; i++) {
-    sumX += i;
-    sumY += closePrices[i];
-    sumXY += i * closePrices[i];
-    sumX2 += i * i;
+    // Exponential weight: recent data weighted more heavily
+    const weight = Math.exp((i - n) / (n / 2)); // Exponential decay
+
+    sumX += i * weight;
+    sumY += recentPrices[i] * weight;
+    sumXY += i * recentPrices[i] * weight;
+    sumX2 += i * i * weight;
+    sumW += weight;
   }
 
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
+  // Weighted least squares
+  const meanX = sumX / sumW;
+  const meanY = sumY / sumW;
+  const slope = (sumXY - sumW * meanX * meanY) / (sumX2 - sumW * meanX * meanX);
+  const intercept = meanY - slope * meanX;
 
   // Generate predictions
   const lastDate = new Date(stockData[stockData.length - 1].date);
@@ -54,7 +66,7 @@ export function generateLinearRegression(
 }
 
 /**
- * Polynomial Regression (degree 2) - Captures curved trends
+ * Polynomial Regression (degree 2) - Captures curved trends with improved fitting
  */
 export function generatePolynomialRegression(
   stockData: StockData[],
@@ -62,8 +74,8 @@ export function generatePolynomialRegression(
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
 
-  // Use only recent 60 days to avoid extrapolation issues
-  const recentWindow = Math.min(60, closePrices.length);
+  // Use recent 90 days for better curve fitting
+  const recentWindow = Math.min(90, closePrices.length);
   const recentPrices = closePrices.slice(-recentWindow);
   const n = recentPrices.length;
 
@@ -104,6 +116,13 @@ export function generatePolynomialRegression(
   const currentPrice = recentPrices[recentPrices.length - 1];
   const avgPrice = recentPrices.reduce((sum, p) => sum + p, 0) / recentPrices.length;
 
+  // Calculate volatility for adaptive bounds
+  const returns: number[] = [];
+  for (let i = 1; i < recentPrices.length; i++) {
+    returns.push(Math.abs((recentPrices[i] - recentPrices[i - 1]) / recentPrices[i - 1]));
+  }
+  const avgVolatility = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+
   for (let i = 0; i < forecastDays; i++) {
     const forecastDate = new Date(lastDate);
     forecastDate.setDate(forecastDate.getDate() + i + 1);
@@ -112,9 +131,10 @@ export function generatePolynomialRegression(
     const x = 1 + (i / (n - 1));
     let predicted = a * x * x + b * x + c;
 
-    // Apply reasonable bounds to prevent crazy extrapolations
-    // Don't allow prediction to deviate more than 20% from current price
-    const maxDeviation = currentPrice * 0.2;
+    // Apply adaptive bounds based on volatility and time horizon
+    // More volatile stocks get wider bounds
+    const timeAdjustment = Math.sqrt(i + 1); // Uncertainty grows with time
+    const maxDeviation = currentPrice * Math.max(0.15, avgVolatility * 10) * timeAdjustment;
     predicted = Math.max(currentPrice - maxDeviation, Math.min(currentPrice + maxDeviation, predicted));
 
     // Ensure positive price
@@ -131,27 +151,41 @@ export function generatePolynomialRegression(
 }
 
 /**
- * Moving Average Prediction - Simple but effective
+ * Moving Average Prediction - Adaptive window based on volatility
  */
 export function generateMovingAverageForecast(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
-  const windowSize = Math.min(20, Math.floor(closePrices.length / 2));
+
+  // Calculate volatility to determine optimal window size
+  const returns: number[] = [];
+  for (let i = 1; i < closePrices.length; i++) {
+    returns.push(Math.abs((closePrices[i] - closePrices[i - 1]) / closePrices[i - 1]));
+  }
+  const avgVolatility = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+
+  // Adaptive window: lower volatility = longer window (smoother)
+  // Higher volatility = shorter window (more responsive)
+  const baseWindow = Math.min(30, Math.floor(closePrices.length / 2));
+  const windowSize = Math.max(10, Math.floor(baseWindow * (1 - avgVolatility * 20)));
 
   // Calculate moving average
   const recentPrices = closePrices.slice(-windowSize);
   const avgPrice = recentPrices.reduce((sum, price) => sum + price, 0) / windowSize;
 
-  // Calculate trend from recent prices
+  // Calculate trend from recent prices with weighted approach
   const halfWindow = Math.floor(windowSize / 2);
   const firstHalf = recentPrices.slice(0, halfWindow);
   const secondHalf = recentPrices.slice(-halfWindow);
 
   const firstAvg = firstHalf.reduce((sum, p) => sum + p, 0) / halfWindow;
   const secondAvg = secondHalf.reduce((sum, p) => sum + p, 0) / halfWindow;
+
+  // Enhanced trend calculation with momentum
   const trend = (secondAvg - firstAvg) / halfWindow;
+  const momentum = (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices.length;
 
   // Generate predictions
   const lastDate = new Date(stockData[stockData.length - 1].date);
@@ -161,7 +195,9 @@ export function generateMovingAverageForecast(
     const forecastDate = new Date(lastDate);
     forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-    const predicted = Math.max(0, avgPrice + trend * (i + 1));
+    // Combine trend and momentum with decay over time
+    const decayFactor = Math.exp(-i / forecastDays); // Momentum decays over time
+    const predicted = Math.max(0, avgPrice + trend * (i + 1) + momentum * (i + 1) * decayFactor);
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],
@@ -174,34 +210,39 @@ export function generateMovingAverageForecast(
 }
 
 /**
- * Exponential Moving Average - Weights recent data more heavily
+ * Exponential Moving Average - Enhanced with dual EMA and momentum
  */
 export function generateEMAForecast(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
-  const period = 20;
-  const multiplier = 2 / (period + 1);
 
-  // Calculate EMA
-  let ema = closePrices.slice(0, period).reduce((sum, p) => sum + p, 0) / period;
+  // Dual EMA approach: fast (12) and slow (26) for better trend detection
+  const fastPeriod = 12;
+  const slowPeriod = 26;
+  const fastMultiplier = 2 / (fastPeriod + 1);
+  const slowMultiplier = 2 / (slowPeriod + 1);
 
-  for (let i = period; i < closePrices.length; i++) {
-    ema = (closePrices[i] - ema) * multiplier + ema;
+  // Calculate Fast EMA
+  let fastEMA = closePrices.slice(0, fastPeriod).reduce((sum, p) => sum + p, 0) / fastPeriod;
+  for (let i = fastPeriod; i < closePrices.length; i++) {
+    fastEMA = (closePrices[i] - fastEMA) * fastMultiplier + fastEMA;
   }
 
-  // Calculate trend from last 10 EMAs
-  const recentEMAs: number[] = [ema];
-  let tempEMA = ema;
-
-  for (let i = closePrices.length - 10; i < closePrices.length; i++) {
-    tempEMA = (closePrices[i] - tempEMA) * multiplier + tempEMA;
-    recentEMAs.push(tempEMA);
+  // Calculate Slow EMA
+  let slowEMA = closePrices.slice(0, slowPeriod).reduce((sum, p) => sum + p, 0) / slowPeriod;
+  for (let i = slowPeriod; i < closePrices.length; i++) {
+    slowEMA = (closePrices[i] - slowEMA) * slowMultiplier + slowEMA;
   }
 
-  // Linear trend from recent EMAs
-  const trend = (recentEMAs[recentEMAs.length - 1] - recentEMAs[0]) / recentEMAs.length;
+  // MACD-like signal: difference between fast and slow EMA indicates momentum
+  const macdSignal = fastEMA - slowEMA;
+
+  // Calculate trend from recent price action
+  const recentWindow = Math.min(20, closePrices.length);
+  const recentPrices = closePrices.slice(-recentWindow);
+  const trend = (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentWindow;
 
   // Generate predictions
   const lastDate = new Date(stockData[stockData.length - 1].date);
@@ -211,7 +252,10 @@ export function generateEMAForecast(
     const forecastDate = new Date(lastDate);
     forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-    const predicted = Math.max(0, ema + trend * (i + 1));
+    // Use fast EMA as baseline and incorporate trend + MACD momentum
+    // MACD signal decays over time as short-term momentum is less predictive long-term
+    const decayFactor = Math.exp(-i / (forecastDays / 2));
+    const predicted = Math.max(0, fastEMA + trend * (i + 1) + macdSignal * decayFactor);
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],

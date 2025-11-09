@@ -1,13 +1,13 @@
-import { pipeline, Pipeline } from '@xenova/transformers';
+import { pipeline } from '@xenova/transformers';
 
 // Singleton pattern for sentiment analysis pipeline
-let sentimentPipeline: Pipeline | null = null;
+let sentimentPipeline: any = null;
 
 /**
  * Get or initialize the sentiment analysis pipeline
  * Uses DistilBERT with keyword-enhanced logic for better financial sentiment
  */
-export async function getSentimentPipeline(): Promise<Pipeline> {
+export async function getSentimentPipeline(): Promise<any> {
   if (sentimentPipeline === null) {
     // Use DistilBERT fine-tuned on SST-2
     sentimentPipeline = await pipeline(

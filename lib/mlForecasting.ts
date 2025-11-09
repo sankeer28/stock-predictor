@@ -35,22 +35,29 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
   return { X, y };
 }
 
-// Build LSTM model (optimized for speed)
+// Build LSTM model (optimized for accuracy with dual layers)
 function buildLSTMModel(lookback: number): tf.Sequential {
   const model = tf.sequential();
 
-  // Single LSTM layer with dropout (faster than 2 layers)
+  // First LSTM layer with return sequences enabled
+  model.add(tf.layers.lstm({
+    units: 64,
+    returnSequences: true,
+    inputShape: [lookback, 1],
+  }));
+  model.add(tf.layers.dropout({ rate: 0.3 }));
+
+  // Second LSTM layer for deeper learning
   model.add(tf.layers.lstm({
     units: 32,
     returnSequences: false,
-    inputShape: [lookback, 1],
   }));
   model.add(tf.layers.dropout({ rate: 0.2 }));
 
   // Dense output layer
   model.add(tf.layers.dense({ units: 1 }));
 
-  // Compile model
+  // Compile model with adaptive learning rate
   model.compile({
     optimizer: tf.train.adam(0.001),
     loss: 'meanSquaredError',
@@ -78,16 +85,16 @@ export async function generateMLForecast(
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
 
-    // Need at least 60 days of data for training
-    if (closePrices.length < 60) {
-      throw new Error('Insufficient data for ML forecasting (minimum 60 days required)');
+    // Need at least 90 days of data for training (lookback=20 requires more data)
+    if (closePrices.length < 90) {
+      throw new Error('Insufficient data for ML forecasting (minimum 90 days required)');
     }
 
     // Normalize data
     const { normalized, min, max } = normalizeData(closePrices);
 
-    // Create training sequences (use last 10 days to predict next day - faster)
-    const lookback = 10;
+    // Create training sequences (use 20 days lookback for better pattern recognition)
+    const lookback = 20;
     const { X, y } = createSequences(normalized, lookback);
 
     // Convert to tensors
@@ -95,17 +102,17 @@ export async function generateMLForecast(
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
     // Build and train model
-    console.log('Training LSTM model...');
+    console.log('Training LSTM model with enhanced architecture...');
     const model = buildLSTMModel(lookback);
 
     await model.fit(xsTensor, ysTensor, {
-      epochs: 15,  // Reduced from 50 for faster training
-      batchSize: 16,  // Reduced from 32 for faster training
-      validationSplit: 0.1,
+      epochs: 50,  // Increased for better accuracy
+      batchSize: 32,  // Standard batch size
+      validationSplit: 0.15,  // Increased validation split
       verbose: 0,
       callbacks: {
         onEpochEnd: (epoch, logs) => {
-          if (epoch % 5 === 0) {
+          if (epoch % 10 === 0) {
             console.log(`Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}, val_loss = ${logs?.val_loss?.toFixed(4)}`);
           }
         }
@@ -139,15 +146,25 @@ export async function generateMLForecast(
     // Denormalize predictions
     const denormalizedPredictions = denormalizeData(predictions, min, max);
 
-    // Calculate confidence intervals (±5% for simplicity, can be improved with ensemble methods)
+    // Calculate volatility for more accurate confidence intervals
+    const returns: number[] = [];
+    for (let i = 1; i < closePrices.length; i++) {
+      returns.push((closePrices[i] - closePrices[i - 1]) / closePrices[i - 1]);
+    }
+    const volatility = Math.sqrt(
+      returns.reduce((sum, r) => sum + r * r, 0) / returns.length
+    );
+
+    // Calculate confidence intervals based on volatility
     const lastDate = new Date(stockData[stockData.length - 1].date);
     const forecasts: MLForecast[] = denormalizedPredictions.map((predicted, i) => {
       const forecastDate = new Date(lastDate);
       forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-      // Calculate uncertainty bounds (increases with time)
-      const uncertaintyFactor = 1 + (i * 0.01); // 1% increase per day
-      const baseUncertainty = predicted * 0.05 * uncertaintyFactor;
+      // Calculate uncertainty bounds (increases with time and volatility)
+      // Using ±2 standard deviations for ~95% confidence interval
+      const timeDecay = Math.sqrt(i + 1); // Uncertainty grows with sqrt of time
+      const baseUncertainty = predicted * volatility * timeDecay * 2.0;
 
       return {
         date: forecastDate.toISOString().split('T')[0],

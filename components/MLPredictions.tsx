@@ -157,7 +157,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
                       <span
                         className="text-xs font-semibold"
                         style={{
-                          color: stats.direction === 'up' ? 'var(--success)' : 'var(--error)',
+                          color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
                         }}
                       >
                         {stats.direction === 'up' ? '↑' : '↓'} {Math.abs(stats.change).toFixed(2)}%
@@ -202,7 +202,19 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
                     if (validPredictions.length === 0) return null;
 
                     const avgPrice = validPredictions.reduce((sum, p) => sum + p, 0) / validPredictions.length;
-                    const change = ((avgPrice - currentPrice) / currentPrice) * 100;
+
+                    // Calculate change from previous day (or current price for day 1)
+                    let previousPrice = currentPrice;
+                    if (dayIndex > 0) {
+                      const prevValidPredictions = algorithms
+                        .map(algo => algo.data?.[dayIndex - 1]?.predicted)
+                        .filter((p): p is number => p !== undefined);
+                      if (prevValidPredictions.length > 0) {
+                        previousPrice = prevValidPredictions.reduce((sum, p) => sum + p, 0) / prevValidPredictions.length;
+                      }
+                    }
+
+                    const change = ((avgPrice - previousPrice) / previousPrice) * 100;
 
                     return (
                       <tr
@@ -217,7 +229,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
                         <td
                           className="p-2 text-right font-semibold"
                           style={{
-                            color: change > 0 ? 'var(--success)' : 'var(--error)',
+                            color: change > 0 ? 'var(--success)' : 'var(--danger)',
                           }}
                         >
                           {change > 0 ? '+' : ''}{change.toFixed(2)}%
