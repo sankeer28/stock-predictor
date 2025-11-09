@@ -61,16 +61,22 @@ export function generatePolynomialRegression(
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
-  const n = closePrices.length;
+
+  // Use only recent 60 days to avoid extrapolation issues
+  const recentWindow = Math.min(60, closePrices.length);
+  const recentPrices = closePrices.slice(-recentWindow);
+  const n = recentPrices.length;
+
+  // Normalize x values to 0-1 range to prevent overflow
+  const xValues = Array.from({ length: n }, (_, i) => i / (n - 1));
 
   // Calculate polynomial regression: y = ax^2 + bx + c
-  // Using simplified matrix approach for degree 2
   let sumX = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0;
   let sumY = 0, sumXY = 0, sumX2Y = 0;
 
   for (let i = 0; i < n; i++) {
-    const x = i;
-    const y = closePrices[i];
+    const x = xValues[i];
+    const y = recentPrices[i];
     sumX += x;
     sumX2 += x * x;
     sumX3 += x * x * x;
@@ -83,6 +89,11 @@ export function generatePolynomialRegression(
   // Solve system of equations using Cramer's rule
   const denominator = n * (sumX2 * sumX4 - sumX3 * sumX3) - sumX * (sumX * sumX4 - sumX2 * sumX3) + sumX2 * (sumX * sumX3 - sumX2 * sumX2);
 
+  if (Math.abs(denominator) < 1e-10) {
+    // Fallback to linear regression if polynomial is unstable
+    return generateLinearRegression(stockData, forecastDays);
+  }
+
   const a = (n * (sumX2Y * sumX2 - sumXY * sumX3) - sumY * (sumX * sumX2 - sumX2 * sumX) + sumXY * (sumX * sumX3 - sumX2 * sumX2)) / denominator;
   const b = (sumY * (sumX2 * sumX4 - sumX3 * sumX3) - sumX * (sumXY * sumX4 - sumX2Y * sumX3) + sumX2 * (sumXY * sumX3 - sumX2Y * sumX2)) / denominator;
   const c = (sumY * sumX2 * sumX4 - sumY * sumX3 * sumX3 - sumX * sumXY * sumX4 + sumX * sumX2Y * sumX3 + sumX2 * sumXY * sumX3 - sumX2 * sumX2Y * sumX2) / denominator;
@@ -90,13 +101,24 @@ export function generatePolynomialRegression(
   // Generate predictions
   const lastDate = new Date(stockData[stockData.length - 1].date);
   const predictions: MLPrediction[] = [];
+  const currentPrice = recentPrices[recentPrices.length - 1];
+  const avgPrice = recentPrices.reduce((sum, p) => sum + p, 0) / recentPrices.length;
 
   for (let i = 0; i < forecastDays; i++) {
     const forecastDate = new Date(lastDate);
     forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-    const x = n + i;
-    const predicted = Math.max(0, a * x * x + b * x + c);
+    // Normalize x value for prediction (continuing from 1.0)
+    const x = 1 + (i / (n - 1));
+    let predicted = a * x * x + b * x + c;
+
+    // Apply reasonable bounds to prevent crazy extrapolations
+    // Don't allow prediction to deviate more than 50% from current price
+    const maxDeviation = currentPrice * 0.5;
+    predicted = Math.max(currentPrice - maxDeviation, Math.min(currentPrice + maxDeviation, predicted));
+
+    // Ensure positive price
+    predicted = Math.max(avgPrice * 0.1, predicted);
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],
