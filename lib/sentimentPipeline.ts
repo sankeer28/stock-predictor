@@ -57,7 +57,10 @@ function getKeywordAdjustment(text: string): { adjustment: number; override?: 'p
     'strong gains', 'big gains', 'massive gains', 'huge gains',
     'significant growth', 'revenue growth', 'profit surge', 'earnings beat',
     'stock soar', 'shares surge', 'record profit', 'record earnings',
-    'blowout earnings', 'explosive growth', 'skyrocket'
+    'blowout earnings', 'explosive growth', 'skyrocket',
+    'upside', 'massive upside', 'huge upside', 'could double', 'could triple',
+    'market cap could double', 'price target', 'raised price target',
+    'analyst upgrade', 'buy rating', 'outperform rating'
   ];
 
   // Moderate positive indicators
@@ -173,6 +176,22 @@ function getKeywordAdjustment(text: string): { adjustment: number; override?: 'p
       hasStrongNegative = true;
     }
   });
+
+  // Pattern matching for percentage gains (e.g., "80% upside", "50% gain")
+  const percentageGainPattern = /(\d+)%\s*(upside|gain|increase|rise|growth|higher)/gi;
+  const percentageLossPattern = /(\d+)%\s*(downside|loss|decrease|decline|drop|lower)/gi;
+
+  const gainMatches = lowerText.match(percentageGainPattern);
+  if (gainMatches && gainMatches.length > 0) {
+    score += 2;
+    hasStrongPositive = true;
+  }
+
+  const lossMatches = lowerText.match(percentageLossPattern);
+  if (lossMatches && lossMatches.length > 0) {
+    score -= 2;
+    hasStrongNegative = true;
+  }
 
   // If we have strong keywords, provide an override suggestion
   if (hasStrongPositive && score > 1) {

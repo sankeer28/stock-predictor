@@ -11,7 +11,12 @@ A professional, real-time stock analysis platform built with Next.js 14, TypeScr
   - Bollinger Bands
   - Volume analysis
 - **Price Forecasting**: Hybrid forecasting using exponential smoothing and linear regression
-- **News & Sentiment**: Real-time news with AI-powered sentiment analysis
+- **ML Predictions**: Multiple ML algorithms including LSTM neural networks, polynomial regression, and EMA forecasting
+- **News & Sentiment**: Real-time news with advanced AI-powered sentiment analysis
+  - Transformers.js ML models (DistilBERT)
+  - NLP enhancements (negation detection, intensity modifiers)
+  - Financial keyword detection with 100+ domain-specific terms
+  - Pattern matching for percentage gains/losses
 - **Trading Signals**: Automated buy/sell signals based on multiple technical indicators
 - **Interactive Charts**: Beautiful, responsive charts with Recharts
 - **Professional UI**: Modern, gradient-based design with Tailwind CSS
@@ -22,7 +27,10 @@ A professional, real-time stock analysis platform built with Next.js 14, TypeScr
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Charts**: Recharts
-- **Sentiment Analysis**: Sentiment.js
+- **ML & AI**:
+  - Transformers.js (DistilBERT sentiment analysis)
+  - TensorFlow.js (LSTM neural networks for price prediction)
+  - Custom NLP algorithms (negation, intensity, context analysis)
 - **APIs**:
   - Yahoo Finance (stock data)
   - NewsAPI (news articles)
