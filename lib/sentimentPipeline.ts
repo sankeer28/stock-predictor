@@ -2,21 +2,35 @@ import { pipeline } from '@xenova/transformers';
 
 // Singleton pattern for sentiment analysis pipeline
 let sentimentPipeline: any = null;
+let pipelinePromise: Promise<any> | null = null;
 
 /**
  * Get or initialize the sentiment analysis pipeline
  * Uses DistilBERT with keyword-enhanced logic for better financial sentiment
  */
 export async function getSentimentPipeline(): Promise<any> {
-  if (sentimentPipeline === null) {
+  if (sentimentPipeline !== null) {
+    return sentimentPipeline;
+  }
+
+  // If already loading, return the existing promise
+  if (pipelinePromise !== null) {
+    return pipelinePromise;
+  }
+
+  // Start loading the pipeline
+  pipelinePromise = (async () => {
     // Use DistilBERT fine-tuned on SST-2
     sentimentPipeline = await pipeline(
       'sentiment-analysis',
       'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
     );
     console.log('Loaded sentiment model: DistilBERT SST-2 with keyword enhancement');
-  }
-  return sentimentPipeline;
+    pipelinePromise = null; // Clear the promise once loaded
+    return sentimentPipeline;
+  })();
+
+  return pipelinePromise;
 }
 
 /**

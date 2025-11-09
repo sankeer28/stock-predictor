@@ -14,9 +14,12 @@ export default function NewsPanel({ articles, sentiments }: NewsPanelProps) {
     return (
       <div className="card">
         <span className="card-label">Latest News & Sentiment</span>
-        <p className="text-center py-8" style={{ color: 'var(--text-4)' }}>
-          No recent news available for this stock.
-        </p>
+        <div className="flex items-center justify-center py-8">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
+            <span style={{ color: 'var(--text-4)' }}>Loading news...</span>
+          </div>
+        </div>
       </div>
     );
   }

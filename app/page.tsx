@@ -122,6 +122,8 @@ export default function Home() {
   const fetchData = async (stockSymbol: string) => {
     setLoading(true);
     setError('');
+    setNewsArticles([]); // Reset news to show loading state
+    setNewsSentiments([]);
 
     try {
       // Fetch stock data
@@ -225,20 +227,27 @@ export default function Home() {
         setTradingSignal(signal);
       }
 
-      // Fetch news (now includes AI-powered sentiment analysis from server)
-      const newsResponse = await fetch(`/api/news?symbol=${stockSymbol}`);
-      if (newsResponse.ok) {
-        const newsResult = await newsResponse.json();
-        setNewsArticles(newsResult.articles || []);
-
-        // Extract sentiments from articles (already analyzed server-side with transformers.js)
-        const sentiments = (newsResult.articles || []).map((article: NewsArticle) =>
-          article.sentiment || { sentiment: 'neutral' as const, score: 0, confidence: 0 }
-        );
-        setNewsSentiments(sentiments);
-      }
-
       setSymbol(stockSymbol);
+
+      // Fetch news asynchronously (non-blocking)
+      setTimeout(async () => {
+        try {
+          const newsResponse = await fetch(`/api/news?symbol=${stockSymbol}`);
+          if (newsResponse.ok) {
+            const newsResult = await newsResponse.json();
+            setNewsArticles(newsResult.articles || []);
+
+            // Extract sentiments from articles (already analyzed server-side with transformers.js)
+            const sentiments = (newsResult.articles || []).map((article: NewsArticle) =>
+              article.sentiment || { sentiment: 'neutral' as const, score: 0, confidence: 0 }
+            );
+            setNewsSentiments(sentiments);
+          }
+        } catch (newsError) {
+          console.error('Error fetching news:', newsError);
+        }
+      }, 100);
+
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
       console.error('Error fetching data:', err);
