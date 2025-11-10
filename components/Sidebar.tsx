@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { History, TrendingUp, X, Menu } from 'lucide-react';
+import { History, TrendingUp, Menu, Trash2 } from 'lucide-react';
 import PredictionsCache from './PredictionsCache';
 import { CachedPrediction } from '@/lib/predictionsCache';
 
@@ -71,15 +71,11 @@ export default function Sidebar({
           {searchHistory.length > 0 && (
             <button
               onClick={onClearHistory}
-              className="text-xs px-2 py-1 border transition-colors"
-              style={{
-                color: 'var(--text-4)',
-                borderColor: 'var(--bg-1)',
-                background: 'var(--bg-3)'
-              }}
+              className="hover:opacity-80 transition-all"
               title="Clear history"
+              style={{ background: 'none', border: 'none', padding: 0 }}
             >
-              <X className="w-3 h-3" />
+              <Trash2 className="w-4 h-4" style={{ color: 'var(--error)' }} />
             </button>
           )}
         </div>
