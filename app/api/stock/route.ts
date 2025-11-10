@@ -18,28 +18,40 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    console.log(`[Stock API] Fetching data for ${symbol}, days: ${days}`);
+
     // Calculate date range - add a day buffer to ensure we get the latest data
     const endDate = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
     const startDate = endDate - ((days + 1) * 24 * 60 * 60);
 
     // Fetch from Yahoo Finance
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=1d`;
+    console.log(`[Stock API] Requesting: ${url}`);
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
       cache: 'no-store', // Disable caching to get fresh data
+      signal: AbortSignal.timeout(10000), // 10 second timeout
     });
 
+    console.log(`[Stock API] Response status: ${response.status}`);
+
     if (!response.ok) {
-      throw new Error(`Yahoo Finance API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[Stock API] Yahoo Finance error response:`, errorText);
+      throw new Error(`Yahoo Finance API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json();
+    console.log(`[Stock API] Successfully parsed JSON response`);
 
     // Check if data is valid
     if (!data.chart?.result?.[0]) {
+      console.error(`[Stock API] Invalid data structure:`, JSON.stringify(data, null, 2).substring(0, 500));
       return NextResponse.json(
         { error: 'Invalid symbol or no data available' },
         { status: 404 }
@@ -47,9 +59,18 @@ export async function GET(request: NextRequest) {
     }
 
     const result = data.chart.result[0];
+
+    // Validate required fields
+    if (!result.timestamp || !result.indicators?.quote?.[0]) {
+      console.error(`[Stock API] Missing required fields in response`);
+      throw new Error('Invalid data structure from Yahoo Finance');
+    }
+
     const timestamps = result.timestamp;
     const quotes = result.indicators.quote[0];
     const adjClose = result.indicators.adjclose?.[0]?.adjclose || [];
+
+    console.log(`[Stock API] Processing ${timestamps.length} data points`);
 
     // Transform to our format
     const stockData: StockData[] = timestamps.map((timestamp: number, index: number) => {
@@ -113,10 +134,15 @@ export async function GET(request: NextRequest) {
       data: validData,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching stock data:', error);
+    // Return more specific error message for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch stock data';
     return NextResponse.json(
-      { error: 'Failed to fetch stock data' },
+      {
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : String(error)
+      },
       { status: 500 }
     );
   }

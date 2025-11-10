@@ -84,6 +84,7 @@ export default function Home() {
   }>({});
   const [mlTraining, setMlTraining] = useState(false);
   const [mlFromCache, setMlFromCache] = useState(false);
+  const isLoadingFromCacheTable = React.useRef(false);
 
   // Load search history from localStorage on mount
   useEffect(() => {
@@ -381,7 +382,7 @@ export default function Home() {
 
   // Update forecast when horizon changes
   useEffect(() => {
-    if (stockData.length > 0) {
+    if (stockData.length > 0 && !isLoadingFromCacheTable.current) {
       const updateForecast = async () => {
         try {
           // Always generate simple forecast first
@@ -500,19 +501,34 @@ export default function Home() {
     }
   };
 
-  const handleLoadCachedPrediction = (cachedPred: CachedPrediction) => {
+  const handleLoadCachedPrediction = async (cachedPred: CachedPrediction) => {
     console.log('Loading cached prediction:', cachedPred);
-    // Load the stock data for this symbol if different
-    if (cachedPred.symbol !== symbol) {
-      fetchData(cachedPred.symbol);
-    }
-    // Load the cached predictions
-    setMlPredictions(cachedPred.predictions);
-    setMlFromCache(true);
-    setMlTraining(false);
-    // Update forecast horizon to match cache
-    if (cachedPred.forecastHorizon !== forecastHorizon) {
-      setForecastHorizon(cachedPred.forecastHorizon);
+
+    // Set flag to prevent useEffect from interfering
+    isLoadingFromCacheTable.current = true;
+
+    try {
+      // Load the stock data for this symbol if different (skip ML calculations since we'll load from cache)
+      if (cachedPred.symbol !== symbol) {
+        await fetchData(cachedPred.symbol, false, true); // forceRecalc=false, skipMLCalculations=true
+      }
+
+      // Update forecast horizon if different
+      if (cachedPred.forecastHorizon !== forecastHorizon) {
+        setForecastHorizon(cachedPred.forecastHorizon);
+      }
+
+      // Load the cached predictions
+      setMlPredictions(cachedPred.predictions);
+      setMlFromCache(true);
+      setMlTraining(false);
+
+      console.log('Successfully loaded cached prediction from table');
+    } finally {
+      // Reset flag after a short delay to allow state updates to complete
+      setTimeout(() => {
+        isLoadingFromCacheTable.current = false;
+      }, 500);
     }
   };
 
