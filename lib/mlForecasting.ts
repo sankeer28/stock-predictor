@@ -35,26 +35,34 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
   return { X, y };
 }
 
-// Build LSTM model (optimized for speed - lighter model)
+// Build LSTM model (balanced accuracy and speed)
 function buildLSTMModel(lookback: number): tf.Sequential {
   const model = tf.sequential();
 
-  // Single LSTM layer (faster and avoids the orthogonal warning)
+  // Single LSTM layer with more units for better accuracy
   model.add(tf.layers.lstm({
-    units: 32,  // Reduced from 64 to avoid orthogonal initializer warning
+    units: 48,  // Increased from 32 for better pattern recognition
     returnSequences: false,
     inputShape: [lookback, 1],
-    kernelInitializer: 'glorotNormal',  // Use glorotNormal instead of default orthogonal
+    kernelInitializer: 'glorotNormal',  // Avoids orthogonal warning
     recurrentInitializer: 'glorotNormal',
   }));
-  model.add(tf.layers.dropout({ rate: 0.2 }));
+  model.add(tf.layers.dropout({ rate: 0.25 }));
 
-  // Dense output layer
+  // Dense layer for better fitting
+  model.add(tf.layers.dense({
+    units: 16,
+    activation: 'relu',
+    kernelInitializer: 'glorotNormal'
+  }));
+  model.add(tf.layers.dropout({ rate: 0.15 }));
+
+  // Output layer
   model.add(tf.layers.dense({ units: 1 }));
 
-  // Compile model
+  // Compile model with adaptive optimizer for faster convergence
   model.compile({
-    optimizer: tf.train.adam(0.001),
+    optimizer: tf.train.adam(0.002, 0.9, 0.999, 1e-7),  // Higher LR with beta tuning
     loss: 'meanSquaredError',
     metrics: ['mae'],
   });
@@ -80,16 +88,16 @@ export async function generateMLForecast(
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
 
-    // Need at least 60 days of data for training
-    if (closePrices.length < 60) {
-      throw new Error('Insufficient data for ML forecasting (minimum 60 days required)');
+    // Need at least 90 days of data for training (20 lookback + enough training data)
+    if (closePrices.length < 90) {
+      throw new Error('Insufficient data for ML forecasting (minimum 90 days required)');
     }
 
     // Normalize data
     const { normalized, min, max } = normalizeData(closePrices);
 
-    // Create training sequences (use 10 days lookback for faster training)
-    const lookback = 10;
+    // Create training sequences (20 days lookback - more context for better accuracy)
+    const lookback = 20;
     const { X, y } = createSequences(normalized, lookback);
 
     // Convert to tensors
@@ -97,18 +105,40 @@ export async function generateMLForecast(
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
     // Build and train model
-    console.log('Training LSTM model with enhanced architecture...');
+    console.log('Training LSTM model with optimized configuration...');
     const model = buildLSTMModel(lookback);
 
+    // Early stopping callback for efficiency
+    let bestValLoss = Infinity;
+    let patienceCounter = 0;
+    const patience = 5; // Stop if no improvement for 5 epochs
+    let shouldStop = false;
+
     await model.fit(xsTensor, ysTensor, {
-      epochs: 20,  // Reduced for faster training
-      batchSize: 16,  // Smaller batch for faster processing
-      validationSplit: 0.1,
+      epochs: 40,  // Max epochs, but will stop early if converged
+      batchSize: 24,  // Larger batch = faster training
+      validationSplit: 0.1,  // More data for training
       verbose: 0,
       callbacks: {
         onEpochEnd: (epoch, logs) => {
-          if (epoch % 5 === 0) {
-            console.log(`Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}, val_loss = ${logs?.val_loss?.toFixed(4)}`);
+          const valLoss = logs?.val_loss || Infinity;
+
+          // Early stopping logic
+          if (valLoss < bestValLoss) {
+            bestValLoss = valLoss;
+            patienceCounter = 0;
+          } else {
+            patienceCounter++;
+          }
+
+          if (patienceCounter >= patience) {
+            shouldStop = true;
+            console.log(`Early stopping at epoch ${epoch}. Best val_loss: ${bestValLoss.toFixed(4)}`);
+            model.stopTraining = true;
+          }
+
+          if (epoch % 5 === 0 || shouldStop) {
+            console.log(`Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}, val_loss = ${valLoss.toFixed(4)}`);
           }
         }
       }
@@ -116,26 +146,26 @@ export async function generateMLForecast(
 
     console.log('LSTM model training complete!');
 
-    // Make predictions
+    // Make predictions with optimized memory management
     const predictions: number[] = [];
     let currentSequence = normalized.slice(-lookback);
 
+    // Use tidy() to automatically dispose intermediate tensors
     for (let i = 0; i < forecastDays; i++) {
-      // Prepare input
-      const input = tf.tensor3d([currentSequence.map(val => [val])]);
+      const predictedValue = await tf.tidy(() => {
+        // Prepare input
+        const input = tf.tensor3d([currentSequence.map(val => [val])]);
 
-      // Predict next value
-      const prediction = model.predict(input) as tf.Tensor;
-      const predictedValue = (await prediction.data())[0];
+        // Predict next value
+        const prediction = model.predict(input) as tf.Tensor;
+        return prediction;
+      }).data().then(data => data[0]);
 
       predictions.push(predictedValue);
 
-      // Update sequence for next prediction
-      currentSequence = [...currentSequence.slice(1), predictedValue];
-
-      // Clean up tensors
-      input.dispose();
-      prediction.dispose();
+      // Update sequence for next prediction (memory efficient)
+      currentSequence.shift();
+      currentSequence.push(predictedValue);
     }
 
     // Denormalize predictions

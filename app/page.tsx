@@ -17,6 +17,7 @@ import {
   generatePolynomialRegression,
   generateMovingAverageForecast,
   generateEMAForecast,
+  generateARIMAForecast,
   MLPrediction
 } from '@/lib/mlAlgorithms';
 import { generateTradingSignal } from '@/lib/tradingSignals';
@@ -54,6 +55,7 @@ export default function Home() {
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
     lstm?: MLForecast[];
+    arima?: MLPrediction[];
     linearRegression?: MLPrediction[];
     polynomialRegression?: MLPrediction[];
     movingAverage?: MLPrediction[];
@@ -126,6 +128,8 @@ export default function Home() {
     setNewsArticles([]); // Reset news to show loading state
     setNewsSentiments([]);
     setIsAnalyzingSentiment(false);
+    setMlPredictions({}); // Reset ML predictions for new stock
+    setMlTraining(false); // Reset training state
 
     try {
       // Fetch stock data
@@ -207,12 +211,14 @@ export default function Home() {
           const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
           const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
           const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
+          const arimaForecast = generateARIMAForecast(stockResult.data, forecastHorizon);
 
           setMlPredictions({
             linearRegression: linearReg,
             polynomialRegression: polyReg,
             movingAverage: maForecast,
             ema: emaForecast,
+            arima: arimaForecast,
           });
 
           // LSTM (slower, train last)
@@ -317,12 +323,14 @@ export default function Home() {
               const polyReg = generatePolynomialRegression(stockData, forecastHorizon);
               const maForecast = generateMovingAverageForecast(stockData, forecastHorizon);
               const emaForecast = generateEMAForecast(stockData, forecastHorizon);
+              const arimaForecast = generateARIMAForecast(stockData, forecastHorizon);
 
               setMlPredictions({
                 linearRegression: linearReg,
                 polynomialRegression: polyReg,
                 movingAverage: maForecast,
                 ema: emaForecast,
+                arima: arimaForecast,
               });
 
               // LSTM (slower)

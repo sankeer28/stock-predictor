@@ -266,3 +266,121 @@ export function generateEMAForecast(
 
   return predictions;
 }
+
+/**
+ * ARIMA (AutoRegressive Integrated Moving Average)
+ * p=5 (AR order), d=1 (differencing), q=5 (MA order)
+ * Advanced statistical forecasting for time series
+ */
+export function generateARIMAForecast(
+  stockData: StockData[],
+  forecastDays: number = 30
+): MLPrediction[] {
+  const closePrices = stockData.map(d => d.close);
+
+  // ARIMA parameters
+  const p = 5; // AR order (autoregressive lags)
+  const d = 1; // Differencing order
+  const q = 5; // MA order (moving average lags)
+
+  // Need sufficient data for ARIMA
+  if (closePrices.length < p + q + 10) {
+    // Fallback to linear regression if insufficient data
+    return generateLinearRegression(stockData, forecastDays);
+  }
+
+  // Step 1: Apply differencing (d=1) to make series stationary
+  const differences: number[] = [];
+  for (let i = 1; i < closePrices.length; i++) {
+    differences.push(closePrices[i] - closePrices[i - 1]);
+  }
+
+  // Step 2: Estimate AR coefficients using Yule-Walker equations (simplified)
+  const n = differences.length;
+  const arCoeffs: number[] = [];
+
+  // Calculate autocorrelations for AR component
+  const mean = differences.reduce((sum, val) => sum + val, 0) / n;
+  const variance = differences.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / n;
+
+  for (let lag = 1; lag <= p; lag++) {
+    let autoCorr = 0;
+    for (let i = lag; i < n; i++) {
+      autoCorr += (differences[i] - mean) * (differences[i - lag] - mean);
+    }
+    autoCorr /= ((n - lag) * variance);
+    arCoeffs.push(autoCorr * 0.8); // Dampened for stability
+  }
+
+  // Step 3: Calculate residuals for MA component
+  const residuals: number[] = new Array(n).fill(0);
+  for (let i = p; i < n; i++) {
+    let predicted = mean;
+    for (let j = 0; j < p; j++) {
+      predicted += arCoeffs[j] * (differences[i - j - 1] - mean);
+    }
+    residuals[i] = differences[i] - predicted;
+  }
+
+  // Step 4: Estimate MA coefficients
+  const maCoeffs: number[] = [];
+  const residualMean = residuals.slice(q).reduce((sum, val) => sum + val, 0) / (n - q);
+
+  for (let lag = 1; lag <= q; lag++) {
+    let maCorr = 0;
+    for (let i = lag; i < residuals.length; i++) {
+      maCorr += residuals[i] * residuals[i - lag];
+    }
+    maCorr /= (residuals.length - lag);
+    maCoeffs.push(maCorr * 0.5); // Dampened for stability
+  }
+
+  // Step 5: Generate forecasts
+  const lastDate = new Date(stockData[stockData.length - 1].date);
+  const predictions: MLPrediction[] = [];
+
+  // Keep track of forecasted differences and recent actual differences
+  const forecastDifferences: number[] = [...differences.slice(-p)];
+  const forecastResiduals: number[] = [...residuals.slice(-q)];
+
+  for (let i = 0; i < forecastDays; i++) {
+    const forecastDate = new Date(lastDate);
+    forecastDate.setDate(forecastDate.getDate() + i + 1);
+
+    // AR component: weighted sum of recent differences
+    let arComponent = mean;
+    for (let j = 0; j < p && j < forecastDifferences.length; j++) {
+      const index = forecastDifferences.length - 1 - j;
+      arComponent += arCoeffs[j] * (forecastDifferences[index] - mean);
+    }
+
+    // MA component: weighted sum of recent residuals
+    let maComponent = 0;
+    for (let j = 0; j < q && j < forecastResiduals.length; j++) {
+      const index = forecastResiduals.length - 1 - j;
+      maComponent += maCoeffs[j] * forecastResiduals[index];
+    }
+
+    // Predicted difference (stationary series)
+    const predictedDiff = arComponent + maComponent;
+
+    // Store for next iteration
+    forecastDifferences.push(predictedDiff);
+    forecastResiduals.push(0); // Assume zero residual for future
+
+    // Integrate back to get price (reverse differencing)
+    const lastPrice = i === 0
+      ? closePrices[closePrices.length - 1]
+      : predictions[i - 1].predicted;
+
+    const predicted = Math.max(0, lastPrice + predictedDiff);
+
+    predictions.push({
+      date: forecastDate.toISOString().split('T')[0],
+      predicted,
+      algorithm: 'ARIMA',
+    });
+  }
+
+  return predictions;
+}

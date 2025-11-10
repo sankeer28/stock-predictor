@@ -9,6 +9,7 @@ interface MLPredictionsProps {
   currentPrice: number;
   predictions: {
     lstm?: MLForecast[];
+    arima?: MLPrediction[];
     linearRegression?: MLPrediction[];
     polynomialRegression?: MLPrediction[];
     movingAverage?: MLPrediction[];
@@ -37,11 +38,12 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
   };
 
   const algorithms = [
-    { name: 'LSTM Neural Network', key: 'lstm', data: predictions.lstm, color: 'var(--accent)' },
-    { name: 'Linear Regression', key: 'linearRegression', data: predictions.linearRegression, color: 'var(--info)' },
-    { name: 'Polynomial Regression', key: 'polynomialRegression', data: predictions.polynomialRegression, color: 'var(--success)' },
-    { name: 'Moving Average', key: 'movingAverage', data: predictions.movingAverage, color: 'var(--warning)' },
-    { name: 'Exponential MA', key: 'ema', data: predictions.ema, color: 'var(--error)' },
+    { name: 'LSTM', key: 'lstm', data: predictions.lstm, color: 'var(--accent)' },
+    { name: 'ARIMA', key: 'arima', data: predictions.arima, color: 'var(--info)' },
+    { name: 'Linear Regression', key: 'linearRegression', data: predictions.linearRegression, color: 'var(--success)' },
+    { name: 'Polynomial Regression', key: 'polynomialRegression', data: predictions.polynomialRegression, color: 'var(--warning)' },
+    { name: 'Moving Average', key: 'movingAverage', data: predictions.movingAverage, color: 'var(--error)' },
+    { name: 'Exponential MA', key: 'ema', data: predictions.ema, color: '#9333ea' },
   ];
 
   return (
@@ -143,7 +145,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>
                     {algo.name}
                   </span>
-                  {!isReady && algo.key === 'lstm' && isTraining && (
+                  {!isReady && isTraining && (
                     <Loader2 className="w-3 h-3 animate-spin" style={{ color: algo.color }} />
                   )}
                 </div>
@@ -169,7 +171,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
                   </>
                 ) : (
                   <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-                    {algo.key === 'lstm' ? 'Training...' : 'Calculating...'}
+                    {isTraining ? (algo.key === 'lstm' ? 'Training model...' : 'Computing predictions...') : 'Waiting...'}
                   </div>
                 )}
               </div>
