@@ -559,13 +559,13 @@ export default function Home() {
         <div className="flex-1 min-w-0">
           {/* Header with Search */}
           <div className="card mb-4">
-            <span className="card-label">Stock Market Analysis</span>
+            <span className="card-label">Stock Predictor</span>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent)' }} />
               <div>
                 <h1 className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
-                  Stock Market Analysis
+                  Stock Predictor
                 </h1>
               </div>
             </div>
