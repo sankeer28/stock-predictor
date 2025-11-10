@@ -123,29 +123,25 @@ export function generatePolynomialRegression(
   }
   const avgVolatility = returns.reduce((sum, r) => sum + r, 0) / returns.length;
 
-  // Calculate linear trend from polynomial for more stability
-  const startX = 0.8;  // Near end of training data
-  const endX = 1.0;
-  const startY = a * startX * startX + b * startX + c;
-  const endY = a * endX * endX + b * endX + c;
-  const linearSlope = (endY - startY) / (endX - startX);  // Use recent trend only
+  // Calculate simple moving average for baseline
+  const recentAvg = recentPrices.slice(-10).reduce((sum, p) => sum + p, 0) / Math.min(10, recentPrices.length);
+
+  // Calculate recent price trend (last 10 days)
+  const recentTrend = (currentPrice - recentPrices[Math.max(0, recentPrices.length - 10)]) / Math.max(1, Math.min(10, recentPrices.length));
 
   for (let i = 0; i < forecastDays; i++) {
     const forecastDate = new Date(lastDate);
     forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-    // Use linear extrapolation from recent trend (more stable than polynomial curve)
-    const x = 1 + (i / (n - 1));
-    const xFromEnd = x - 1;  // Distance from end of training
-    let predicted = currentPrice + (linearSlope * (n - 1) * xFromEnd);
+    // Simple linear projection from recent trend
+    const trendPrediction = currentPrice + (recentTrend * (i + 1));
 
-    // Apply damping - predictions should be conservative
-    const dampingFactor = 0.5;  // Reduce predicted change by 50%
-    const change = predicted - currentPrice;
-    predicted = currentPrice + (change * dampingFactor);
+    // Weighted average: 70% current price, 30% trend prediction (very conservative)
+    let predicted = currentPrice * 0.70 + trendPrediction * 0.30;
 
-    // Ensure positive and reasonable
-    predicted = Math.max(currentPrice * 0.9, Math.min(currentPrice * 1.1, predicted));
+    // Additional safety bounds
+    const maxChange = currentPrice * 0.05 * Math.sqrt(i + 1);  // ±5% with gradual increase
+    predicted = Math.max(currentPrice - maxChange, Math.min(currentPrice + maxChange, predicted));
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],
