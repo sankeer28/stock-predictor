@@ -117,8 +117,8 @@ export default function StockChart({
   const candlestickData = React.useMemo(() => {
     return combinedData.map(d => ({
       ...d,
-      lowValue: d.low,
-      candleHeight: d.high && d.low ? d.high - d.low : 0,
+      lowValue: 'low' in d ? d.low : undefined,
+      candleHeight: 'high' in d && 'low' in d && d.high && d.low ? d.high - d.low : 0,
     }));
   }, [combinedData]);
 
