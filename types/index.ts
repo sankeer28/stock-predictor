@@ -56,13 +56,16 @@ export interface TradingSignal {
 
 export interface ChartDataPoint {
   date: string;
+  open: number;
+  high: number;
+  low: number;
   close: number;
   ma20?: number;
   ma50?: number;
   ma200?: number;
   bbUpper?: number;
   bbLower?: number;
-  volume?: number;
+  volume: number;
   rsi?: number;
   macd?: number;
   macdSignal?: number;

@@ -57,6 +57,8 @@ export default function Home() {
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
+  const [chartType, setChartType] = useState<'line' | 'candlestick'>('line');
+  const [showVolume, setShowVolume] = useState(true);
 
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
@@ -169,6 +171,9 @@ export default function Home() {
       // Prepare chart data
       const preparedChartData: ChartDataPoint[] = stockResult.data.map((d: StockData, i: number) => ({
         date: d.date,
+        open: d.open,
+        high: d.high,
+        low: d.low,
         close: d.close,
         volume: d.volume,
         ma20: indicators.ma20[i],
@@ -547,6 +552,38 @@ export default function Home() {
             {/* Chart Controls */}
             <div className="card mb-6 py-3">
               <span className="card-label">Chart Controls</span>
+
+              {/* Chart Type Toggle */}
+              <div className="mb-3 pb-3 border-b" style={{ borderColor: 'var(--bg-1)' }}>
+                <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>CHART TYPE</div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setChartType('line')}
+                    className="px-3 py-1.5 text-xs font-medium border transition-all"
+                    style={{
+                      background: chartType === 'line' ? 'var(--accent)' : 'var(--bg-3)',
+                      borderColor: chartType === 'line' ? 'var(--accent)' : 'var(--bg-1)',
+                      color: chartType === 'line' ? 'var(--text-0)' : 'var(--text-3)',
+                    }}
+                  >
+                    LINE
+                  </button>
+                  <button
+                    onClick={() => setChartType('candlestick')}
+                    className="px-3 py-1.5 text-xs font-medium border transition-all"
+                    style={{
+                      background: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-3)',
+                      borderColor: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-1)',
+                      color: chartType === 'candlestick' ? 'var(--text-0)' : 'var(--text-3)',
+                    }}
+                  >
+                    CANDLESTICK
+                  </button>
+                </div>
+              </div>
+
+              {/* Indicators & Options */}
+              <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>INDICATORS & OPTIONS</div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input
@@ -603,6 +640,19 @@ export default function Home() {
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
+                    checked={showVolume}
+                    onChange={(e) => setShowVolume(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showVolume ? 'var(--accent)' : 'var(--bg-3)',
+                    }}
+                  />
+                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>Volume</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
                     checked={showIndicators}
                     onChange={(e) => setShowIndicators(e.target.checked)}
                     className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
@@ -647,6 +697,8 @@ export default function Home() {
                 showMA200={showMA200}
                 showBB={showBB}
                 forecastData={forecastData}
+                chartType={chartType}
+                showVolume={showVolume}
               />
             </div>
 

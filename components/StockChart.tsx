@@ -14,6 +14,8 @@ import {
   ComposedChart,
   ReferenceLine,
   Brush,
+  Bar,
+  BarChart,
 } from 'recharts';
 import { ChartDataPoint } from '@/types';
 
@@ -25,7 +27,10 @@ interface StockChartProps {
   showBB?: boolean;
   showForecast?: boolean;
   forecastData?: Array<{ date: string; predicted: number; upper: number; lower: number }>;
+  chartType?: 'line' | 'candlestick';
+  showVolume?: boolean;
 }
+
 
 export default function StockChart({
   data,
@@ -35,6 +40,8 @@ export default function StockChart({
   showBB = false,
   showForecast = true,
   forecastData = [],
+  chartType = 'line',
+  showVolume = true,
 }: StockChartProps) {
   // Combine historical and forecast data
   const combinedData = [
@@ -102,6 +109,18 @@ export default function StockChart({
 
   const formatPrice = (value: number) => {
     return `$${value.toFixed(2)}`;
+  };
+
+  // Custom candlestick renderer using scatter plot approach
+  const renderCustomCandlestick = () => {
+    if (chartType !== 'candlestick') return null;
+
+    // This will be rendered as a custom layer
+    return (
+      <g className="candlesticks-layer">
+        {/* Candlesticks will be rendered here */}
+      </g>
+    );
   };
 
   return (
@@ -187,11 +206,26 @@ export default function StockChart({
             style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
           />
           <YAxis
+            yAxisId="price"
             tickFormatter={formatPrice}
             stroke="oklch(75% 0 0)"
             style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
             domain={['auto', 'auto']}
           />
+          {showVolume && (
+            <YAxis
+              yAxisId="volume"
+              orientation="right"
+              stroke="oklch(75% 0 0)"
+              style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
+              tickFormatter={(value) => {
+                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                return value.toString();
+              }}
+              domain={[0, (dataMax: number) => dataMax * 4]}
+            />
+          )}
           <Tooltip
             formatter={(value: any) => formatPrice(Number(value))}
             labelFormatter={formatDate}
@@ -236,9 +270,21 @@ export default function StockChart({
             gap={1}
           />
 
+          {/* Volume Bars - rendered first so they're behind */}
+          {showVolume && (
+            <Bar
+              yAxisId="volume"
+              dataKey="volume"
+              fill="oklch(70% 0.12 170)"
+              opacity={0.3}
+              name="Volume"
+            />
+          )}
+
           {/* Forecast separator line */}
           {showForecast && forecastData.length > 0 && (
             <ReferenceLine
+              yAxisId="price"
               x={data[data.length - 1]?.date}
               stroke="oklch(60% 0 0)"
               strokeDasharray="5 5"
@@ -256,6 +302,7 @@ export default function StockChart({
           {showBB && (
             <>
               <Area
+                yAxisId="price"
                 type="monotone"
                 dataKey="bbUpper"
                 stroke="oklch(70% 0.12 310)"
@@ -265,6 +312,7 @@ export default function StockChart({
                 strokeDasharray="3 3"
               />
               <Area
+                yAxisId="price"
                 type="monotone"
                 dataKey="bbLower"
                 stroke="oklch(70% 0.12 310)"
@@ -279,6 +327,7 @@ export default function StockChart({
           {/* Moving Averages */}
           {showMA200 && (
             <Line
+              yAxisId="price"
               type="monotone"
               dataKey="ma200"
               stroke="oklch(70% 0.12 170)"
@@ -289,6 +338,7 @@ export default function StockChart({
           )}
           {showMA50 && (
             <Line
+              yAxisId="price"
               type="monotone"
               dataKey="ma50"
               stroke="oklch(75% 0.12 90)"
@@ -299,6 +349,7 @@ export default function StockChart({
           )}
           {showMA20 && (
             <Line
+              yAxisId="price"
               type="monotone"
               dataKey="ma20"
               stroke="oklch(70% 0.13 0)"
@@ -308,20 +359,56 @@ export default function StockChart({
             />
           )}
 
-          {/* Price Line */}
-          <Line
-            type="monotone"
-            dataKey="close"
-            stroke="oklch(70% 0.11 215)"
-            strokeWidth={3}
-            dot={false}
-            name="Close Price"
-          />
+          {/* Price Line or Candlesticks */}
+          {chartType === 'line' ? (
+            <Line
+              yAxisId="price"
+              type="monotone"
+              dataKey="close"
+              stroke="oklch(70% 0.11 215)"
+              strokeWidth={3}
+              dot={false}
+              name="Close Price"
+            />
+          ) : (
+            <>
+              {/* Candlestick bars - simplified OHLC representation */}
+              <Bar
+                yAxisId="price"
+                dataKey="close"
+                shape={(props: any) => {
+                  const { x, y, width, height, payload } = props;
+                  if (!payload || payload.isForecast || !payload.open) return null;
+
+                  const isPositive = payload.close >= payload.open;
+                  const color = isPositive ? 'oklch(70% 0.12 170)' : 'oklch(70% 0.13 0)';
+                  const fillColor = isPositive ? 'oklch(70% 0.12 170)' : 'oklch(23% 0 0)';
+
+                  const barWidth = Math.max(width * 0.7, 2);
+                  const barX = x + (width - barWidth) / 2;
+
+                  return (
+                    <rect
+                      x={barX}
+                      y={y}
+                      width={barWidth}
+                      height={Math.max(height, 1)}
+                      fill={isPositive ? fillColor : 'oklch(23% 0 0)'}
+                      stroke={color}
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
+                isAnimationActive={false}
+              />
+            </>
+          )}
 
           {/* Forecast Line */}
           {showForecast && forecastData.length > 0 && (
             <>
               <Line
+                yAxisId="price"
                 type="monotone"
                 dataKey="predicted"
                 stroke="oklch(70% 0.13 0)"
@@ -331,6 +418,7 @@ export default function StockChart({
                 name="Forecast"
               />
               <Area
+                yAxisId="price"
                 type="monotone"
                 dataKey="upper"
                 stroke="oklch(70% 0.13 0)"
@@ -340,6 +428,7 @@ export default function StockChart({
                 name="Upper Bound"
               />
               <Area
+                yAxisId="price"
                 type="monotone"
                 dataKey="lower"
                 stroke="oklch(70% 0.13 0)"
