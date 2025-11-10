@@ -196,7 +196,11 @@ export default function StockChart({
 
       <div className="w-full h-[550px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartType === 'candlestick' ? candlestickData : combinedData} margin={{ top: 5, right: 30, left: 20, bottom: 50 }}>
+          <ComposedChart
+            data={chartType === 'candlestick' ? candlestickData : combinedData}
+            margin={{ top: 5, right: 30, left: 20, bottom: 50 }}
+            barCategoryGap="10%"
+          >
           <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
           <XAxis
             dataKey="date"
@@ -419,41 +423,52 @@ export default function StockChart({
                 stroke="transparent"
                 strokeWidth={0}
                 dot={(dotProps: any) => {
-                  const { cx, cy, payload, key, index } = dotProps;
+                  const { cx, cy, payload, key, index, width, height, xAxis, yAxis } = dotProps;
 
                   if (!payload || payload.isForecast || !payload.open || !payload.close || !payload.high || !payload.low) {
                     return null;
                   }
-
-                  // We need to calculate Y positions based on the actual price scale
-                  // Since we're in a dot, we only have cx (X position) and the payload data
-                  // We'll need to estimate the scale
 
                   const { open, close, high, low } = payload;
                   const isGreen = close >= open;
                   const color = isGreen ? 'oklch(70% 0.12 170)' : 'oklch(70% 0.13 0)';
                   const fillColor = isGreen ? 'oklch(70% 0.12 170)' : 'oklch(23% 0 0)';
 
-                  // cy is at the close price position
-                  // We need to calculate relative positions for open, high, low
-                  // This is a hack but should work: estimate pixel-per-dollar ratio
-                  const priceRange = high - low;
-                  const pixelsPerDollar = priceRange > 0 ? 20 / priceRange : 1; // rough estimate
+                  // Calculate bar width based on available space
+                  // Get the number of visible data points from the brush range
+                  const visibleDataPoints = brushRange.endIndex - brushRange.startIndex + 1;
+                  // Calculate width per data point (use xAxis if available, otherwise estimate)
+                  const chartWidth = width || 800; // fallback width
+                  const availableWidth = chartWidth * 0.8; // accounting for margins
+                  const widthPerPoint = availableWidth / visibleDataPoints;
+                  // Set bar width to 60% of available space to avoid overlap, with min/max bounds
+                  const barWidth = Math.max(2, Math.min(widthPerPoint * 0.6, 12));
 
-                  const highOffset = (close - high) * pixelsPerDollar;
-                  const lowOffset = (close - low) * pixelsPerDollar;
-                  const openOffset = (close - open) * pixelsPerDollar;
+                  // Calculate Y positions using the yAxis scale if available
+                  let yHigh, yLow, yOpen, yClose;
 
-                  const yHigh = cy + highOffset;
-                  const yLow = cy + lowOffset;
-                  const yOpen = cy + openOffset;
-                  const yClose = cy;
+                  if (yAxis && yAxis.scale) {
+                    // Use the actual chart scale for accurate positioning
+                    yHigh = yAxis.scale(high);
+                    yLow = yAxis.scale(low);
+                    yOpen = yAxis.scale(open);
+                    yClose = yAxis.scale(close);
+                  } else {
+                    // Fallback to estimation
+                    const priceRange = high - low;
+                    const pixelsPerDollar = priceRange > 0 ? 50 / priceRange : 1;
+                    const highOffset = (close - high) * pixelsPerDollar;
+                    const lowOffset = (close - low) * pixelsPerDollar;
+                    const openOffset = (close - open) * pixelsPerDollar;
+                    yHigh = cy + highOffset;
+                    yLow = cy + lowOffset;
+                    yOpen = cy + openOffset;
+                    yClose = cy;
+                  }
 
                   const bodyTop = Math.min(yOpen, yClose);
                   const bodyBottom = Math.max(yOpen, yClose);
                   const bodyHeight = Math.max(Math.abs(bodyBottom - bodyTop), 1);
-
-                  const barWidth = 8;
 
                   return (
                     <g key={`candle-${index}`}>
@@ -464,7 +479,7 @@ export default function StockChart({
                         x2={cx}
                         y2={yLow}
                         stroke={color}
-                        strokeWidth={1}
+                        strokeWidth={Math.max(1, barWidth * 0.15)}
                       />
                       {/* Body */}
                       <rect
@@ -474,7 +489,7 @@ export default function StockChart({
                         height={bodyHeight}
                         fill={fillColor}
                         stroke={color}
-                        strokeWidth={1.5}
+                        strokeWidth={Math.max(1, barWidth * 0.2)}
                       />
                     </g>
                   );
