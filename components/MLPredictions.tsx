@@ -20,9 +20,11 @@ interface MLPredictionsProps {
     ema?: MLPrediction[];
   };
   isTraining: boolean;
+  fromCache?: boolean;
+  onRecalculate?: () => void;
 }
 
-export default function MLPredictions({ currentPrice, predictions, isTraining }: MLPredictionsProps) {
+export default function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate }: MLPredictionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number>(7);
 
@@ -88,6 +90,29 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
         }}
       >
         <span className="card-label">ML Predictions</span>
+
+        {/* Cache Status and Recalculate Button */}
+        <div className="mb-3 flex items-center justify-between">
+          {fromCache && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full" style={{ background: 'var(--accent)' }} />
+              <span className="text-xs" style={{ color: 'var(--text-4)' }}>From cache</span>
+            </div>
+          )}
+          {fromCache && onRecalculate && !isTraining && (
+            <button
+              onClick={onRecalculate}
+              className="px-2 py-1 text-xs border transition-all"
+              style={{
+                background: 'var(--bg-3)',
+                borderColor: 'var(--bg-1)',
+                color: 'var(--text-3)',
+              }}
+            >
+              Recalculate
+            </button>
+          )}
+        </div>
 
         {isTraining && (
           <div className="flex items-center justify-end mb-4">

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { History, TrendingUp, X, Menu } from 'lucide-react';
+import PredictionsCache from './PredictionsCache';
 
 export interface SearchHistoryItem {
   symbol: string;
@@ -118,6 +119,23 @@ export default function Sidebar({
           ))
         )}
       </div>
+    </div>
+
+    {/* Predictions Cache - Separate Container Below Search History */}
+    <div
+      className={`w-64 transition-transform xl:translate-x-0 ${
+        isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
+      } xl:block mt-6`}
+      style={{
+        position: isOpen ? 'fixed' : 'relative',
+        left: isOpen ? 0 : 'auto',
+        top: isOpen ? '50vh' : 'auto',
+        zIndex: isOpen ? 40 : 'auto',
+        maxHeight: isOpen ? '50vh' : 'none',
+        overflowY: isOpen ? 'auto' : 'visible',
+      }}
+    >
+      <PredictionsCache onLoadPrediction={onSelectSymbol} />
     </div>
 
     {/* Mobile Overlay */}

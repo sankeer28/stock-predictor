@@ -28,6 +28,7 @@ import {
 } from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
+import { getCachedPredictions, savePredictionsToCache, clearCachedPrediction } from '@/lib/predictionsCache';
 
 export default function Home() {
   const [symbol, setSymbol] = useState('AAPL');
@@ -82,6 +83,7 @@ export default function Home() {
     ema?: MLPrediction[];
   }>({});
   const [mlTraining, setMlTraining] = useState(false);
+  const [mlFromCache, setMlFromCache] = useState(false);
 
   // Load search history from localStorage on mount
   useEffect(() => {
@@ -142,7 +144,7 @@ export default function Home() {
     }
   };
 
-  const fetchData = async (stockSymbol: string) => {
+  const fetchData = async (stockSymbol: string, forceRecalc: boolean = false) => {
     setLoading(true);
     setError('');
     setNewsArticles([]); // Reset news to show loading state
@@ -225,54 +227,95 @@ export default function Home() {
         }
       }, 100);
 
-      // Run ML algorithms in background (much lower priority - wait for chart to render)
-      setMlTraining(true);
-      setTimeout(async () => {
-        try {
-          // Fast algorithms (non-neural network)
-          const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
-          const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
-          const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
-          const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
-          const arimaForecast = generateARIMAForecast(stockResult.data, forecastHorizon);
+      // Check cache first unless force recalculate is true
+      const cached = !forceRecalc ? getCachedPredictions(stockSymbol, forecastHorizon) : null;
 
-          setMlPredictions({
-            linearRegression: linearReg,
-            polynomialRegression: polyReg,
-            movingAverage: maForecast,
-            ema: emaForecast,
-            arima: arimaForecast,
-          });
+      if (cached && !forceRecalc) {
+        // Use cached predictions
+        console.log(`Loading cached ML predictions for ${stockSymbol}`);
+        setMlPredictions(cached.predictions);
+        setMlFromCache(true);
+        setMlTraining(false);
+      } else {
+        // Run ML algorithms in background (much lower priority - wait for chart to render)
+        setMlFromCache(false);
+        setMlTraining(true);
+        setTimeout(async () => {
+          try {
+            // Fast algorithms (non-neural network)
+            const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
+            const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
+            const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
+            const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
+            const arimaForecast = generateARIMAForecast(stockResult.data, forecastHorizon);
 
-          // Neural network models (train in parallel for speed)
-          console.log('Starting all neural network models in parallel...');
+            const predictions = {
+              linearRegression: linearReg,
+              polynomialRegression: polyReg,
+              movingAverage: maForecast,
+              ema: emaForecast,
+              arima: arimaForecast,
+            };
 
-          // Start all models at once (parallel training)
-          const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon)
-            .then(forecast => setMlPredictions(prev => ({ ...prev, gru: forecast })));
+            setMlPredictions(predictions);
 
-          const tftPromise = generateTFTForecast(stockResult.data, forecastHorizon)
-            .then(forecast => setMlPredictions(prev => ({ ...prev, tft: forecast })));
+            // Neural network models (train in parallel for speed)
+            console.log('Starting all neural network models in parallel...');
 
-          const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon)
-            .then(forecast => setMlPredictions(prev => ({ ...prev, cnn: forecast })));
+            // Start all models at once (parallel training)
+            const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon)
+              .then(forecast => {
+                setMlPredictions(prev => ({ ...prev, gru: forecast }));
+                return forecast;
+              });
 
-          const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon)
-            .then(forecast => setMlPredictions(prev => ({ ...prev, cnnLstm: forecast })));
+            const tftPromise = generateTFTForecast(stockResult.data, forecastHorizon)
+              .then(forecast => {
+                setMlPredictions(prev => ({ ...prev, tft: forecast }));
+                return forecast;
+              });
 
-          const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon)
-            .then(forecast => setMlPredictions(prev => ({ ...prev, lstm: forecast })));
+            const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon)
+              .then(forecast => {
+                setMlPredictions(prev => ({ ...prev, cnn: forecast }));
+                return forecast;
+              });
 
-          // Wait for all to complete
-          await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+            const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon)
+              .then(forecast => {
+                setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
+                return forecast;
+              });
 
-          setMlTraining(false);
-          console.log('All ML algorithms completed!');
-        } catch (mlError) {
-          console.error('ML algorithms error:', mlError);
-          setMlTraining(false);
-        }
-      }, 2000); // Wait 2 seconds to let chart fully render first
+            const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon)
+              .then(forecast => {
+                setMlPredictions(prev => ({ ...prev, lstm: forecast }));
+                return forecast;
+              });
+
+            // Wait for all to complete
+            const [gru, tft, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+
+            // Save all predictions to cache
+            const allPredictions = {
+              ...predictions,
+              gru,
+              tft,
+              cnn,
+              cnnLstm,
+              lstm,
+            };
+
+            savePredictionsToCache(stockSymbol, allPredictions, forecastHorizon);
+
+            setMlTraining(false);
+            console.log('All ML algorithms completed and cached!');
+          } catch (mlError) {
+            console.error('ML algorithms error:', mlError);
+            setMlTraining(false);
+          }
+        }, 2000); // Wait 2 seconds to let chart fully render first
+      }
 
       // Fetch news asynchronously (fast, no sentiment)
       setTimeout(async () => {
@@ -350,9 +393,19 @@ export default function Home() {
           );
           setTradingSignal(simpleSignal);
 
-          // Run all ML algorithms in background (delay to avoid blocking UI)
-          setMlTraining(true);
-          setTimeout(async () => {
+          // Check cache for this forecast horizon
+          const cached = getCachedPredictions(symbol, forecastHorizon);
+
+          if (cached) {
+            console.log(`Loading cached ML predictions for ${symbol} (horizon: ${forecastHorizon})`);
+            setMlPredictions(cached.predictions);
+            setMlFromCache(true);
+            setMlTraining(false);
+          } else {
+            // Run all ML algorithms in background (delay to avoid blocking UI)
+            setMlFromCache(false);
+            setMlTraining(true);
+            setTimeout(async () => {
             try {
               // Fast algorithms (non-neural network)
               const linearReg = generateLinearRegression(stockData, forecastHorizon);
@@ -371,21 +424,48 @@ export default function Home() {
 
               // Neural network models (parallel training)
               const gruPromise = generateGRUForecast(stockData, forecastHorizon)
-                .then(forecast => setMlPredictions(prev => ({ ...prev, gru: forecast })));
+                .then(forecast => {
+                  setMlPredictions(prev => ({ ...prev, gru: forecast }));
+                  return forecast;
+                });
 
               const tftPromise = generateTFTForecast(stockData, forecastHorizon)
-                .then(forecast => setMlPredictions(prev => ({ ...prev, tft: forecast })));
+                .then(forecast => {
+                  setMlPredictions(prev => ({ ...prev, tft: forecast }));
+                  return forecast;
+                });
 
               const cnnPromise = generate1DCNNForecast(stockData, forecastHorizon)
-                .then(forecast => setMlPredictions(prev => ({ ...prev, cnn: forecast })));
+                .then(forecast => {
+                  setMlPredictions(prev => ({ ...prev, cnn: forecast }));
+                  return forecast;
+                });
 
               const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon)
-                .then(forecast => setMlPredictions(prev => ({ ...prev, cnnLstm: forecast })));
+                .then(forecast => {
+                  setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
+                  return forecast;
+                });
 
               const lstmPromise = generateMLForecast(stockData, forecastHorizon)
-                .then(forecast => setMlPredictions(prev => ({ ...prev, lstm: forecast })));
+                .then(forecast => {
+                  setMlPredictions(prev => ({ ...prev, lstm: forecast }));
+                  return forecast;
+                });
 
-              await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+              const [gru, tft, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+
+              // Save all predictions to cache
+              const allPredictions = {
+                ...predictions,
+                gru,
+                tft,
+                cnn,
+                cnnLstm,
+                lstm,
+              };
+
+              savePredictionsToCache(symbol, allPredictions, forecastHorizon);
 
               setMlTraining(false);
             } catch (mlError) {
@@ -393,6 +473,7 @@ export default function Home() {
               setMlTraining(false);
             }
           }, 1500); // Delay ML to let chart render smoothly
+          }
         } catch (forecastError) {
           console.error('Forecast update error:', forecastError);
           setMlTraining(false);
@@ -809,6 +890,10 @@ export default function Home() {
               currentPrice={currentPrice}
               predictions={mlPredictions}
               isTraining={mlTraining}
+              fromCache={mlFromCache}
+              onRecalculate={() => {
+                fetchData(symbol, true); // Pass true to force recalculation
+              }}
             />
           </div>
         )}
