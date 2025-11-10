@@ -179,62 +179,61 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
           })}
         </div>
 
-        {/* Detailed Table */}
+        {/* ML Models Comparison Table */}
         {algorithms.some(a => a.data && a.data.length > 0) && (
           <div className="mt-6">
             <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-2)' }}>
-              Detailed Predictions ({selectedDays} days)
+              Model Comparison ({selectedDays} days)
             </h3>
             <div className="border-2" style={{ borderColor: 'var(--bg-1)' }}>
               <table className="w-full text-xs">
                 <thead style={{ background: 'var(--bg-2)' }}>
                   <tr>
-                    <th className="p-2 text-left" style={{ color: 'var(--text-4)' }}>Day</th>
-                    <th className="p-2 text-right" style={{ color: 'var(--text-4)' }}>Avg Price</th>
+                    <th className="p-2 text-left" style={{ color: 'var(--text-4)' }}>Model</th>
+                    <th className="p-2 text-right" style={{ color: 'var(--text-4)' }}>Price</th>
                     <th className="p-2 text-right" style={{ color: 'var(--text-4)' }}>Change</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.from({ length: Math.min(selectedDays, 10) }).map((_, dayIndex) => {
-                    // Calculate average prediction across all algorithms
-                    const validPredictions = algorithms
-                      .map(algo => algo.data?.[dayIndex]?.predicted)
-                      .filter((p): p is number => p !== undefined);
-
-                    if (validPredictions.length === 0) return null;
-
-                    const avgPrice = validPredictions.reduce((sum, p) => sum + p, 0) / validPredictions.length;
-
-                    // Calculate change from previous day (or current price for day 1)
-                    let previousPrice = currentPrice;
-                    if (dayIndex > 0) {
-                      const prevValidPredictions = algorithms
-                        .map(algo => algo.data?.[dayIndex - 1]?.predicted)
-                        .filter((p): p is number => p !== undefined);
-                      if (prevValidPredictions.length > 0) {
-                        previousPrice = prevValidPredictions.reduce((sum, p) => sum + p, 0) / prevValidPredictions.length;
-                      }
-                    }
-
-                    const change = ((avgPrice - previousPrice) / previousPrice) * 100;
+                  {algorithms.map((algo, index) => {
+                    const stats = calculateStats(algo.data);
+                    const isReady = algo.data && algo.data.length > 0;
 
                     return (
                       <tr
-                        key={dayIndex}
+                        key={algo.key}
                         className="border-t"
-                        style={{ borderColor: 'var(--bg-1)', background: dayIndex % 2 === 0 ? 'var(--bg-3)' : 'var(--bg-2)' }}
+                        style={{
+                          borderColor: 'var(--bg-1)',
+                          background: index % 2 === 0 ? 'var(--bg-3)' : 'var(--bg-2)',
+                          opacity: isReady ? 1 : 0.4,
+                        }}
                       >
-                        <td className="p-2" style={{ color: 'var(--text-3)' }}>Day {dayIndex + 1}</td>
+                        <td className="p-2" style={{ color: 'var(--text-3)' }}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ background: algo.color }}
+                            />
+                            {algo.name}
+                          </div>
+                        </td>
                         <td className="p-2 text-right font-mono" style={{ color: 'var(--text-2)' }}>
-                          ${avgPrice.toFixed(2)}
+                          {isReady && stats ? `$${stats.price.toFixed(2)}` : '—'}
                         </td>
                         <td
                           className="p-2 text-right font-semibold"
                           style={{
-                            color: change > 0 ? 'var(--success)' : 'var(--danger)',
+                            color: stats && stats.change > 0 ? 'var(--success)' : 'var(--danger)',
                           }}
                         >
-                          {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                          {isReady && stats ? (
+                            <>
+                              {stats.change > 0 ? '+' : ''}{stats.change.toFixed(2)}%
+                            </>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                       </tr>
                     );
