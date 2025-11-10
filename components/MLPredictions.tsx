@@ -121,19 +121,8 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
           </div>
         </div>
 
-        {/* Current Price Reference */}
-        <div className="mb-4 p-3 border-2" style={{
-          background: 'var(--bg-2)',
-          borderColor: 'var(--bg-1)',
-        }}>
-          <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Current Price</div>
-          <div className="text-xl font-bold font-mono" style={{ color: 'var(--text-1)' }}>
-            ${currentPrice.toFixed(2)}
-          </div>
-        </div>
-
         {/* Algorithms List */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {algorithms.map((algo) => {
             const stats = calculateStats(algo.data);
             const isReady = algo.data && algo.data.length > 0;
@@ -141,16 +130,16 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
             return (
               <div
                 key={algo.key}
-                className="p-4 border-2"
+                className="p-2 border-2"
                 style={{
                   background: 'var(--bg-2)',
                   borderColor: algo.color,
-                  borderLeftWidth: '4px',
+                  borderLeftWidth: '3px',
                   opacity: isReady ? 1 : 0.5,
                 }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>
                     {algo.name}
                   </span>
                   {!isReady && isTraining && (
@@ -159,27 +148,22 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
                 </div>
 
                 {isReady && stats ? (
-                  <>
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-lg font-bold font-mono" style={{ color: algo.color }}>
-                        ${stats.price.toFixed(2)}
-                      </span>
-                      <span
-                        className="text-xs font-semibold"
-                        style={{
-                          color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
-                        }}
-                      >
-                        {stats.direction === 'up' ? '↑' : '↓'} {Math.abs(stats.change).toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-                      {selectedDays} day forecast
-                    </div>
-                  </>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-bold font-mono" style={{ color: algo.color }}>
+                      ${stats.price.toFixed(2)}
+                    </span>
+                    <span
+                      className="text-xs font-semibold"
+                      style={{
+                        color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
+                      }}
+                    >
+                      {stats.direction === 'up' ? '↑' : '↓'} {Math.abs(stats.change).toFixed(2)}%
+                    </span>
+                  </div>
                 ) : (
                   <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-                    {isTraining ? (algo.key === 'lstm' ? 'Training model...' : 'Computing predictions...') : 'Waiting...'}
+                    {isTraining ? (algo.key === 'lstm' ? 'Training...' : 'Computing...') : 'Waiting...'}
                   </div>
                 )}
               </div>
