@@ -35,29 +35,24 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
   return { X, y };
 }
 
-// Build LSTM model (optimized for accuracy with dual layers)
+// Build LSTM model (optimized for speed - lighter model)
 function buildLSTMModel(lookback: number): tf.Sequential {
   const model = tf.sequential();
 
-  // First LSTM layer with return sequences enabled
+  // Single LSTM layer (faster and avoids the orthogonal warning)
   model.add(tf.layers.lstm({
-    units: 64,
-    returnSequences: true,
-    inputShape: [lookback, 1],
-  }));
-  model.add(tf.layers.dropout({ rate: 0.3 }));
-
-  // Second LSTM layer for deeper learning
-  model.add(tf.layers.lstm({
-    units: 32,
+    units: 32,  // Reduced from 64 to avoid orthogonal initializer warning
     returnSequences: false,
+    inputShape: [lookback, 1],
+    kernelInitializer: 'glorotNormal',  // Use glorotNormal instead of default orthogonal
+    recurrentInitializer: 'glorotNormal',
   }));
   model.add(tf.layers.dropout({ rate: 0.2 }));
 
   // Dense output layer
   model.add(tf.layers.dense({ units: 1 }));
 
-  // Compile model with adaptive learning rate
+  // Compile model
   model.compile({
     optimizer: tf.train.adam(0.001),
     loss: 'meanSquaredError',
@@ -85,16 +80,16 @@ export async function generateMLForecast(
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
 
-    // Need at least 90 days of data for training (lookback=20 requires more data)
-    if (closePrices.length < 90) {
-      throw new Error('Insufficient data for ML forecasting (minimum 90 days required)');
+    // Need at least 60 days of data for training
+    if (closePrices.length < 60) {
+      throw new Error('Insufficient data for ML forecasting (minimum 60 days required)');
     }
 
     // Normalize data
     const { normalized, min, max } = normalizeData(closePrices);
 
-    // Create training sequences (use 20 days lookback for better pattern recognition)
-    const lookback = 20;
+    // Create training sequences (use 10 days lookback for faster training)
+    const lookback = 10;
     const { X, y } = createSequences(normalized, lookback);
 
     // Convert to tensors
@@ -106,13 +101,13 @@ export async function generateMLForecast(
     const model = buildLSTMModel(lookback);
 
     await model.fit(xsTensor, ysTensor, {
-      epochs: 50,  // Increased for better accuracy
-      batchSize: 32,  // Standard batch size
-      validationSplit: 0.15,  // Increased validation split
+      epochs: 20,  // Reduced for faster training
+      batchSize: 16,  // Smaller batch for faster processing
+      validationSplit: 0.1,
       verbose: 0,
       callbacks: {
         onEpochEnd: (epoch, logs) => {
-          if (epoch % 10 === 0) {
+          if (epoch % 5 === 0) {
             console.log(`Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}, val_loss = ${logs?.val_loss?.toFixed(4)}`);
           }
         }

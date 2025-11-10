@@ -7,9 +7,10 @@ import { TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
 interface NewsPanelProps {
   articles: NewsArticle[];
   sentiments: SentimentResult[];
+  isAnalyzingSentiment?: boolean;
 }
 
-export default function NewsPanel({ articles, sentiments }: NewsPanelProps) {
+export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment = false }: NewsPanelProps) {
   if (articles.length === 0) {
     return (
       <div className="card">
@@ -58,7 +59,15 @@ export default function NewsPanel({ articles, sentiments }: NewsPanelProps) {
 
   return (
     <div className="card">
-      <span className="card-label">Latest News & Sentiment</span>
+      <div className="flex items-center justify-between mb-4">
+        <span className="card-label">Latest News & Sentiment</span>
+        {isAnalyzingSentiment && (
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-4)' }}>Analyzing sentiment...</span>
+          </div>
+        )}
+      </div>
 
       {/* Overall Sentiment Summary */}
       <div className="mb-6 p-4 border-2" style={{

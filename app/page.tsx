@@ -38,6 +38,7 @@ export default function Home() {
   const [forecastData, setForecastData] = useState<any[]>([]);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
   const [newsSentiments, setNewsSentiments] = useState<any[]>([]);
+  const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
   const [tradingSignal, setTradingSignal] = useState<any>(null);
   const [forecastInsights, setForecastInsights] = useState<any>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
@@ -124,6 +125,7 @@ export default function Home() {
     setError('');
     setNewsArticles([]); // Reset news to show loading state
     setNewsSentiments([]);
+    setIsAnalyzingSentiment(false);
 
     try {
       // Fetch stock data
@@ -167,81 +169,106 @@ export default function Home() {
 
       setChartData(preparedChartData);
 
-      // Generate simple forecast first (non-blocking)
-      try {
-        const simpleForecast = generateForecast(stockResult.data, forecastHorizon);
-        const simpleInsights = getForecastInsights(
-          stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close,
-          simpleForecast
-        );
-
-        setForecastData(simpleForecast);
-        setForecastInsights(simpleInsights);
-
-        // Generate trading signal with simple forecast
-        const signal = generateTradingSignal(
-          stockResult.data,
-          indicators,
-          simpleInsights?.mediumTerm.change
-        );
-        setTradingSignal(signal);
-
-        // Run all ML algorithms in background
-        setMlTraining(true);
-        setTimeout(async () => {
-          try {
-            // Fast algorithms (run immediately)
-            const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
-            const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
-            const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
-            const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
-
-            setMlPredictions({
-              linearRegression: linearReg,
-              polynomialRegression: polyReg,
-              movingAverage: maForecast,
-              ema: emaForecast,
-            });
-
-            // LSTM (slower, train last)
-            console.log('Starting LSTM training...');
-            const lstmForecast = await generateMLForecast(stockResult.data, forecastHorizon);
-
-            setMlPredictions(prev => ({
-              ...prev,
-              lstm: lstmForecast,
-            }));
-
-            setMlTraining(false);
-            console.log('All ML algorithms completed!');
-          } catch (mlError) {
-            console.error('ML algorithms error:', mlError);
-            setMlTraining(false);
-          }
-        }, 100);
-      } catch (forecastError) {
-        console.error('Forecast error:', forecastError);
-        setMlTraining(false);
-        // Generate trading signal without forecast
-        const signal = generateTradingSignal(stockResult.data, indicators);
-        setTradingSignal(signal);
-      }
-
       setSymbol(stockSymbol);
 
-      // Fetch news asynchronously (non-blocking)
+      // Generate simple forecast in background (non-blocking)
+      setTimeout(() => {
+        try {
+          const simpleForecast = generateForecast(stockResult.data, forecastHorizon);
+          const simpleInsights = getForecastInsights(
+            stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close,
+            simpleForecast
+          );
+
+          setForecastData(simpleForecast);
+          setForecastInsights(simpleInsights);
+
+          // Generate trading signal with simple forecast
+          const signal = generateTradingSignal(
+            stockResult.data,
+            indicators,
+            simpleInsights?.mediumTerm.change
+          );
+          setTradingSignal(signal);
+        } catch (forecastError) {
+          console.error('Forecast error:', forecastError);
+          // Generate trading signal without forecast
+          const signal = generateTradingSignal(stockResult.data, indicators);
+          setTradingSignal(signal);
+        }
+      }, 10);
+
+      // Run ML algorithms in background (lower priority)
+      setMlTraining(true);
+      setTimeout(async () => {
+        try {
+          // Fast algorithms
+          const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
+          const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
+          const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
+          const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
+
+          setMlPredictions({
+            linearRegression: linearReg,
+            polynomialRegression: polyReg,
+            movingAverage: maForecast,
+            ema: emaForecast,
+          });
+
+          // LSTM (slower, train last)
+          console.log('Starting LSTM training...');
+          const lstmForecast = await generateMLForecast(stockResult.data, forecastHorizon);
+
+          setMlPredictions(prev => ({
+            ...prev,
+            lstm: lstmForecast,
+          }));
+
+          setMlTraining(false);
+          console.log('All ML algorithms completed!');
+        } catch (mlError) {
+          console.error('ML algorithms error:', mlError);
+          setMlTraining(false);
+        }
+      }, 500);
+
+      // Fetch news asynchronously (fast, no sentiment)
       setTimeout(async () => {
         try {
           const newsResponse = await fetch(`/api/news?symbol=${stockSymbol}`);
           if (newsResponse.ok) {
             const newsResult = await newsResponse.json();
-            setNewsArticles(newsResult.articles || []);
+            const articles = newsResult.articles || [];
+            setNewsArticles(articles);
 
-            // Extract sentiments from articles (already analyzed server-side with transformers.js)
-            const sentiments = (newsResult.articles || []).map((article: NewsArticle) =>
-              article.sentiment || { sentiment: 'neutral' as const, score: 0, confidence: 0 }
-            );
-            setNewsSentiments(sentiments);
+            // Set placeholder sentiments
+            const placeholders = articles.map(() => ({
+              sentiment: 'neutral' as const,
+              score: 0,
+              confidence: 0
+            }));
+            setNewsSentiments(placeholders);
+
+            // Analyze sentiment in background (slower)
+            setTimeout(async () => {
+              try {
+                setIsAnalyzingSentiment(true);
+                const sentimentResponse = await fetch('/api/sentiment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ articles }),
+                });
+
+                if (sentimentResponse.ok) {
+                  const sentimentResult = await sentimentResponse.json();
+                  setNewsSentiments(sentimentResult.sentiments || placeholders);
+                }
+              } catch (sentimentError) {
+                console.error('Error analyzing sentiment:', sentimentError);
+              } finally {
+                setIsAnalyzingSentiment(false);
+              }
+            }, 1000);
           }
         } catch (newsError) {
           console.error('Error fetching news:', newsError);
@@ -644,7 +671,11 @@ export default function Home() {
               )}
 
               {/* News & Sentiment */}
-              <NewsPanel articles={newsArticles} sentiments={newsSentiments} />
+              <NewsPanel
+                articles={newsArticles}
+                sentiments={newsSentiments}
+                isAnalyzingSentiment={isAnalyzingSentiment}
+              />
             </div>
           </>
         )}

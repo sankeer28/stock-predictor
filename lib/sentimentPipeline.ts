@@ -1,4 +1,9 @@
-import { pipeline } from '@xenova/transformers';
+import { pipeline, env } from '@xenova/transformers';
+
+// Configure cache directory for Vercel (use /tmp which is writable)
+if (process.env.VERCEL) {
+  env.cacheDir = '/tmp/.transformers_cache';
+}
 
 // Singleton pattern for sentiment analysis pipeline
 let sentimentPipeline: any = null;
@@ -20,14 +25,20 @@ export async function getSentimentPipeline(): Promise<any> {
 
   // Start loading the pipeline
   pipelinePromise = (async () => {
-    // Use DistilBERT fine-tuned on SST-2
-    sentimentPipeline = await pipeline(
-      'sentiment-analysis',
-      'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
-    );
-    console.log('Loaded sentiment model: DistilBERT SST-2 with keyword enhancement');
-    pipelinePromise = null; // Clear the promise once loaded
-    return sentimentPipeline;
+    try {
+      // Use DistilBERT fine-tuned on SST-2
+      sentimentPipeline = await pipeline(
+        'sentiment-analysis',
+        'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
+      );
+      console.log('Loaded sentiment model: DistilBERT SST-2 with keyword enhancement');
+      pipelinePromise = null; // Clear the promise once loaded
+      return sentimentPipeline;
+    } catch (error) {
+      console.error('Failed to load sentiment model:', error);
+      pipelinePromise = null;
+      throw error;
+    }
   })();
 
   return pipelinePromise;

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NewsArticle } from '@/types';
-import { analyzeSentiment } from '@/lib/sentiment';
 
 /**
- * Fetch news articles from NewsAPI with AI-powered sentiment analysis
+ * Fetch news articles from NewsAPI (fast - no sentiment)
  * GET /api/news?symbol=AAPL
  */
 export async function GET(request: NextRequest) {
@@ -38,27 +37,17 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
-    // Transform to our format and add sentiment analysis
-    const articlesWithSentiment: NewsArticle[] = await Promise.all(
-      (data.articles || []).map(async (article: any) => {
-        const combinedText = `${article.title || ''} ${article.description || ''}`;
+    // Transform to our format WITHOUT sentiment (for fast loading)
+    const articles: NewsArticle[] = (data.articles || []).map((article: any) => ({
+      title: article.title,
+      description: article.description || '',
+      url: article.url,
+      publishedAt: article.publishedAt,
+      source: article.source?.name || 'Unknown',
+      sentiment: { sentiment: 'neutral' as const, score: 0, confidence: 0 }, // Placeholder
+    }));
 
-        // Perform sentiment analysis using transformers.js
-        const sentiment = await analyzeSentiment(combinedText);
-
-
-        return {
-          title: article.title,
-          description: article.description || '',
-          url: article.url,
-          publishedAt: article.publishedAt,
-          source: article.source?.name || 'Unknown',
-          sentiment, // AI-powered sentiment analysis
-        };
-      })
-    );
-
-    return NextResponse.json({ articles: articlesWithSentiment });
+    return NextResponse.json({ articles });
 
   } catch (error) {
     console.error('Error fetching news:', error);
