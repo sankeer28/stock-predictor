@@ -20,6 +20,12 @@ import {
   generateARIMAForecast,
   MLPrediction
 } from '@/lib/mlAlgorithms';
+import {
+  generateGRUForecast,
+  generate1DCNNForecast,
+  generateCNNLSTMForecast,
+  generateTFTForecast,
+} from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
 
@@ -56,6 +62,10 @@ export default function Home() {
   const [mlPredictions, setMlPredictions] = useState<{
     lstm?: MLForecast[];
     arima?: MLPrediction[];
+    gru?: MLPrediction[];
+    tft?: MLPrediction[];
+    cnn?: MLPrediction[];
+    cnnLstm?: MLPrediction[];
     linearRegression?: MLPrediction[];
     polynomialRegression?: MLPrediction[];
     movingAverage?: MLPrediction[];
@@ -206,7 +216,7 @@ export default function Home() {
       setMlTraining(true);
       setTimeout(async () => {
         try {
-          // Fast algorithms
+          // Fast algorithms (non-neural network)
           const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
           const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
           const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
@@ -221,14 +231,27 @@ export default function Home() {
             arima: arimaForecast,
           });
 
-          // LSTM (slower, train last)
-          console.log('Starting LSTM training...');
-          const lstmForecast = await generateMLForecast(stockResult.data, forecastHorizon);
+          // Neural network models (train in parallel for speed)
+          console.log('Starting all neural network models in parallel...');
 
-          setMlPredictions(prev => ({
-            ...prev,
-            lstm: lstmForecast,
-          }));
+          // Start all models at once (parallel training)
+          const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon)
+            .then(forecast => setMlPredictions(prev => ({ ...prev, gru: forecast })));
+
+          const tftPromise = generateTFTForecast(stockResult.data, forecastHorizon)
+            .then(forecast => setMlPredictions(prev => ({ ...prev, tft: forecast })));
+
+          const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon)
+            .then(forecast => setMlPredictions(prev => ({ ...prev, cnn: forecast })));
+
+          const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon)
+            .then(forecast => setMlPredictions(prev => ({ ...prev, cnnLstm: forecast })));
+
+          const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon)
+            .then(forecast => setMlPredictions(prev => ({ ...prev, lstm: forecast })));
+
+          // Wait for all to complete
+          await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
 
           setMlTraining(false);
           console.log('All ML algorithms completed!');
@@ -318,7 +341,7 @@ export default function Home() {
           setMlTraining(true);
           setTimeout(async () => {
             try {
-              // Fast algorithms
+              // Fast algorithms (non-neural network)
               const linearReg = generateLinearRegression(stockData, forecastHorizon);
               const polyReg = generatePolynomialRegression(stockData, forecastHorizon);
               const maForecast = generateMovingAverageForecast(stockData, forecastHorizon);
@@ -333,13 +356,23 @@ export default function Home() {
                 arima: arimaForecast,
               });
 
-              // LSTM (slower)
-              const lstmForecast = await generateMLForecast(stockData, forecastHorizon);
+              // Neural network models (parallel training)
+              const gruPromise = generateGRUForecast(stockData, forecastHorizon)
+                .then(forecast => setMlPredictions(prev => ({ ...prev, gru: forecast })));
 
-              setMlPredictions(prev => ({
-                ...prev,
-                lstm: lstmForecast,
-              }));
+              const tftPromise = generateTFTForecast(stockData, forecastHorizon)
+                .then(forecast => setMlPredictions(prev => ({ ...prev, tft: forecast })));
+
+              const cnnPromise = generate1DCNNForecast(stockData, forecastHorizon)
+                .then(forecast => setMlPredictions(prev => ({ ...prev, cnn: forecast })));
+
+              const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon)
+                .then(forecast => setMlPredictions(prev => ({ ...prev, cnnLstm: forecast })));
+
+              const lstmPromise = generateMLForecast(stockData, forecastHorizon)
+                .then(forecast => setMlPredictions(prev => ({ ...prev, lstm: forecast })));
+
+              await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
 
               setMlTraining(false);
             } catch (mlError) {

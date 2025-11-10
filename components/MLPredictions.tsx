@@ -10,6 +10,10 @@ interface MLPredictionsProps {
   predictions: {
     lstm?: MLForecast[];
     arima?: MLPrediction[];
+    gru?: MLPrediction[];
+    tft?: MLPrediction[];
+    cnn?: MLPrediction[];
+    cnnLstm?: MLPrediction[];
     linearRegression?: MLPrediction[];
     polynomialRegression?: MLPrediction[];
     movingAverage?: MLPrediction[];
@@ -40,6 +44,10 @@ export default function MLPredictions({ currentPrice, predictions, isTraining }:
   const algorithms = [
     { name: 'LSTM', key: 'lstm', data: predictions.lstm, color: 'var(--accent)' },
     { name: 'ARIMA', key: 'arima', data: predictions.arima, color: 'var(--info)' },
+    { name: 'GRU', key: 'gru', data: predictions.gru, color: '#10b981' },
+    { name: 'TFT', key: 'tft', data: predictions.tft, color: '#f59e0b' },
+    { name: '1D CNN', key: 'cnn', data: predictions.cnn, color: '#8b5cf6' },
+    { name: 'CNN-LSTM', key: 'cnnLstm', data: predictions.cnnLstm, color: '#ec4899' },
     { name: 'Linear Regression', key: 'linearRegression', data: predictions.linearRegression, color: 'var(--success)' },
     { name: 'Polynomial Regression', key: 'polynomialRegression', data: predictions.polynomialRegression, color: 'var(--warning)' },
     { name: 'Moving Average', key: 'movingAverage', data: predictions.movingAverage, color: 'var(--error)' },
