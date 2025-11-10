@@ -68,14 +68,9 @@ function buildLSTMModel(lookback: number): tf.Sequential {
     activation: 'linear'
   }));
 
-  // Compile with conservative learning rate and gradient clipping
-  const optimizer = tf.train.adam(0.001);  // Lower learning rate for stability
-  optimizer.clipGradientByValue = (min: number, max: number) => {
-    // Prevent exploding gradients
-  };
-
+  // Compile with conservative learning rate for stability
   model.compile({
-    optimizer: optimizer,
+    optimizer: tf.train.adam(0.001),  // Lower learning rate for stability
     loss: 'meanSquaredError',
     metrics: ['mae'],
   });

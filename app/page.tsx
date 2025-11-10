@@ -545,53 +545,73 @@ export default function Home() {
             )}
 
             {/* Chart Controls */}
-            <div className="card mb-6">
+            <div className="card mb-6 py-3">
               <span className="card-label">Chart Controls</span>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={showMA20}
                     onChange={(e) => setShowMA20(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent)]"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showMA20 ? 'var(--accent)' : 'var(--bg-3)',
+                    }}
                   />
-                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>20-Day MA</span>
+                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>20-Day MA</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={showMA50}
                     onChange={(e) => setShowMA50(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent)]"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showMA50 ? 'var(--accent)' : 'var(--bg-3)',
+                    }}
                   />
-                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>50-Day MA</span>
+                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>50-Day MA</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={showMA200}
                     onChange={(e) => setShowMA200(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent)]"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showMA200 ? 'var(--accent)' : 'var(--bg-3)',
+                    }}
                   />
-                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>200-Day MA</span>
+                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>200-Day MA</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={showBB}
                     onChange={(e) => setShowBB(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent)]"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showBB ? 'var(--accent)' : 'var(--bg-3)',
+                    }}
                   />
-                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>Bollinger Bands</span>
+                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>Bollinger Bands</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={showIndicators}
                     onChange={(e) => setShowIndicators(e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent)]"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showIndicators ? 'var(--accent)' : 'var(--bg-3)',
+                    }}
                   />
-                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>RSI/MACD</span>
+                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>RSI/MACD</span>
                 </label>
                 <div className="col-span-2 sm:col-span-3 md:col-span-1">
                   <label className="text-sm block mb-1" style={{ color: 'var(--text-3)' }}>
@@ -603,7 +623,7 @@ export default function Home() {
                     max="90"
                     value={forecastHorizon}
                     onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
-                    className="w-full px-3 py-2 border font-mono text-sm"
+                    className="w-full px-3 py-1.5 border font-mono text-sm"
                     style={{
                       background: 'var(--bg-3)',
                       borderColor: 'var(--bg-1)',
