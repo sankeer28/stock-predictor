@@ -60,6 +60,14 @@ export default function Home() {
   const [chartType, setChartType] = useState<'line' | 'candlestick'>('line');
   const [showVolume, setShowVolume] = useState(true);
 
+  // Optimize chart type changes to avoid blocking UI
+  const handleChartTypeChange = (type: 'line' | 'candlestick') => {
+    // Use setTimeout to make the state update non-blocking
+    setTimeout(() => {
+      setChartType(type);
+    }, 0);
+  };
+
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
     lstm?: MLForecast[];
@@ -215,9 +223,9 @@ export default function Home() {
           const signal = generateTradingSignal(stockResult.data, indicators);
           setTradingSignal(signal);
         }
-      }, 10);
+      }, 100);
 
-      // Run ML algorithms in background (lower priority)
+      // Run ML algorithms in background (much lower priority - wait for chart to render)
       setMlTraining(true);
       setTimeout(async () => {
         try {
@@ -264,7 +272,7 @@ export default function Home() {
           console.error('ML algorithms error:', mlError);
           setMlTraining(false);
         }
-      }, 500);
+      }, 2000); // Wait 2 seconds to let chart fully render first
 
       // Fetch news asynchronously (fast, no sentiment)
       setTimeout(async () => {
@@ -342,7 +350,7 @@ export default function Home() {
           );
           setTradingSignal(simpleSignal);
 
-          // Run all ML algorithms in background
+          // Run all ML algorithms in background (delay to avoid blocking UI)
           setMlTraining(true);
           setTimeout(async () => {
             try {
@@ -384,7 +392,7 @@ export default function Home() {
               console.error('ML algorithms error:', mlError);
               setMlTraining(false);
             }
-          }, 100);
+          }, 1500); // Delay ML to let chart render smoothly
         } catch (forecastError) {
           console.error('Forecast update error:', forecastError);
           setMlTraining(false);
@@ -558,7 +566,7 @@ export default function Home() {
                 <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>CHART TYPE</div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setChartType('line')}
+                    onClick={() => handleChartTypeChange('line')}
                     className="px-3 py-1.5 text-xs font-medium border transition-all"
                     style={{
                       background: chartType === 'line' ? 'var(--accent)' : 'var(--bg-3)',
@@ -569,7 +577,7 @@ export default function Home() {
                     LINE
                   </button>
                   <button
-                    onClick={() => setChartType('candlestick')}
+                    onClick={() => handleChartTypeChange('candlestick')}
                     className="px-3 py-1.5 text-xs font-medium border transition-all"
                     style={{
                       background: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-3)',

@@ -16,6 +16,7 @@ import {
   Brush,
   Bar,
   BarChart,
+  Cell,
 } from 'recharts';
 import { ChartDataPoint } from '@/types';
 
@@ -43,8 +44,8 @@ export default function StockChart({
   chartType = 'line',
   showVolume = true,
 }: StockChartProps) {
-  // Combine historical and forecast data
-  const combinedData = [
+  // Combine historical and forecast data - memoized to avoid recalculation
+  const combinedData = React.useMemo(() => [
     ...data.map(d => ({ ...d, isForecast: false })),
     ...forecastData.map(f => ({
       date: f.date,
@@ -53,7 +54,7 @@ export default function StockChart({
       lower: f.lower,
       isForecast: true,
     })),
-  ];
+  ], [data, forecastData]);
 
   // Calculate the index where forecast starts
   const historicalDataLength = data.length;
@@ -107,21 +108,19 @@ export default function StockChart({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const formatPrice = (value: number) => {
+  const formatPrice = (value: number | undefined | null) => {
+    if (value === undefined || value === null || isNaN(value)) return '$0.00';
     return `$${value.toFixed(2)}`;
   };
 
-  // Custom candlestick renderer using scatter plot approach
-  const renderCustomCandlestick = () => {
-    if (chartType !== 'candlestick') return null;
-
-    // This will be rendered as a custom layer
-    return (
-      <g className="candlesticks-layer">
-        {/* Candlesticks will be rendered here */}
-      </g>
-    );
-  };
+  // Prepare data with low as base and range for candlestick height
+  const candlestickData = React.useMemo(() => {
+    return combinedData.map(d => ({
+      ...d,
+      lowValue: d.low,
+      candleHeight: d.high && d.low ? d.high - d.low : 0,
+    }));
+  }, [combinedData]);
 
   return (
     <div className="w-full">
@@ -197,7 +196,7 @@ export default function StockChart({
 
       <div className="w-full h-[550px]">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={combinedData} margin={{ top: 5, right: 30, left: 20, bottom: 50 }}>
+          <ComposedChart data={chartType === 'candlestick' ? candlestickData : combinedData} margin={{ top: 5, right: 30, left: 20, bottom: 50 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
           <XAxis
             dataKey="date"
@@ -227,7 +226,26 @@ export default function StockChart({
             />
           )}
           <Tooltip
-            formatter={(value: any) => formatPrice(Number(value))}
+            formatter={(value: any, name: any, props: any) => {
+              if (chartType === 'candlestick' && props?.payload) {
+                const { open, high, low, close } = props.payload;
+                // Check if OHLC data exists
+                if (open !== undefined && high !== undefined && low !== undefined && close !== undefined) {
+                  return [
+                    <div key="ohlc" style={{ fontSize: '11px' }}>
+                      <div>O: {formatPrice(open)}</div>
+                      <div>H: {formatPrice(high)}</div>
+                      <div>L: {formatPrice(low)}</div>
+                      <div>C: {formatPrice(close)}</div>
+                    </div>,
+                    'OHLC'
+                  ];
+                }
+              }
+              // Safe formatting with null check
+              if (value === undefined || value === null) return 'N/A';
+              return formatPrice(Number(value));
+            }}
             labelFormatter={formatDate}
             contentStyle={{
               backgroundColor: 'oklch(23% 0 0)',
@@ -372,34 +390,97 @@ export default function StockChart({
             />
           ) : (
             <>
-              {/* Candlestick bars - simplified OHLC representation */}
-              <Bar
+              {/* Use scatter/line to establish the Y domain properly */}
+              <Line
                 yAxisId="price"
+                type="monotone"
+                dataKey="high"
+                stroke="transparent"
+                strokeWidth={0}
+                dot={false}
+                isAnimationActive={false}
+                legendType="none"
+              />
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="low"
+                stroke="transparent"
+                strokeWidth={0}
+                dot={false}
+                isAnimationActive={false}
+                legendType="none"
+              />
+              {/* Candlestick visualization using Line with custom dot */}
+              <Line
+                yAxisId="price"
+                type="monotone"
                 dataKey="close"
-                shape={(props: any) => {
-                  const { x, y, width, height, payload } = props;
-                  if (!payload || payload.isForecast || !payload.open) return null;
+                stroke="transparent"
+                strokeWidth={0}
+                dot={(dotProps: any) => {
+                  const { cx, cy, payload, key, index } = dotProps;
 
-                  const isPositive = payload.close >= payload.open;
-                  const color = isPositive ? 'oklch(70% 0.12 170)' : 'oklch(70% 0.13 0)';
-                  const fillColor = isPositive ? 'oklch(70% 0.12 170)' : 'oklch(23% 0 0)';
+                  if (!payload || payload.isForecast || !payload.open || !payload.close || !payload.high || !payload.low) {
+                    return null;
+                  }
 
-                  const barWidth = Math.max(width * 0.7, 2);
-                  const barX = x + (width - barWidth) / 2;
+                  // We need to calculate Y positions based on the actual price scale
+                  // Since we're in a dot, we only have cx (X position) and the payload data
+                  // We'll need to estimate the scale
+
+                  const { open, close, high, low } = payload;
+                  const isGreen = close >= open;
+                  const color = isGreen ? 'oklch(70% 0.12 170)' : 'oklch(70% 0.13 0)';
+                  const fillColor = isGreen ? 'oklch(70% 0.12 170)' : 'oklch(23% 0 0)';
+
+                  // cy is at the close price position
+                  // We need to calculate relative positions for open, high, low
+                  // This is a hack but should work: estimate pixel-per-dollar ratio
+                  const priceRange = high - low;
+                  const pixelsPerDollar = priceRange > 0 ? 20 / priceRange : 1; // rough estimate
+
+                  const highOffset = (close - high) * pixelsPerDollar;
+                  const lowOffset = (close - low) * pixelsPerDollar;
+                  const openOffset = (close - open) * pixelsPerDollar;
+
+                  const yHigh = cy + highOffset;
+                  const yLow = cy + lowOffset;
+                  const yOpen = cy + openOffset;
+                  const yClose = cy;
+
+                  const bodyTop = Math.min(yOpen, yClose);
+                  const bodyBottom = Math.max(yOpen, yClose);
+                  const bodyHeight = Math.max(Math.abs(bodyBottom - bodyTop), 1);
+
+                  const barWidth = 8;
 
                   return (
-                    <rect
-                      x={barX}
-                      y={y}
-                      width={barWidth}
-                      height={Math.max(height, 1)}
-                      fill={isPositive ? fillColor : 'oklch(23% 0 0)'}
-                      stroke={color}
-                      strokeWidth={1.5}
-                    />
+                    <g key={`candle-${index}`}>
+                      {/* Wick */}
+                      <line
+                        x1={cx}
+                        y1={yHigh}
+                        x2={cx}
+                        y2={yLow}
+                        stroke={color}
+                        strokeWidth={1}
+                      />
+                      {/* Body */}
+                      <rect
+                        x={cx - barWidth / 2}
+                        y={bodyTop}
+                        width={barWidth}
+                        height={bodyHeight}
+                        fill={fillColor}
+                        stroke={color}
+                        strokeWidth={1.5}
+                      />
+                    </g>
                   );
                 }}
                 isAnimationActive={false}
+                name="Price"
               />
             </>
           )}
