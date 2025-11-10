@@ -4,13 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Database, Trash2, RefreshCw } from 'lucide-react';
 import {
   getAllCachedPredictions,
-  clearCachedPrediction,
+  clearCachedPredictionByTimestamp,
   clearAllCachedPredictions,
   CachedPrediction,
 } from '@/lib/predictionsCache';
 
 interface PredictionsCacheProps {
-  onLoadPrediction?: (symbol: string) => void;
+  onLoadPrediction?: (prediction: CachedPrediction) => void;
 }
 
 export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheProps) {
@@ -30,8 +30,9 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
     return () => clearInterval(interval);
   }, []);
 
-  const handleClearOne = (symbol: string, forecastHorizon: number) => {
-    clearCachedPrediction(symbol, forecastHorizon);
+  const handleClearOne = (timestamp: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click
+    clearCachedPredictionByTimestamp(timestamp);
     loadCache();
   };
 
@@ -54,16 +55,12 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const countModels = (predictions: CachedPrediction['predictions']) => {
-    return Object.values(predictions).filter(p => p && p.length > 0).length;
-  };
-
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Database className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-          <span className="card-label">Predictions Cache</span>
+          <span className="card-label">ML Cache</span>
           <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg-1)', color: 'var(--text-4)' }}>
             {cachedPredictions.length}
           </span>
@@ -94,8 +91,6 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--bg-1)' }}>
                   <th className="text-left py-2 px-2" style={{ color: 'var(--text-4)' }}>Symbol</th>
-                  <th className="text-left py-2 px-2" style={{ color: 'var(--text-4)' }}>Models</th>
-                  <th className="text-left py-2 px-2" style={{ color: 'var(--text-4)' }}>Days</th>
                   <th className="text-left py-2 px-2" style={{ color: 'var(--text-4)' }}>Cached</th>
                   <th className="text-right py-2 px-2" style={{ color: 'var(--text-4)' }}>Actions</th>
                 </tr>
@@ -104,31 +99,30 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
                 {cachedPredictions.slice(0, isExpanded ? undefined : 5).map((pred, index) => (
                   <tr
                     key={`${pred.symbol}-${pred.timestamp}`}
+                    onClick={() => onLoadPrediction?.(pred)}
+                    className="cursor-pointer hover:bg-opacity-80 transition-all"
                     style={{
                       borderBottom: index < cachedPredictions.length - 1 ? '1px solid var(--bg-1)' : 'none',
+                      background: 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--bg-1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
                     }}
                   >
                     <td className="py-2 px-2">
-                      <button
-                        onClick={() => onLoadPrediction?.(pred.symbol)}
-                        className="font-mono font-semibold hover:underline transition-all"
-                        style={{ color: 'var(--accent)' }}
-                      >
+                      <span className="font-mono font-semibold" style={{ color: 'var(--accent)' }}>
                         {pred.symbol}
-                      </button>
-                    </td>
-                    <td className="py-2 px-2" style={{ color: 'var(--text-3)' }}>
-                      {countModels(pred.predictions)}
-                    </td>
-                    <td className="py-2 px-2" style={{ color: 'var(--text-3)' }}>
-                      {pred.forecastHorizon}d
+                      </span>
                     </td>
                     <td className="py-2 px-2" style={{ color: 'var(--text-4)' }}>
                       {formatTimeAgo(pred.timestamp)}
                     </td>
                     <td className="py-2 px-2 text-right">
                       <button
-                        onClick={() => handleClearOne(pred.symbol, pred.forecastHorizon)}
+                        onClick={(e) => handleClearOne(pred.timestamp, e)}
                         className="p-1 hover:bg-opacity-80 transition-all"
                         style={{ color: 'var(--error)' }}
                         title="Remove from cache"

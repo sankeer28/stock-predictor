@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { History, TrendingUp, X, Menu } from 'lucide-react';
 import PredictionsCache from './PredictionsCache';
+import { CachedPrediction } from '@/lib/predictionsCache';
 
 export interface SearchHistoryItem {
   symbol: string;
@@ -15,13 +16,15 @@ interface SidebarProps {
   onSelectSymbol: (symbol: string) => void;
   onClearHistory: () => void;
   currentSymbol?: string;
+  onLoadCachedPrediction?: (prediction: CachedPrediction) => void;
 }
 
 export default function Sidebar({
   searchHistory,
   onSelectSymbol,
   onClearHistory,
-  currentSymbol
+  currentSymbol,
+  onLoadCachedPrediction
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -135,7 +138,10 @@ export default function Sidebar({
         overflowY: isOpen ? 'auto' : 'visible',
       }}
     >
-      <PredictionsCache onLoadPrediction={onSelectSymbol} />
+      <PredictionsCache onLoadPrediction={(pred) => {
+        onLoadCachedPrediction?.(pred);
+        setIsOpen(false); // Close sidebar on mobile after loading
+      }} />
     </div>
 
     {/* Mobile Overlay */}

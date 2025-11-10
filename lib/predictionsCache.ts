@@ -81,7 +81,7 @@ export function getCachedPredictions(symbol: string, forecastHorizon: number): C
 }
 
 /**
- * Save predictions to cache
+ * Save predictions to cache (keeps historical predictions, doesn't overwrite)
  */
 export function savePredictionsToCache(
   symbol: string,
@@ -91,12 +91,7 @@ export function savePredictionsToCache(
   try {
     const allPredictions = getAllCachedPredictions();
 
-    // Remove existing prediction for this symbol with same forecast horizon
-    const filtered = allPredictions.filter(p =>
-      !(p.symbol.toUpperCase() === symbol.toUpperCase() && p.forecastHorizon === forecastHorizon)
-    );
-
-    // Add new prediction
+    // Add new prediction (don't remove old ones - keep history!)
     const newPrediction: CachedPrediction = {
       symbol: symbol.toUpperCase(),
       timestamp: Date.now(),
@@ -105,29 +100,35 @@ export function savePredictionsToCache(
       forecastHorizon,
     };
 
-    filtered.unshift(newPrediction); // Add to front
+    allPredictions.unshift(newPrediction); // Add to front
 
-    // Keep only last 20 predictions to avoid filling localStorage
-    const toSave = filtered.slice(0, 20);
+    // Keep only last 50 predictions to avoid filling localStorage (increased from 20)
+    const toSave = allPredictions.slice(0, 50);
 
     localStorage.setItem(CACHE_KEY, JSON.stringify(toSave));
-    console.log(`Saved ML predictions for ${symbol} to cache`);
+    console.log(`Saved ML predictions for ${symbol} to cache (historical)`);
   } catch (e) {
     console.error('Error saving predictions to cache:', e);
   }
 }
 
 /**
- * Clear a specific cached prediction
+ * Get a specific cached prediction by timestamp
  */
-export function clearCachedPrediction(symbol: string, forecastHorizon: number): void {
+export function getCachedPredictionByTimestamp(timestamp: number): CachedPrediction | null {
+  const allPredictions = getAllCachedPredictions();
+  return allPredictions.find(p => p.timestamp === timestamp) || null;
+}
+
+/**
+ * Clear a specific cached prediction by timestamp
+ */
+export function clearCachedPredictionByTimestamp(timestamp: number): void {
   try {
     const allPredictions = getAllCachedPredictions();
-    const filtered = allPredictions.filter(p =>
-      !(p.symbol.toUpperCase() === symbol.toUpperCase() && p.forecastHorizon === forecastHorizon)
-    );
+    const filtered = allPredictions.filter(p => p.timestamp !== timestamp);
     localStorage.setItem(CACHE_KEY, JSON.stringify(filtered));
-    console.log(`Cleared cache for ${symbol}`);
+    console.log(`Cleared cache entry`);
   } catch (e) {
     console.error('Error clearing cache:', e);
   }

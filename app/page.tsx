@@ -28,7 +28,7 @@ import {
 } from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
-import { getCachedPredictions, savePredictionsToCache, clearCachedPrediction } from '@/lib/predictionsCache';
+import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '@/lib/predictionsCache';
 
 export default function Home() {
   const [symbol, setSymbol] = useState('AAPL');
@@ -144,7 +144,7 @@ export default function Home() {
     }
   };
 
-  const fetchData = async (stockSymbol: string, forceRecalc: boolean = false) => {
+  const fetchData = async (stockSymbol: string, forceRecalc: boolean = false, skipMLCalculations: boolean = false) => {
     setLoading(true);
     setError('');
     setNewsArticles([]); // Reset news to show loading state
@@ -226,6 +226,12 @@ export default function Home() {
           setTradingSignal(signal);
         }
       }, 100);
+
+      // Skip ML if requested (e.g., when loading from cache table)
+      if (skipMLCalculations) {
+        console.log('Skipping ML calculations as requested');
+        return;
+      }
 
       // Check cache first unless force recalculate is true
       const cached = !forceRecalc ? getCachedPredictions(stockSymbol, forecastHorizon) : null;
@@ -457,7 +463,11 @@ export default function Home() {
 
               // Save all predictions to cache
               const allPredictions = {
-                ...predictions,
+                linearRegression: linearReg,
+                polynomialRegression: polyReg,
+                movingAverage: maForecast,
+                ema: emaForecast,
+                arima: arimaForecast,
                 gru,
                 tft,
                 cnn,
@@ -490,6 +500,22 @@ export default function Home() {
     }
   };
 
+  const handleLoadCachedPrediction = (cachedPred: CachedPrediction) => {
+    console.log('Loading cached prediction:', cachedPred);
+    // Load the stock data for this symbol if different
+    if (cachedPred.symbol !== symbol) {
+      fetchData(cachedPred.symbol);
+    }
+    // Load the cached predictions
+    setMlPredictions(cachedPred.predictions);
+    setMlFromCache(true);
+    setMlTraining(false);
+    // Update forecast horizon to match cache
+    if (cachedPred.forecastHorizon !== forecastHorizon) {
+      setForecastHorizon(cachedPred.forecastHorizon);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
@@ -509,6 +535,7 @@ export default function Home() {
             }}
             onClearHistory={clearHistory}
             currentSymbol={symbol}
+            onLoadCachedPrediction={handleLoadCachedPrediction}
           />
         </div>
 
