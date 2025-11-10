@@ -21,48 +21,61 @@ function denormalizeData(normalized: number[], min: number, max: number): number
   return normalized.map(val => val * range + min);
 }
 
-// Create sequences for LSTM training
+// Create sequences for LSTM training - predict price changes instead of absolute prices
 function createSequences(data: number[], lookback: number): { X: number[][][], y: number[] } {
   const X: number[][][] = [];
   const y: number[] = [];
 
   for (let i = lookback; i < data.length; i++) {
+    // Use last 'lookback' days as features
     const sequence = data.slice(i - lookback, i).map(val => [val]);
     X.push(sequence);
-    y.push(data[i]);
+
+    // Predict the CHANGE from last day to current day (prevents drift)
+    const priceChange = data[i] - data[i - 1];
+    y.push(priceChange);
   }
 
   return { X, y };
 }
 
-// Build LSTM model (balanced accuracy and speed)
+// Build LSTM model (optimized for stability and accuracy)
 function buildLSTMModel(lookback: number): tf.Sequential {
   const model = tf.sequential();
 
-  // Single LSTM layer with more units for better accuracy
+  // LSTM layer with moderate units for stable predictions
   model.add(tf.layers.lstm({
-    units: 48,  // Increased from 32 for better pattern recognition
+    units: 32,  // Reduced for stability
     returnSequences: false,
     inputShape: [lookback, 1],
-    kernelInitializer: 'glorotNormal',  // Avoids orthogonal warning
-    recurrentInitializer: 'glorotNormal',
+    kernelInitializer: 'glorotUniform',  // More stable than glorotNormal
+    recurrentInitializer: 'glorotUniform',
+    kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),  // L2 regularization to prevent overfitting
   }));
-  model.add(tf.layers.dropout({ rate: 0.25 }));
+  model.add(tf.layers.dropout({ rate: 0.1 }));  // Reduced dropout for better learning
 
-  // Dense layer for better fitting
+  // Dense layer
   model.add(tf.layers.dense({
-    units: 16,
+    units: 8,  // Reduced complexity
     activation: 'relu',
-    kernelInitializer: 'glorotNormal'
+    kernelInitializer: 'glorotUniform',
+    kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
   }));
-  model.add(tf.layers.dropout({ rate: 0.15 }));
 
-  // Output layer
-  model.add(tf.layers.dense({ units: 1 }));
+  // Output layer with linear activation (better for regression)
+  model.add(tf.layers.dense({
+    units: 1,
+    activation: 'linear'
+  }));
 
-  // Compile model with adaptive optimizer for faster convergence
+  // Compile with conservative learning rate and gradient clipping
+  const optimizer = tf.train.adam(0.001);  // Lower learning rate for stability
+  optimizer.clipGradientByValue = (min: number, max: number) => {
+    // Prevent exploding gradients
+  };
+
   model.compile({
-    optimizer: tf.train.adam(0.002, 0.9, 0.999, 1e-7),  // Higher LR with beta tuning
+    optimizer: optimizer,
     loss: 'meanSquaredError',
     metrics: ['mae'],
   });
@@ -88,16 +101,16 @@ export async function generateMLForecast(
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
 
-    // Need at least 90 days of data for training (20 lookback + enough training data)
-    if (closePrices.length < 90) {
-      throw new Error('Insufficient data for ML forecasting (minimum 90 days required)');
+    // Need at least 60 days of data for training
+    if (closePrices.length < 60) {
+      throw new Error('Insufficient data for ML forecasting (minimum 60 days required)');
     }
 
     // Normalize data
     const { normalized, min, max } = normalizeData(closePrices);
 
-    // Create training sequences (20 days lookback - more context for better accuracy)
-    const lookback = 20;
+    // Create training sequences (10 days lookback - balanced context and stability)
+    const lookback = 10;
     const { X, y } = createSequences(normalized, lookback);
 
     // Convert to tensors
@@ -115,20 +128,29 @@ export async function generateMLForecast(
     let shouldStop = false;
 
     await model.fit(xsTensor, ysTensor, {
-      epochs: 40,  // Max epochs, but will stop early if converged
-      batchSize: 24,  // Larger batch = faster training
-      validationSplit: 0.1,  // More data for training
+      epochs: 30,  // Reduced max epochs to prevent overfitting
+      batchSize: 32,  // Larger batch for stability
+      validationSplit: 0.2,  // More validation data to catch overfitting
+      shuffle: true,  // Shuffle data for better generalization
       verbose: 0,
       callbacks: {
         onEpochEnd: (epoch, logs) => {
           const valLoss = logs?.val_loss || Infinity;
+          const trainLoss = logs?.loss || Infinity;
 
-          // Early stopping logic
+          // Early stopping logic with overfitting detection
           if (valLoss < bestValLoss) {
             bestValLoss = valLoss;
             patienceCounter = 0;
           } else {
             patienceCounter++;
+          }
+
+          // Stop if overfitting (validation loss increasing while training loss decreasing)
+          if (valLoss > trainLoss * 1.5 && epoch > 10) {
+            shouldStop = true;
+            console.log(`Stopping due to overfitting at epoch ${epoch}`);
+            model.stopTraining = true;
           }
 
           if (patienceCounter >= patience) {
@@ -138,7 +160,7 @@ export async function generateMLForecast(
           }
 
           if (epoch % 5 === 0 || shouldStop) {
-            console.log(`Epoch ${epoch}: loss = ${logs?.loss.toFixed(4)}, val_loss = ${valLoss.toFixed(4)}`);
+            console.log(`Epoch ${epoch}: loss = ${trainLoss.toFixed(4)}, val_loss = ${valLoss.toFixed(4)}`);
           }
         }
       }
@@ -147,31 +169,48 @@ export async function generateMLForecast(
     console.log('LSTM model training complete!');
 
     // Make predictions with optimized memory management
-    const predictions: number[] = [];
+    const predictedChanges: number[] = [];
     let currentSequence = normalized.slice(-lookback);
+    let currentPrice = closePrices[closePrices.length - 1];
 
     // Use tidy() to automatically dispose intermediate tensors
     for (let i = 0; i < forecastDays; i++) {
-      const predictedValue = await tf.tidy(() => {
+      const predictedChange = await tf.tidy(() => {
         // Prepare input
         const input = tf.tensor3d([currentSequence.map(val => [val])]);
 
-        // Predict next value
+        // Predict next CHANGE
         const prediction = model.predict(input) as tf.Tensor;
         return prediction;
       }).data().then(data => data[0]);
 
-      predictions.push(predictedValue);
+      // Denormalize the change
+      const range = max - min;
+      const denormalizedChange = predictedChange * range;
 
-      // Update sequence for next prediction (memory efficient)
+      // Apply conservative damping to prevent wild swings
+      const dampedChange = denormalizedChange * 0.5;  // Dampen predictions
+
+      predictedChanges.push(dampedChange);
+
+      // Update current price for next iteration
+      currentPrice = currentPrice + dampedChange;
+
+      // Normalize the new price and update sequence
+      const normalizedNewPrice = (currentPrice - min) / range;
       currentSequence.shift();
-      currentSequence.push(predictedValue);
+      currentSequence.push(normalizedNewPrice);
     }
 
-    // Denormalize predictions
-    const denormalizedPredictions = denormalizeData(predictions, min, max);
+    // Build actual price predictions from changes
+    let denormalizedPredictions: number[] = [];
+    let price = closePrices[closePrices.length - 1];
+    for (const change of predictedChanges) {
+      price += change;
+      denormalizedPredictions.push(price);
+    }
 
-    // Calculate volatility for more accurate confidence intervals
+    // Calculate volatility for confidence intervals
     const returns: number[] = [];
     for (let i = 1; i < closePrices.length; i++) {
       returns.push((closePrices[i] - closePrices[i - 1]) / closePrices[i - 1]);

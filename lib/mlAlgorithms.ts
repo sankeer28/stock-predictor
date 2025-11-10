@@ -123,22 +123,29 @@ export function generatePolynomialRegression(
   }
   const avgVolatility = returns.reduce((sum, r) => sum + r, 0) / returns.length;
 
+  // Calculate linear trend from polynomial for more stability
+  const startX = 0.8;  // Near end of training data
+  const endX = 1.0;
+  const startY = a * startX * startX + b * startX + c;
+  const endY = a * endX * endX + b * endX + c;
+  const linearSlope = (endY - startY) / (endX - startX);  // Use recent trend only
+
   for (let i = 0; i < forecastDays; i++) {
     const forecastDate = new Date(lastDate);
     forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-    // Normalize x value for prediction (continuing from 1.0)
+    // Use linear extrapolation from recent trend (more stable than polynomial curve)
     const x = 1 + (i / (n - 1));
-    let predicted = a * x * x + b * x + c;
+    const xFromEnd = x - 1;  // Distance from end of training
+    let predicted = currentPrice + (linearSlope * (n - 1) * xFromEnd);
 
-    // Apply adaptive bounds based on volatility and time horizon
-    // More volatile stocks get wider bounds
-    const timeAdjustment = Math.sqrt(i + 1); // Uncertainty grows with time
-    const maxDeviation = currentPrice * Math.max(0.15, avgVolatility * 10) * timeAdjustment;
-    predicted = Math.max(currentPrice - maxDeviation, Math.min(currentPrice + maxDeviation, predicted));
+    // Apply damping - predictions should be conservative
+    const dampingFactor = 0.5;  // Reduce predicted change by 50%
+    const change = predicted - currentPrice;
+    predicted = currentPrice + (change * dampingFactor);
 
-    // Ensure positive price
-    predicted = Math.max(avgPrice * 0.1, predicted);
+    // Ensure positive and reasonable
+    predicted = Math.max(currentPrice * 0.9, Math.min(currentPrice * 1.1, predicted));
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],
