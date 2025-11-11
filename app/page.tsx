@@ -552,17 +552,36 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (debouncedQuery) {
-        getTickerFromAPi(debouncedQuery);
-      } else {
-        setSuggestions([]);
-      }
-    }, 300); // 300ms delay to debounce
+  const getMarketStatus = () => {
+    const now = new Date();
+    const etOffset = -4; // ET is UTC-4 (adjust for DST if needed)
+    const etTime = new Date(now.getTime() + (etOffset * 60 * 60 * 1000));
+    const day = etTime.getDay(); // 0=Sunday, 6=Saturday
+    const hour = etTime.getHours();
+    const minute = etTime.getMinutes();
 
-    return () => clearTimeout(timer);
-  }, [debouncedQuery]);
+    if (day === 0 || day === 6) return 'CLOSED'; // Weekend
+
+    const currentMinutes = hour * 60 + minute;
+    const openMinutes = 9 * 60 + 30; // 9:30 AM
+    const closeMinutes = 16 * 60; // 4:00 PM
+
+    if (currentMinutes < openMinutes) return 'PRE';
+    if (currentMinutes >= closeMinutes) return 'POST';
+    return 'REGULAR';
+  };
+
+  // Update market status on interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMarketState(getMarketStatus());
+    }, 60000); // Update every minute
+
+    // Initial set
+    setMarketState(getMarketStatus());
+
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <main className="min-h-screen p-4" style={{ background: 'var(--bg-4)' }}>
