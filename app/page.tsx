@@ -641,9 +641,9 @@ export default function Home() {
                   />
                   {suggestions.length > 0 && (
                     <div
-                      className="absolute top-full left-0 right-0 z-50 max-h-40 overflow-y-auto border"
+                      className="absolute top-full left-0 right-0 z-50 max-h-40 overflow-y-auto border-2"
                       style={{
-                        background: 'var(--bg-3)',
+                        background: 'var(--bg-2)',
                         borderColor: 'var(--bg-1)',
                       }}
                     >
