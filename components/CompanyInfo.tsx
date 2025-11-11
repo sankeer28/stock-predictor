@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Building2, TrendingUp, DollarSign, BarChart3, Percent, Award, ExternalLink } from 'lucide-react';
+import { Building2, TrendingUp, DollarSign, BarChart3, Percent, Award, ExternalLink, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface CompanyInfoProps {
   symbol: string;
   companyName: string;
   currentPrice: number;
+  currentChange?: number | null;
+  currentChangePercent?: number | null;
   companyInfo: {
     sector?: string;
     industry?: string;
@@ -30,7 +32,10 @@ interface CompanyInfoProps {
   };
 }
 
-export default function CompanyInfo({ symbol, companyName, currentPrice, companyInfo }: CompanyInfoProps) {
+export default function CompanyInfo({ symbol, companyName, currentPrice, currentChange, currentChangePercent, companyInfo }: CompanyInfoProps) {
+  // Prefer explicit props if provided, otherwise read from companyInfo
+  const change = typeof currentChange === 'number' ? currentChange : companyInfo?.change ?? null;
+  const changePercent = typeof currentChangePercent === 'number' ? currentChangePercent : companyInfo?.changePercent ?? null;
   const formatNumber = (num: number | null | undefined, decimals: number = 2): string => {
     if (num === null || num === undefined) return 'N/A';
     return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -76,10 +81,21 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, company
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Current Price</div>
-              <div className="text-3xl font-bold font-mono" style={{ color: 'var(--accent)' }}>
-                ${currentPrice.toFixed(2)}
+            <div className="flex items-center gap-3">
+              {/* Today's change with arrow to the left of the price */}
+              {typeof change === 'number' && typeof changePercent === 'number' ? (
+                <div className="flex items-center text-sm font-mono" style={{ color: change > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {change > 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                  <span className="ml-1">
+                    {change > 0 ? '+' : ''}{change.toFixed(2)} ({changePercent.toFixed(2)}%)
+                  </span>
+                </div>
+              ) : null}
+
+              <div className="text-right">
+                <div className="text-4xl font-bold font-mono" style={{ color: 'var(--accent)' }}>
+                  ${currentPrice.toFixed(2)}
+                </div>
               </div>
             </div>
             {companyInfo.website && (

@@ -123,11 +123,31 @@ export async function GET(request: NextRequest) {
       console.error('Failed to fetch company info:', err);
     }
 
+    // Determine current price and previous close
+    const currentPrice = typeof result.meta.regularMarketPrice !== 'undefined' ? result.meta.regularMarketPrice : (validData.length > 0 ? validData[validData.length - 1].close : null);
+    const prevCloseFromMeta = typeof result.meta.regularMarketPreviousClose !== 'undefined' ? result.meta.regularMarketPreviousClose : null;
+
+    // Try to read change values from meta first
+    let change = typeof result.meta.regularMarketChange !== 'undefined' ? result.meta.regularMarketChange : null;
+    let changePercent = typeof result.meta.regularMarketChangePercent !== 'undefined' ? result.meta.regularMarketChangePercent : null;
+
+    // Fallback: compute from the last two valid data points if meta fields are missing
+    if ((change === null || changePercent === null) && currentPrice !== null) {
+      const prevClose = prevCloseFromMeta ?? (validData.length > 1 ? validData[validData.length - 2].close : null);
+      if (prevClose !== null && typeof prevClose === 'number') {
+        change = currentPrice - prevClose;
+        changePercent = prevClose !== 0 ? (change / prevClose) * 100 : null;
+      }
+    }
+
     return NextResponse.json({
       symbol: result.meta.symbol,
       currency: result.meta.currency,
       exchangeName: result.meta.exchangeName,
-      currentPrice: result.meta.regularMarketPrice,
+      currentPrice,
+      previousClose: prevCloseFromMeta,
+      change,
+      changePercent,
       companyName: result.meta.longName || result.meta.shortName || result.meta.symbol,
       marketState: result.meta.marketState || 'UNKNOWN',
       companyInfo,

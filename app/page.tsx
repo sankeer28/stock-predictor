@@ -226,7 +226,12 @@ export default function Home() {
       setCompanyName(stockResult.companyName || stockSymbol);
   // Use client-side ET calculation to determine market status immediately
   setMarketState(getMarketStatus());
-      setCompanyInfo(stockResult.companyInfo || null);
+      // attach change info (if API returned it) to companyInfo for easier passing to components
+      setCompanyInfo({
+        ...(stockResult.companyInfo || {}),
+        change: typeof stockResult.change !== 'undefined' ? stockResult.change : null,
+        changePercent: typeof stockResult.changePercent !== 'undefined' ? stockResult.changePercent : null,
+      });
 
       // Add to search history
       addToHistory(stockSymbol, price);
@@ -814,6 +819,9 @@ export default function Home() {
                   symbol={symbol}
                   companyName={companyName}
                   currentPrice={currentPrice}
+                  // forward today's change if available from API
+                  currentChange={companyInfo?.change ?? (stockData.length > 1 ? undefined : undefined)}
+                  currentChangePercent={companyInfo?.changePercent ?? undefined}
                   companyInfo={companyInfo}
                 />
               </div>
