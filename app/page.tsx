@@ -147,6 +147,58 @@ export default function Home() {
     }
   };
 
+  // Determine market status in Eastern Time (ET). Uses Intl timeZone when available.
+  const getMarketStatus = () => {
+    const now = new Date();
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour12: false,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).formatToParts(now);
+
+      const map: Record<string, string> = {};
+      for (const p of parts) if (p.type && p.value) map[p.type] = p.value;
+
+      const hour = parseInt(map.hour || '0', 10);
+      const minute = parseInt(map.minute || '0', 10);
+      const weekdayShort = map.weekday || '';
+
+      const weekdayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekdayShort);
+      const currentMinutes = hour * 60 + minute;
+      const openMinutes = 9 * 60 + 30;
+      const closeMinutes = 16 * 60;
+
+      const status = (weekdayIndex === 0 || weekdayIndex === 6)
+        ? 'CLOSED'
+        : (currentMinutes < openMinutes ? 'PRE' : currentMinutes >= closeMinutes ? 'POST' : 'REGULAR');
+
+      // eslint-disable-next-line no-console
+      console.debug('[MarketStatus]', { now: now.toString(), et: { hour, minute, weekdayShort, weekdayIndex }, currentMinutes, status });
+
+      return status;
+    } catch (e) {
+      const monthIdx = now.getMonth();
+      const isDSTInNY = monthIdx >= 2 && monthIdx <= 10;
+      const etOffset = isDSTInNY ? -4 : -5;
+      const etTime = new Date(now.getTime() + etOffset * 60 * 60 * 1000);
+      const dayIdx = etTime.getDay();
+      const hour = etTime.getHours();
+      const minute = etTime.getMinutes();
+
+      // eslint-disable-next-line no-console
+      console.debug('[MarketStatus-fallback]', { now: now.toString(), etTime: etTime.toString(), dayIdx, hour, minute });
+
+      if (dayIdx === 0 || dayIdx === 6) return 'CLOSED';
+      const currentMinutes = hour * 60 + minute;
+      if (currentMinutes < 9 * 60 + 30) return 'PRE';
+      if (currentMinutes >= 16 * 60) return 'POST';
+      return 'REGULAR';
+    }
+  };
+
   const fetchData = async (stockSymbol: string, forceRecalc: boolean = false, skipMLCalculations: boolean = false) => {
     setLoading(true);
     setError('');
@@ -168,11 +220,12 @@ export default function Home() {
         throw new Error(stockResult.error);
       }
 
-      setStockData(stockResult.data);
+  setStockData(stockResult.data);
       const price = stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close;
       setCurrentPrice(price);
       setCompanyName(stockResult.companyName || stockSymbol);
-      setMarketState(stockResult.marketState || 'UNKNOWN');
+  // Use client-side ET calculation to determine market status immediately
+  setMarketState(getMarketStatus());
       setCompanyInfo(stockResult.companyInfo || null);
 
       // Add to search history
@@ -552,25 +605,6 @@ export default function Home() {
     }
   };
 
-  const getMarketStatus = () => {
-    const now = new Date();
-    const etOffset = -4; // ET is UTC-4 (adjust for DST if needed)
-    const etTime = new Date(now.getTime() + (etOffset * 60 * 60 * 1000));
-    const day = etTime.getDay(); // 0=Sunday, 6=Saturday
-    const hour = etTime.getHours();
-    const minute = etTime.getMinutes();
-
-    if (day === 0 || day === 6) return 'CLOSED'; // Weekend
-
-    const currentMinutes = hour * 60 + minute;
-    const openMinutes = 9 * 60 + 30; // 9:30 AM
-    const closeMinutes = 16 * 60; // 4:00 PM
-
-    if (currentMinutes < openMinutes) return 'PRE';
-    if (currentMinutes >= closeMinutes) return 'POST';
-    return 'REGULAR';
-  };
-
   // Update market status on interval
   useEffect(() => {
     const interval = setInterval(() => {
@@ -582,6 +616,27 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Helper to show ET clock next to the market status for easier debugging/visibility
+  const getETTimeString = () => {
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date());
+    } catch (e) {
+      const now = new Date();
+      const month = now.getMonth();
+      const isDSTInNY = month >= 2 && month <= 10;
+      const etOffset = isDSTInNY ? -4 : -5;
+      const et = new Date(now.getTime() + etOffset * 60 * 60 * 1000);
+      const hh = String(et.getHours()).padStart(2, '0');
+      const mm = String(et.getMinutes()).padStart(2, '0');
+      return `${hh}:${mm}`;
+    }
+  };
 
   return (
     <main className="min-h-screen p-4" style={{ background: 'var(--bg-4)' }}>
@@ -717,11 +772,14 @@ export default function Home() {
                   <div className={`w-2 h-2 rounded-full ${marketState === 'REGULAR' ? 'animate-pulse' : ''}`} style={{
                     background: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
                   }} />
-                  <span className="text-xs font-semibold" style={{
-                    color: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
-                  }}>
-                    {marketState === 'REGULAR' ? 'OPEN' : marketState === 'CLOSED' ? 'CLOSED' : marketState === 'PRE' ? 'PRE' : marketState === 'POST' ? 'POST' : 'CLOSED'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold" style={{
+                      color: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
+                    }}>
+                      {marketState === 'REGULAR' ? 'OPEN' : marketState === 'CLOSED' ? 'CLOSED' : marketState === 'PRE' ? 'PRE' : marketState === 'POST' ? 'POST' : 'CLOSED'}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--text-4)' }}>{getETTimeString()} ET</span>
+                  </div>
                 </div>
               )}
             </div>
