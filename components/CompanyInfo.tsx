@@ -29,6 +29,9 @@ interface CompanyInfoProps {
     fiftyTwoWeekChange?: number;
     averageVolume?: number;
     sharesOutstanding?: number;
+    // optional fields added by API: today's change and percent
+    change?: number | null;
+    changePercent?: number | null;
   };
 }
 
