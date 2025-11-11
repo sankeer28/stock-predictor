@@ -50,6 +50,8 @@ export default function Home() {
   const [tradingSignal, setTradingSignal] = useState<any>(null);
   const [forecastInsights, setForecastInsights] = useState<any>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Chart display options
   const [showMA20, setShowMA20] = useState(true);
@@ -501,6 +503,18 @@ export default function Home() {
     }
   };
 
+  const getTickerFromAPi = async (e: string) => {
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(e)}`);
+      const data = await response.json();
+      const suggestions = data.quotes.map((item: any) => `${item.symbol} , ${item.shortname}`);
+      setSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error fetching tickers:', error);
+      setSuggestions([]);
+    }
+  };
+
   const handleLoadCachedPrediction = async (cachedPred: CachedPrediction) => {
     console.log('Loading cached prediction:', cachedPred);
 
@@ -537,6 +551,18 @@ export default function Home() {
       handleSearch();
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (debouncedQuery) {
+        getTickerFromAPi(debouncedQuery);
+      } else {
+        setSuggestions([]);
+      }
+    }, 300); // 300ms delay to debounce
+
+    return () => clearTimeout(timer);
+  }, [debouncedQuery]);
 
   return (
     <main className="min-h-screen p-4" style={{ background: 'var(--bg-4)' }}>
@@ -588,22 +614,57 @@ export default function Home() {
           <div className="flex items-center gap-3 flex-wrap">
               {/* Search Input */}
               <div className="flex gap-3 items-center flex-1">
-                <input
-                  type="text"
-                  value={inputSymbol}
-                  onChange={(e) => setInputSymbol(e.target.value.toUpperCase())}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Symbol (e.g., AAPL)"
-                  className="flex-1 max-w-md px-4 py-3 border transition-all font-mono"
-                  style={{
-                    background: 'var(--bg-3)',
-                    borderColor: 'var(--bg-1)',
-                    borderLeftColor: 'var(--accent)',
-                    borderLeftWidth: '3px',
-                    color: 'var(--text-2)',
-                    outline: 'none'
-                  }}
-                />
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    value={inputSymbol}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setInputSymbol(value);
+                      if (value) {
+                        getTickerFromAPi(value);
+                      } else {
+                        setSuggestions([]);
+                      }
+                    }}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Symbol (e.g., AAPL)"
+                    className="w-full px-4 py-3 border transition-all font-mono"
+                    style={{
+                      background: 'var(--bg-3)',
+                      borderColor: 'var(--bg-1)',
+                      borderLeftColor: 'var(--accent)',
+                      borderLeftWidth: '3px',
+                      color: 'var(--text-2)',
+                      outline: 'none'
+                    }}
+                  />
+                  {suggestions.length > 0 && (
+                    <div
+                      className="absolute top-full left-0 right-0 z-50 max-h-40 overflow-y-auto border"
+                      style={{
+                        background: 'var(--bg-3)',
+                        borderColor: 'var(--bg-1)',
+                      }}
+                    >
+                      {suggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            const symbol = suggestion.split(' ,')[0];
+                            setInputSymbol(symbol);
+                            setSuggestions([]);
+                            fetchData(symbol);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:opacity-80 transition-all"
+                          style={{ color: 'var(--text-2)' }}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={handleSearch}
                   disabled={loading}
@@ -611,7 +672,7 @@ export default function Home() {
                   style={{
                     background: 'var(--accent)',
                     borderColor: 'var(--accent)',
-                    color: 'var(--text-0)'
+                    color: 'var(--text-0'
                   }}
                 >
                   {loading ? (
