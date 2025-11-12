@@ -17,6 +17,8 @@ interface SidebarProps {
   onClearHistory: () => void;
   currentSymbol?: string;
   onLoadCachedPrediction?: (prediction: CachedPrediction) => void;
+  // When true the sidebar will render inline for mobile (no fixed toggle/overlay)
+  inlineMobile?: boolean;
 }
 
 export default function Sidebar({
@@ -25,40 +27,43 @@ export default function Sidebar({
   onClearHistory,
   currentSymbol,
   onLoadCachedPrediction
+  , inlineMobile
 }: SidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState<boolean>(!!inlineMobile);
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-3 border-2 xl:hidden"
-        style={{
-          position: 'fixed',
-          left: '1rem',
-          top: '1rem',
-          zIndex: 50,
-          background: 'var(--bg-4)',
-          borderColor: 'var(--accent)',
-          color: 'var(--accent)'
-        }}
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+      {/* Mobile Toggle Button (only when not rendering inline) */}
+      {!inlineMobile && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-3 border-2 xl:hidden"
+          style={{
+            position: 'fixed',
+            left: '1rem',
+            top: '1rem',
+            zIndex: 50,
+            background: 'var(--bg-4)',
+            borderColor: 'var(--accent)',
+            color: 'var(--accent)'
+          }}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Sidebar */}
       <div
-        className={`card w-64 transition-transform xl:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
+        className={`card ${inlineMobile ? 'w-full' : 'w-64'} transition-transform xl:translate-x-0 ${
+          isOpen ? 'translate-x-0' : (inlineMobile ? '' : '-translate-x-[calc(100%+1rem)]')
         } xl:block`}
         style={{
-          position: isOpen ? 'fixed' : 'relative',
-          left: isOpen ? 0 : 'auto',
-          top: isOpen ? 0 : 'auto',
-          zIndex: isOpen ? 40 : 'auto',
-          maxHeight: isOpen ? '100vh' : 'none',
-          overflowY: isOpen ? 'auto' : 'visible',
+          position: inlineMobile ? 'relative' : (isOpen ? 'fixed' : 'relative'),
+          left: isOpen && !inlineMobile ? 0 : 'auto',
+          top: isOpen && !inlineMobile ? 0 : 'auto',
+          zIndex: isOpen && !inlineMobile ? 40 : 'auto',
+          maxHeight: isOpen && !inlineMobile ? '100vh' : 'none',
+          overflowY: isOpen && !inlineMobile ? 'auto' : 'visible',
         }}
       >
         <span className="card-label">Search History</span>
@@ -122,16 +127,16 @@ export default function Sidebar({
 
     {/* Predictions Cache - Separate Container Below Search History */}
     <div
-      className={`w-64 transition-transform xl:translate-x-0 ${
-        isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+1rem)]'
+      className={`${inlineMobile ? 'w-full' : 'w-64'} transition-transform xl:translate-x-0 ${
+        isOpen ? 'translate-x-0' : (inlineMobile ? '' : '-translate-x-[calc(100%+1rem)]')
       } xl:block mt-6`}
       style={{
-        position: isOpen ? 'fixed' : 'relative',
-        left: isOpen ? 0 : 'auto',
-        top: isOpen ? '50vh' : 'auto',
-        zIndex: isOpen ? 40 : 'auto',
-        maxHeight: isOpen ? '50vh' : 'none',
-        overflowY: isOpen ? 'auto' : 'visible',
+        position: inlineMobile ? 'relative' : (isOpen ? 'fixed' : 'relative'),
+        left: isOpen && !inlineMobile ? 0 : 'auto',
+        top: isOpen && !inlineMobile ? '50vh' : 'auto',
+        zIndex: isOpen && !inlineMobile ? 40 : 'auto',
+        maxHeight: isOpen && !inlineMobile ? '50vh' : 'none',
+        overflowY: isOpen && !inlineMobile ? 'auto' : 'visible',
       }}
     >
       <PredictionsCache onLoadPrediction={(pred) => {
@@ -141,7 +146,8 @@ export default function Sidebar({
     </div>
 
     {/* Mobile Overlay */}
-    {isOpen && (
+    {/* Mobile Overlay (only when not inline) */}
+    {!inlineMobile && isOpen && (
       <div
         className="fixed inset-0 bg-black bg-opacity-50 z-30 xl:hidden"
         onClick={() => setIsOpen(false)}

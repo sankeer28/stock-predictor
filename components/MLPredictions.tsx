@@ -22,10 +22,12 @@ interface MLPredictionsProps {
   isTraining: boolean;
   fromCache?: boolean;
   onRecalculate?: () => void;
+  // Render inline on mobile (stacked below news) when true
+  inlineMobile?: boolean;
 }
 
-export default function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate }: MLPredictionsProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate, inlineMobile }: MLPredictionsProps) {
+  const [isOpen, setIsOpen] = useState<boolean>(!!inlineMobile);
   const [selectedDays, setSelectedDays] = useState<number>(7);
 
   // Calculate summary statistics for each algorithm
@@ -58,35 +60,37 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-3 border-2 xl:hidden"
-        style={{
-          position: 'fixed',
-          right: '1rem',
-          top: '1rem',
-          zIndex: 50,
-          background: 'var(--bg-4)',
-          borderColor: 'var(--accent)',
-          color: 'var(--accent)'
-        }}
-      >
-        <Brain className="w-5 h-5" />
-      </button>
+      {/* Mobile Toggle Button (hide when rendering inline) */}
+      {!inlineMobile && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-3 border-2 xl:hidden"
+          style={{
+            position: 'fixed',
+            right: '1rem',
+            top: '1rem',
+            zIndex: 50,
+            background: 'var(--bg-4)',
+            borderColor: 'var(--accent)',
+            color: 'var(--accent)'
+          }}
+        >
+          <Brain className="w-5 h-5" />
+        </button>
+      )}
 
       {/* ML Predictions Sidebar */}
       <div
-        className={`card w-80 transition-transform xl:translate-x-0 ${
-          isOpen ? 'translate-x-0' : 'translate-x-[calc(100%+1rem)]'
+        className={`card ${inlineMobile ? 'w-full' : 'w-80'} transition-transform xl:translate-x-0 ${
+          isOpen ? 'translate-x-0' : (inlineMobile ? '' : 'translate-x-[calc(100%+1rem)]')
         } xl:block`}
         style={{
-          position: isOpen ? 'fixed' : 'relative',
-          right: isOpen ? 0 : 'auto',
-          top: isOpen ? 0 : 'auto',
-          zIndex: isOpen ? 40 : 'auto',
-          maxHeight: isOpen ? '100vh' : 'none',
-          overflowY: isOpen ? 'auto' : 'visible',
+          position: inlineMobile ? 'relative' : (isOpen ? 'fixed' : 'relative'),
+          right: inlineMobile ? 'auto' : (isOpen ? 0 : 'auto'),
+          top: inlineMobile ? 'auto' : (isOpen ? 0 : 'auto'),
+          zIndex: inlineMobile ? 'auto' : (isOpen ? 40 : 'auto'),
+          maxHeight: inlineMobile ? 'none' : (isOpen ? '100vh' : 'none'),
+          overflowY: inlineMobile ? 'visible' : (isOpen ? 'auto' : 'visible'),
         }}
       >
         <span className="card-label">ML Predictions</span>
@@ -274,8 +278,8 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
         </div>
       </div>
 
-      {/* Mobile Overlay */}
-      {isOpen && (
+      {/* Mobile Overlay (skip when inline) */}
+      {!inlineMobile && isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 xl:hidden"
           onClick={() => setIsOpen(false)}

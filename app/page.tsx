@@ -1068,6 +1068,30 @@ export default function Home() {
                 isAnalyzingSentiment={isAnalyzingSentiment}
               />
             </div>
+
+            {/* Mobile: stack Search History, Cache and ML panels below News */}
+            <div className="block xl:hidden mt-6 space-y-4">
+              <Sidebar
+                searchHistory={searchHistory}
+                onSelectSymbol={(sym) => {
+                  setInputSymbol(sym);
+                  fetchData(sym);
+                }}
+                onClearHistory={clearHistory}
+                currentSymbol={symbol}
+                onLoadCachedPrediction={handleLoadCachedPrediction}
+                inlineMobile={true}
+              />
+
+              <MLPredictions
+                currentPrice={currentPrice}
+                predictions={mlPredictions}
+                isTraining={mlTraining}
+                fromCache={mlFromCache}
+                onRecalculate={() => fetchData(symbol, true)}
+                inlineMobile={true}
+              />
+            </div>
           </>
         )}
         </div>
