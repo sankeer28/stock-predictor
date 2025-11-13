@@ -45,16 +45,32 @@ export default function StockChart({
   showVolume = true,
 }: StockChartProps) {
   // Combine historical and forecast data - memoized to avoid recalculation
-  const combinedData = React.useMemo(() => [
-    ...data.map(d => ({ ...d, isForecast: false })),
-    ...forecastData.map(f => ({
-      date: f.date,
-      predicted: f.predicted,
-      upper: f.upper,
-      lower: f.lower,
-      isForecast: true,
-    })),
-  ], [data, forecastData]);
+  const combinedData = React.useMemo(() => {
+    const historicalData = data.map(d => ({ ...d, isForecast: false }));
+
+    // Bridge the gap by adding the last historical price as the first forecast point
+    const forecastWithBridge = forecastData.length > 0 && data.length > 0
+      ? [
+          {
+            date: data[data.length - 1].date,
+            close: data[data.length - 1].close,
+            predicted: data[data.length - 1].close,
+            upper: data[data.length - 1].close,
+            lower: data[data.length - 1].close,
+            isForecast: true,
+          },
+          ...forecastData.map(f => ({
+            date: f.date,
+            predicted: f.predicted,
+            upper: f.upper,
+            lower: f.lower,
+            isForecast: true,
+          })),
+        ]
+      : [];
+
+    return [...historicalData, ...forecastWithBridge];
+  }, [data, forecastData]);
 
   // Calculate the index where forecast starts
   const historicalDataLength = data.length;
@@ -503,6 +519,51 @@ export default function StockChart({
           {/* Forecast Line */}
           {showForecast && forecastData.length > 0 && (
             <>
+              {/* Confidence Interval Band - filled area between upper and lower */}
+              <Area
+                yAxisId="price"
+                type="monotone"
+                dataKey="upper"
+                stroke="none"
+                fill="oklch(70% 0.13 0)"
+                fillOpacity={0.15}
+                name="Confidence Interval"
+              />
+              <Area
+                yAxisId="price"
+                type="monotone"
+                dataKey="lower"
+                stroke="none"
+                fill="var(--bg-4)"
+                fillOpacity={1}
+                name=""
+              />
+
+              {/* Upper and Lower Bounds - dotted lines */}
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="upper"
+                stroke="oklch(70% 0.13 0)"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+                strokeOpacity={0.5}
+                dot={false}
+                name="Upper Bound"
+              />
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="lower"
+                stroke="oklch(70% 0.13 0)"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+                strokeOpacity={0.5}
+                dot={false}
+                name="Lower Bound"
+              />
+
+              {/* Forecast Line - render on top */}
               <Line
                 yAxisId="price"
                 type="monotone"
@@ -512,26 +573,6 @@ export default function StockChart({
                 strokeDasharray="5 5"
                 dot={false}
                 name="Forecast"
-              />
-              <Area
-                yAxisId="price"
-                type="monotone"
-                dataKey="upper"
-                stroke="oklch(70% 0.13 0)"
-                fill="oklch(70% 0.13 0)"
-                fillOpacity={0.1}
-                strokeDasharray="2 2"
-                name="Upper Bound"
-              />
-              <Area
-                yAxisId="price"
-                type="monotone"
-                dataKey="lower"
-                stroke="oklch(70% 0.13 0)"
-                fill="transparent"
-                fillOpacity={0.1}
-                strokeDasharray="2 2"
-                name="Lower Bound"
               />
             </>
           )}

@@ -12,6 +12,7 @@ import MLPredictions from '@/components/MLPredictions';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateMLForecast, getMLForecastInsights, MLForecast } from '@/lib/mlForecasting';
+import { generateProphetWithChangepoints, ProphetForecast } from '@/lib/prophetForecast';
 import {
   generateLinearRegression,
   generatePolynomialRegression,
@@ -44,6 +45,8 @@ export default function Home() {
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [forecastData, setForecastData] = useState<any[]>([]);
+  const [prophetForecastData, setProphetForecastData] = useState<ProphetForecast[]>([]);
+  const [useProphetForecast, setUseProphetForecast] = useState(false);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
   const [newsSentiments, setNewsSentiments] = useState<any[]>([]);
   const [isAnalyzingSentiment, setIsAnalyzingSentiment] = useState(false);
@@ -282,9 +285,10 @@ export default function Home() {
 
       setSymbol(stockSymbol);
 
-      // Generate simple forecast in background (non-blocking)
+      // Generate forecasts in background (non-blocking)
       setTimeout(() => {
         try {
+          // Generate custom forecast
           const simpleForecast = generateForecast(stockResult.data, forecastHorizon);
           const simpleInsights = getForecastInsights(
             stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close,
@@ -293,6 +297,14 @@ export default function Home() {
 
           setForecastData(simpleForecast);
           setForecastInsights(simpleInsights);
+
+          // Generate Prophet forecast
+          try {
+            const prophetForecast = generateProphetWithChangepoints(stockResult.data, forecastHorizon);
+            setProphetForecastData(prophetForecast);
+          } catch (prophetError) {
+            console.error('Prophet forecast error:', prophetError);
+          }
 
           // Generate trading signal with simple forecast
           const signal = generateTradingSignal(
@@ -466,12 +478,20 @@ export default function Home() {
     if (stockData.length > 0 && !isLoadingFromCacheTable.current) {
       const updateForecast = async () => {
         try {
-          // Always generate simple forecast first
+          // Generate custom forecast
           const simpleForecast = generateForecast(stockData, forecastHorizon);
           const simpleInsights = getForecastInsights(currentPrice, simpleForecast);
 
           setForecastData(simpleForecast);
           setForecastInsights(simpleInsights);
+
+          // Generate Prophet forecast
+          try {
+            const prophetForecast = generateProphetWithChangepoints(stockData, forecastHorizon);
+            setProphetForecastData(prophetForecast);
+          } catch (prophetError) {
+            console.error('Prophet forecast error:', prophetError);
+          }
 
           const indicators = calculateAllIndicators(stockData);
           const simpleSignal = generateTradingSignal(
@@ -881,6 +901,64 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Forecast Method Toggle */}
+              <div className="mb-3 pb-3 border-b" style={{ borderColor: 'var(--bg-1)' }}>
+                <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>FORECAST METHOD</div>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => setUseProphetForecast(false)}
+                    className="px-3 py-1.5 text-xs font-medium border transition-all"
+                    style={{
+                      background: !useProphetForecast ? 'var(--success)' : 'var(--bg-3)',
+                      borderColor: !useProphetForecast ? 'var(--success)' : 'var(--bg-1)',
+                      color: !useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
+                    }}
+                  >
+                    CUSTOM ML
+                  </button>
+                  <button
+                    onClick={() => setUseProphetForecast(true)}
+                    className="px-3 py-1.5 text-xs font-medium border transition-all"
+                    style={{
+                      background: useProphetForecast ? 'var(--info)' : 'var(--bg-3)',
+                      borderColor: useProphetForecast ? 'var(--info)' : 'var(--bg-1)',
+                      color: useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
+                    }}
+                  >
+                    PROPHET
+                  </button>
+                </div>
+
+                {/* Forecast Days Input */}
+                <div className="mb-2">
+                  <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--text-4)' }}>
+                    Forecast Horizon (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="7"
+                    max="90"
+                    value={forecastHorizon}
+                    onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
+                    className="w-full px-3 py-2 border font-mono text-sm"
+                    style={{
+                      background: 'var(--bg-3)',
+                      borderColor: 'var(--bg-1)',
+                      borderLeftColor: 'var(--accent)',
+                      borderLeftWidth: '3px',
+                      color: 'var(--text-2)',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div className="text-xs" style={{ color: 'var(--text-5)' }}>
+                  {useProphetForecast
+                    ? 'Using Prophet: Trend + Seasonality decomposition with changepoint detection'
+                    : 'Using Custom ML: Linear regression with exponential smoothing'}
+                </div>
+              </div>
+
               {/* Indicators & Options */}
               <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>INDICATORS & OPTIONS</div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
@@ -962,40 +1040,24 @@ export default function Home() {
                   />
                   <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>RSI/MACD</span>
                 </label>
-                <div className="col-span-2 sm:col-span-3 md:col-span-1">
-                  <label className="text-sm block mb-1" style={{ color: 'var(--text-3)' }}>
-                    Forecast Days
-                  </label>
-                  <input
-                    type="number"
-                    min="7"
-                    max="90"
-                    value={forecastHorizon}
-                    onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
-                    className="w-full px-3 py-1.5 border font-mono text-sm"
-                    style={{
-                      background: 'var(--bg-3)',
-                      borderColor: 'var(--bg-1)',
-                      borderLeftColor: 'var(--accent)',
-                      borderLeftWidth: '3px',
-                      color: 'var(--text-2)',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
               </div>
             </div>
 
             {/* Main Chart */}
             <div className="card mb-6">
-              <span className="card-label">Price Chart with Forecast</span>
+              <span className="card-label">
+                Price Chart with Forecast
+                <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-5)' }}>
+                  ({useProphetForecast ? 'Prophet' : 'Custom ML'})
+                </span>
+              </span>
               <StockChart
                 data={chartData}
                 showMA20={showMA20}
                 showMA50={showMA50}
                 showMA200={showMA200}
                 showBB={showBB}
-                forecastData={forecastData}
+                forecastData={useProphetForecast ? prophetForecastData : forecastData}
                 chartType={chartType}
                 showVolume={showVolume}
               />
