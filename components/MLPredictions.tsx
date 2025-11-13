@@ -95,7 +95,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
       >
         <span className="card-label">ML Predictions</span>
 
-        {/* Cache Status and Recalculate Button */}
+        {/* Cache Status and Retrain Button */}
         <div className="mb-3 flex items-center justify-between">
           {fromCache && (
             <div className="flex items-center gap-1">
@@ -103,17 +103,17 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
               <span className="text-xs" style={{ color: 'var(--text-4)' }}>From cache</span>
             </div>
           )}
-          {fromCache && onRecalculate && !isTraining && (
+          {onRecalculate && !isTraining && (
             <button
               onClick={onRecalculate}
-              className="px-2 py-1 text-xs border transition-all"
+              className="px-2 py-1 text-xs border transition-all ml-auto"
               style={{
                 background: 'var(--bg-3)',
                 borderColor: 'var(--bg-1)',
                 color: 'var(--text-3)',
               }}
             >
-              Recalculate
+              Retrain
             </button>
           )}
         </div>

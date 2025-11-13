@@ -13,6 +13,8 @@ import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateMLForecast, getMLForecastInsights, MLForecast } from '@/lib/mlForecasting';
 import { generateProphetWithChangepoints, ProphetForecast } from '@/lib/prophetForecast';
+import MLSettingsPanel from '@/components/MLSettingsPanel';
+import { MLSettings, MLPreset, DEFAULT_ML_SETTINGS, getPresetSettings } from '@/types/mlSettings';
 import {
   generateLinearRegression,
   generatePolynomialRegression,
@@ -91,7 +93,11 @@ export default function Home() {
   const [mlFromCache, setMlFromCache] = useState(false);
   const isLoadingFromCacheTable = React.useRef(false);
 
-  // Load search history from localStorage on mount
+  // ML Settings
+  const [mlSettings, setMlSettings] = useState<MLSettings>(DEFAULT_ML_SETTINGS);
+  const [mlPreset, setMlPreset] = useState<MLPreset>('balanced');
+
+  // Load search history and ML settings from localStorage on mount
   useEffect(() => {
     try {
       const savedHistory = localStorage.getItem('stockSearchHistory');
@@ -102,10 +108,30 @@ export default function Home() {
       } else {
         console.log('No search history found in localStorage');
       }
+
+      // Load ML settings
+      const savedMLSettings = localStorage.getItem('mlSettings');
+      const savedMLPreset = localStorage.getItem('mlPreset');
+      if (savedMLSettings) {
+        setMlSettings(JSON.parse(savedMLSettings));
+      }
+      if (savedMLPreset) {
+        setMlPreset(savedMLPreset as MLPreset);
+      }
     } catch (e) {
-      console.error('Failed to load search history from localStorage:', e);
+      console.error('Failed to load from localStorage:', e);
     }
   }, []);
+
+  // Save ML settings to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('mlSettings', JSON.stringify(mlSettings));
+      localStorage.setItem('mlPreset', mlPreset);
+    } catch (error) {
+      console.error('Error saving ML settings:', error);
+    }
+  }, [mlSettings, mlPreset]);
 
   // Save search history to localStorage
   const saveSearchHistory = (history: SearchHistoryItem[]) => {
@@ -1166,6 +1192,15 @@ export default function Home() {
                 inlineMobile={true}
               />
 
+              {/* ML Settings Panel */}
+              <MLSettingsPanel
+                settings={mlSettings}
+                onSettingsChange={setMlSettings}
+                onPresetChange={setMlPreset}
+                currentPreset={mlPreset}
+                inlineMobile={true}
+              />
+
               <MLPredictions
                 currentPrice={currentPrice}
                 predictions={mlPredictions}
@@ -1182,6 +1217,14 @@ export default function Home() {
         {/* ML Predictions Sidebar - Right Side */}
         {!loading && stockData.length > 0 && (
           <div className="hidden xl:block flex-shrink-0">
+            {/* ML Settings Panel */}
+            <MLSettingsPanel
+              settings={mlSettings}
+              onSettingsChange={setMlSettings}
+              onPresetChange={setMlPreset}
+              currentPreset={mlPreset}
+            />
+
             <MLPredictions
               currentPrice={currentPrice}
               predictions={mlPredictions}
