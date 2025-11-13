@@ -32,10 +32,37 @@ interface CompanyInfoProps {
     // optional fields added by API: today's change and percent
     change?: number | null;
     changePercent?: number | null;
+
+    // Massive API fields
+    phone?: string;
+    address?: {
+      address1?: string;
+      city?: string;
+      state?: string;
+      postal_code?: string;
+    };
+    totalEmployees?: number;
+    primaryExchange?: string;
+    listDate?: string;
+    sicCode?: string;
+    sicDescription?: string;
+    logoUrl?: string;
+    iconUrl?: string;
+    cik?: string;
+    locale?: string;
+    market?: string;
+    type?: string;
   };
 }
 
 export default function CompanyInfo({ symbol, companyName, currentPrice, currentChange, currentChangePercent, companyInfo }: CompanyInfoProps) {
+  const [imageError, setImageError] = React.useState(false);
+
+  // Reset image error when symbol changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [symbol, companyInfo.iconUrl]);
+
   // Prefer explicit props if provided, otherwise read from companyInfo
   const change = typeof currentChange === 'number' ? currentChange : companyInfo?.change ?? null;
   const changePercent = typeof currentChangePercent === 'number' ? currentChangePercent : companyInfo?.changePercent ?? null;
@@ -73,13 +100,28 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <Building2 className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+            {companyInfo.iconUrl && !imageError ? (
+              <img
+                src={companyInfo.iconUrl}
+                alt={`${companyName} icon`}
+                className="w-12 h-12 rounded-lg object-contain"
+                style={{ background: 'var(--bg-3)', padding: '4px' }}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <Building2 className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+            )}
             <div>
               <h2 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>
                 {companyName}
               </h2>
               <p className="text-sm font-mono" style={{ color: 'var(--text-4)' }}>
                 {symbol}
+                {companyInfo.primaryExchange && (
+                  <span className="ml-2 text-xs" style={{ color: 'var(--text-5)' }}>
+                    · {companyInfo.primaryExchange}
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -120,54 +162,192 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
           </div>
         </div>
 
+        {/* Company Metadata */}
+        <div className="flex flex-wrap gap-4 mt-3 text-xs" style={{ color: 'var(--text-4)' }}>
+          {companyInfo.sector && (
+            <div className="flex items-center gap-1">
+              <span>Sector:</span>
+              <span style={{ color: 'var(--text-3)' }}>{companyInfo.sector}</span>
+            </div>
+          )}
+          {companyInfo.totalEmployees && (
+            <div className="flex items-center gap-1">
+              <span>Employees:</span>
+              <span style={{ color: 'var(--text-3)' }}>{companyInfo.totalEmployees.toLocaleString()}</span>
+            </div>
+          )}
+          {companyInfo.listDate && (
+            <div className="flex items-center gap-1">
+              <span>Listed:</span>
+              <span style={{ color: 'var(--text-3)' }}>{new Date(companyInfo.listDate).getFullYear()}</span>
+            </div>
+          )}
+          {companyInfo.phone && (
+            <div className="flex items-center gap-1">
+              <span>Phone:</span>
+              <span style={{ color: 'var(--text-3)' }}>{companyInfo.phone}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Address */}
+        {companyInfo.address && (
+          <div className="mt-2 text-xs" style={{ color: 'var(--text-4)' }}>
+            <span>Address: </span>
+            <span style={{ color: 'var(--text-3)' }}>
+              {companyInfo.address.address1}
+              {companyInfo.address.city && `, ${companyInfo.address.city}`}
+              {companyInfo.address.state && `, ${companyInfo.address.state}`}
+              {companyInfo.address.postal_code && ` ${companyInfo.address.postal_code}`}
+            </span>
+          </div>
+        )}
+
         {/* Description */}
         {companyInfo.description && (
           <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--text-3)' }}>
-            {companyInfo.description.length > 300
-              ? `${companyInfo.description.substring(0, 300)}...`
+            {companyInfo.description.length > 400
+              ? `${companyInfo.description.substring(0, 400)}...`
               : companyInfo.description}
           </p>
         )}
       </div>
 
       {/* Market Data - Only show available fields */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {/* 52 Week Range */}
-        <div className="p-4 border-2" style={{
-          background: 'var(--bg-2)',
-          borderColor: 'var(--info)',
-          borderLeftWidth: '3px'
-        }}>
-          <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>52-Week High</div>
-          <div className="text-sm font-semibold font-mono" style={{ color: 'var(--info)' }}>
-            ${formatNumber(companyInfo.fiftyTwoWeekHigh)}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {/* Market Cap */}
+        {companyInfo.marketCap && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: 'var(--accent)',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Market Cap</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--accent)' }}>
+              {formatMarketCap(companyInfo.marketCap)}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="p-4 border-2" style={{
-          background: 'var(--bg-2)',
-          borderColor: 'var(--info)',
-          borderLeftWidth: '3px'
-        }}>
-          <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>52-Week Low</div>
-          <div className="text-sm font-semibold font-mono" style={{ color: 'var(--info)' }}>
-            ${formatNumber(companyInfo.fiftyTwoWeekLow)}
+        {/* Shares Outstanding */}
+        {companyInfo.sharesOutstanding && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: 'var(--success)',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Shares Out.</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--success)' }}>
+              {formatVolume(companyInfo.sharesOutstanding)}
+            </div>
           </div>
-        </div>
+        )}
 
+        {/* 52 Week High */}
+        {companyInfo.fiftyTwoWeekHigh && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: 'var(--info)',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>52-Week High</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--info)' }}>
+              ${formatNumber(companyInfo.fiftyTwoWeekHigh)}
+            </div>
+          </div>
+        )}
+
+        {/* 52 Week Low */}
+        {companyInfo.fiftyTwoWeekLow && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: 'var(--info)',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>52-Week Low</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--info)' }}>
+              ${formatNumber(companyInfo.fiftyTwoWeekLow)}
+            </div>
+          </div>
+        )}
+
+        {/* Average Volume */}
         {companyInfo.averageVolume && (
-          <div className="p-4 border-2" style={{
+          <div className="p-3 border-2" style={{
             background: 'var(--bg-2)',
             borderColor: 'var(--warning)',
             borderLeftWidth: '3px'
           }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Average Volume</div>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Avg Volume</div>
             <div className="text-sm font-semibold font-mono" style={{ color: 'var(--warning)' }}>
               {formatVolume(companyInfo.averageVolume)}
             </div>
           </div>
         )}
+
+        {/* P/E Ratio */}
+        {companyInfo.trailingPE && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: '#8b5cf6',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>P/E Ratio</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: '#8b5cf6' }}>
+              {formatNumber(companyInfo.trailingPE)}
+            </div>
+          </div>
+        )}
+
+        {/* Beta */}
+        {companyInfo.beta && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: '#ec4899',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Beta</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: '#ec4899' }}>
+              {formatNumber(companyInfo.beta)}
+            </div>
+          </div>
+        )}
+
+        {/* Dividend Yield */}
+        {companyInfo.dividendYield && (
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: '#10b981',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Div Yield</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: '#10b981' }}>
+              {formatPercent(companyInfo.dividendYield)}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Footer with CIK and identifiers */}
+      {(companyInfo.cik || companyInfo.sicCode) && (
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--bg-1)' }}>
+          <div className="flex flex-wrap gap-4 text-xs" style={{ color: 'var(--text-5)' }}>
+            {companyInfo.cik && (
+              <div>
+                <span>CIK: </span>
+                <span className="font-mono">{companyInfo.cik}</span>
+              </div>
+            )}
+            {companyInfo.sicCode && companyInfo.sicDescription && (
+              <div>
+                <span>SIC: </span>
+                <span className="font-mono">{companyInfo.sicCode}</span>
+                <span className="ml-1">({companyInfo.sicDescription})</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

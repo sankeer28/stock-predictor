@@ -226,9 +226,30 @@ export default function Home() {
       setCompanyName(stockResult.companyName || stockSymbol);
   // Use client-side ET calculation to determine market status immediately
   setMarketState(getMarketStatus());
-      // attach change info (if API returned it) to companyInfo for easier passing to components
+
+      // Fetch detailed company info from Massive API
+      let massiveCompanyInfo = {};
+      try {
+        const companyResponse = await fetch(`/api/company?symbol=${stockSymbol}`);
+        if (companyResponse.ok) {
+          const companyResult = await companyResponse.json();
+          if (companyResult.success && companyResult.companyInfo) {
+            massiveCompanyInfo = companyResult.companyInfo;
+            // Update company name from Massive if available
+            if (companyResult.companyInfo.name) {
+              setCompanyName(companyResult.companyInfo.name);
+            }
+          }
+        }
+      } catch (companyError) {
+        console.error('Error fetching Massive company info:', companyError);
+        // Continue with stock data even if company info fails
+      }
+
+      // Merge Yahoo Finance data with Massive API data
       setCompanyInfo({
         ...(stockResult.companyInfo || {}),
+        ...massiveCompanyInfo,
         change: typeof stockResult.change !== 'undefined' ? stockResult.change : null,
         changePercent: typeof stockResult.changePercent !== 'undefined' ? stockResult.changePercent : null,
       });
