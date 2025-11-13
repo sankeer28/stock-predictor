@@ -1,4 +1,5 @@
 import { StockData } from '@/types';
+import { MLSettings, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
 
 export interface ProphetForecast {
   date: string;
@@ -108,21 +109,22 @@ function decomposeTimeSeries(prices: number[]): {
  */
 function calculatePredictionIntervals(
   residuals: number[],
-  forecastLength: number
+  forecastLength: number,
+  confidenceInterval: number = 1.96
 ): { upper: number[]; lower: number[] } {
   // Calculate residual standard deviation
   const mean = residuals.reduce((sum, val) => sum + val, 0) / residuals.length;
   const variance = residuals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / residuals.length;
   const std = Math.sqrt(variance);
 
-  // 95% confidence interval (approximately 2 standard deviations)
+  // User-defined confidence interval (1.64 = 90%, 1.96 = 95%, 2.58 = 99%)
   // Uncertainty grows with forecast horizon
   const upper: number[] = [];
   const lower: number[] = [];
 
   for (let i = 0; i < forecastLength; i++) {
     const uncertaintyMultiplier = 1 + (i / forecastLength) * 0.5; // Grows from 1 to 1.5
-    const interval = 1.96 * std * uncertaintyMultiplier;
+    const interval = confidenceInterval * std * uncertaintyMultiplier;
     upper.push(interval);
     lower.push(-interval);
   }
@@ -135,8 +137,11 @@ function calculatePredictionIntervals(
  */
 export function generateProphetForecast(
   stockData: StockData[],
-  forecastDays: number = 30
+  forecastDays: number = 30,
+  settings?: MLSettings
 ): ProphetForecast[] {
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
+
   // Extract closing prices
   const prices = stockData.map(d => d.close);
 
@@ -154,8 +159,8 @@ export function generateProphetForecast(
   const seasonalityPeriod = 7;
   const recentSeasonality = seasonal.slice(-seasonalityPeriod);
 
-  // Calculate prediction intervals
-  const intervals = calculatePredictionIntervals(residual, forecastDays);
+  // Calculate prediction intervals with user-defined confidence level
+  const intervals = calculatePredictionIntervals(residual, forecastDays, mlSettings.confidenceInterval);
 
   // Generate forecasts
   const forecasts: ProphetForecast[] = [];
@@ -198,13 +203,15 @@ export function generateProphetForecast(
 export function generateProphetWithChangepoints(
   stockData: StockData[],
   forecastDays: number = 30,
-  numChangepoints: number = 5
+  numChangepoints: number = 5,
+  settings?: MLSettings
 ): ProphetForecast[] {
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
   const prices = stockData.map(d => d.close);
 
   if (prices.length < 60) {
     // Fall back to simple forecast if not enough data
-    return generateProphetForecast(stockData, forecastDays);
+    return generateProphetForecast(stockData, forecastDays, settings);
   }
 
   // Detect changepoints (significant trend changes)
@@ -223,8 +230,8 @@ export function generateProphetWithChangepoints(
   // Decompose with focus on recent data
   const { seasonal, residual } = decomposeTimeSeries(prices);
 
-  // Calculate intervals
-  const intervals = calculatePredictionIntervals(residual, forecastDays);
+  // Calculate intervals with user-defined confidence level
+  const intervals = calculatePredictionIntervals(residual, forecastDays, mlSettings.confidenceInterval);
 
   // Generate forecasts using recent trend
   const forecasts: ProphetForecast[] = [];
@@ -242,8 +249,8 @@ export function generateProphetWithChangepoints(
     // Add seasonal component
     const seasonalValue = recentSeasonality[i % seasonalityPeriod];
 
-    // Combine with damping factor to prevent extreme extrapolation
-    const dampingFactor = Math.exp(-i / (forecastDays * 2)); // Exponential decay
+    // Combine with user-defined damping factor to prevent extreme extrapolation
+    const dampingFactor = Math.exp(-i / (forecastDays * 2)) * mlSettings.dampingFactor;
     const predicted = prices[prices.length - 1] + (trendValue - recentPrices[recentPrices.length - 1]) * dampingFactor + seasonalValue * 0.3;
 
     // Add prediction intervals

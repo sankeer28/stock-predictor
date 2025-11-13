@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs';
 import { StockData } from '@/types';
+import { MLSettings, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
 
 // Normalize data to 0-1 range for better training
 function normalizeData(data: number[]): { normalized: number[], min: number, max: number } {
@@ -40,7 +41,7 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
 }
 
 // Build LSTM model (optimized for stability and accuracy)
-function buildLSTMModel(lookback: number): tf.Sequential {
+function buildLSTMModel(lookback: number, settings: MLSettings): tf.Sequential {
   const model = tf.sequential();
 
   // LSTM layer with moderate units for stable predictions
@@ -50,16 +51,16 @@ function buildLSTMModel(lookback: number): tf.Sequential {
     inputShape: [lookback, 1],
     kernelInitializer: 'glorotUniform',  // More stable than glorotNormal
     recurrentInitializer: 'glorotUniform',
-    kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),  // L2 regularization to prevent overfitting
+    kernelRegularizer: tf.regularizers.l2({ l2: settings.l2Regularization }),
   }));
-  model.add(tf.layers.dropout({ rate: 0.1 }));  // Reduced dropout for better learning
+  model.add(tf.layers.dropout({ rate: settings.dropout }));
 
   // Dense layer
   model.add(tf.layers.dense({
     units: 8,  // Reduced complexity
     activation: 'relu',
     kernelInitializer: 'glorotUniform',
-    kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+    kernelRegularizer: tf.regularizers.l2({ l2: settings.l2Regularization }),
   }));
 
   // Output layer with linear activation (better for regression)
@@ -68,9 +69,9 @@ function buildLSTMModel(lookback: number): tf.Sequential {
     activation: 'linear'
   }));
 
-  // Compile with conservative learning rate for stability
+  // Compile with user-defined learning rate
   model.compile({
-    optimizer: tf.train.adam(0.001),  // Lower learning rate for stability
+    optimizer: tf.train.adam(settings.learningRate),
     loss: 'meanSquaredError',
     metrics: ['mae'],
   });
@@ -90,8 +91,11 @@ export interface MLForecast {
  */
 export async function generateMLForecast(
   stockData: StockData[],
-  forecastDays: number = 30
+  forecastDays: number = 30,
+  settings?: MLSettings
 ): Promise<MLForecast[]> {
+  // Use default settings if not provided
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
@@ -104,8 +108,8 @@ export async function generateMLForecast(
     // Normalize data
     const { normalized, min, max } = normalizeData(closePrices);
 
-    // Create training sequences (10 days lookback - balanced context and stability)
-    const lookback = 10;
+    // Create training sequences using user-defined lookback window
+    const lookback = mlSettings.lookbackWindow;
     const { X, y } = createSequences(normalized, lookback);
 
     // Convert to tensors
@@ -113,19 +117,19 @@ export async function generateMLForecast(
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
     // Build and train model
-    console.log('Training LSTM model with optimized configuration...');
-    const model = buildLSTMModel(lookback);
+    console.log('Training LSTM model with user-defined configuration...');
+    const model = buildLSTMModel(lookback, mlSettings);
 
     // Early stopping callback for efficiency
     let bestValLoss = Infinity;
     let patienceCounter = 0;
-    const patience = 5; // Stop if no improvement for 5 epochs
+    const patience = mlSettings.earlyStoppingPatience;
     let shouldStop = false;
 
     await model.fit(xsTensor, ysTensor, {
-      epochs: 30,  // Reduced max epochs to prevent overfitting
-      batchSize: 32,  // Larger batch for stability
-      validationSplit: 0.2,  // More validation data to catch overfitting
+      epochs: mlSettings.epochs,
+      batchSize: mlSettings.batchSize,
+      validationSplit: mlSettings.validationSplit,
       shuffle: true,  // Shuffle data for better generalization
       verbose: 0,
       callbacks: {
@@ -183,8 +187,8 @@ export async function generateMLForecast(
       const range = max - min;
       const denormalizedChange = predictedChange * range;
 
-      // Apply conservative damping to prevent wild swings
-      const dampedChange = denormalizedChange * 0.5;  // Dampen predictions
+      // Apply user-defined damping to control prediction volatility
+      const dampedChange = denormalizedChange * mlSettings.dampingFactor;
 
       predictedChanges.push(dampedChange);
 
@@ -221,9 +225,9 @@ export async function generateMLForecast(
       forecastDate.setDate(forecastDate.getDate() + i + 1);
 
       // Calculate uncertainty bounds (increases with time and volatility)
-      // Using ±2 standard deviations for ~95% confidence interval
+      // Using user-defined confidence interval (1.64 = 90%, 1.96 = 95%, 2.58 = 99%)
       const timeDecay = Math.sqrt(i + 1); // Uncertainty grows with sqrt of time
-      const baseUncertainty = predicted * volatility * timeDecay * 2.0;
+      const baseUncertainty = predicted * volatility * timeDecay * mlSettings.confidenceInterval;
 
       return {
         date: forecastDate.toISOString().split('T')[0],

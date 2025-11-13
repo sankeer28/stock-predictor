@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs';
 import { StockData } from '@/types';
+import { MLSettings, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
 
 export interface MLPrediction {
   date: string;
@@ -41,8 +42,10 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
  */
 export async function generateGRUForecast(
   stockData: StockData[],
-  forecastDays: number = 30
+  forecastDays: number = 30,
+  settings?: MLSettings
 ): Promise<MLPrediction[]> {
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
     const closePrices = stockData.map(d => d.close);
     if (closePrices.length < 60) {
@@ -50,7 +53,7 @@ export async function generateGRUForecast(
     }
 
     const { normalized, min, max } = normalizeData(closePrices);
-    const lookback = 10;
+    const lookback = mlSettings.lookbackWindow;
     const { X, y } = createSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
@@ -64,13 +67,13 @@ export async function generateGRUForecast(
       inputShape: [lookback, 1],
       kernelInitializer: 'glorotUniform',
       recurrentInitializer: 'glorotUniform',
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
-    model.add(tf.layers.dropout({ rate: 0.1 }));
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
-      optimizer: tf.train.adam(0.001),
+      optimizer: tf.train.adam(mlSettings.learningRate),
       loss: 'meanSquaredError',
       metrics: ['mae'],
     });
@@ -80,9 +83,9 @@ export async function generateGRUForecast(
     let patienceCounter = 0;
 
     await model.fit(xsTensor, ysTensor, {
-      epochs: 25,
-      batchSize: 32,
-      validationSplit: 0.2,
+      epochs: mlSettings.epochs,
+      batchSize: mlSettings.batchSize,
+      validationSplit: mlSettings.validationSplit,
       shuffle: true,
       verbose: 0,
       callbacks: {
@@ -94,7 +97,7 @@ export async function generateGRUForecast(
           } else {
             patienceCounter++;
           }
-          if (patienceCounter >= 5) {
+          if (patienceCounter >= mlSettings.earlyStoppingPatience) {
             model.stopTraining = true;
           }
         }
@@ -114,7 +117,7 @@ export async function generateGRUForecast(
       }).data().then(data => data[0]);
 
       const range = max - min;
-      const denormalizedChange = predictedChange * range * 0.5;  // Dampen
+      const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
       const normalizedNewPrice = (currentPrice - min) / range;
@@ -145,8 +148,10 @@ export async function generateGRUForecast(
  */
 export async function generate1DCNNForecast(
   stockData: StockData[],
-  forecastDays: number = 30
+  forecastDays: number = 30,
+  settings?: MLSettings
 ): Promise<MLPrediction[]> {
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
     const closePrices = stockData.map(d => d.close);
     if (closePrices.length < 60) {
@@ -154,7 +159,7 @@ export async function generate1DCNNForecast(
     }
 
     const { normalized, min, max } = normalizeData(closePrices);
-    const lookback = 10;
+    const lookback = mlSettings.lookbackWindow;
     const { X, y } = createSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
@@ -172,7 +177,7 @@ export async function generate1DCNNForecast(
       padding: 'same',
       kernelInitializer: 'glorotUniform',
     }));
-    model.add(tf.layers.dropout({ rate: 0.1 }));
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
     model.add(tf.layers.conv1d({
       filters: 16,
@@ -186,16 +191,16 @@ export async function generate1DCNNForecast(
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
-      optimizer: tf.train.adam(0.001),
+      optimizer: tf.train.adam(mlSettings.learningRate),
       loss: 'meanSquaredError',
       metrics: ['mae'],
     });
 
     // Train
     await model.fit(xsTensor, ysTensor, {
-      epochs: 20,
-      batchSize: 32,
-      validationSplit: 0.2,
+      epochs: mlSettings.epochs,
+      batchSize: mlSettings.batchSize,
+      validationSplit: mlSettings.validationSplit,
       shuffle: true,
       verbose: 0,
     });
@@ -213,7 +218,7 @@ export async function generate1DCNNForecast(
       }).data().then(data => data[0]);
 
       const range = max - min;
-      const denormalizedChange = predictedChange * range * 0.5;
+      const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
       const normalizedNewPrice = (currentPrice - min) / range;
@@ -244,8 +249,10 @@ export async function generate1DCNNForecast(
  */
 export async function generateCNNLSTMForecast(
   stockData: StockData[],
-  forecastDays: number = 30
+  forecastDays: number = 30,
+  settings?: MLSettings
 ): Promise<MLPrediction[]> {
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
     const closePrices = stockData.map(d => d.close);
     if (closePrices.length < 60) {
@@ -253,7 +260,7 @@ export async function generateCNNLSTMForecast(
     }
 
     const { normalized, min, max } = normalizeData(closePrices);
-    const lookback = 10;
+    const lookback = mlSettings.lookbackWindow;
     const { X, y } = createSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
@@ -270,30 +277,30 @@ export async function generateCNNLSTMForecast(
       inputShape: [lookback, 1],
       padding: 'same',
     }));
-    model.add(tf.layers.dropout({ rate: 0.1 }));
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
     // LSTM for temporal modeling
     model.add(tf.layers.lstm({
       units: 16,
       returnSequences: false,
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
-    model.add(tf.layers.dropout({ rate: 0.1 }));
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
     model.add(tf.layers.dense({ units: 8, activation: 'relu' }));
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
-      optimizer: tf.train.adam(0.001),
+      optimizer: tf.train.adam(mlSettings.learningRate),
       loss: 'meanSquaredError',
       metrics: ['mae'],
     });
 
     // Train
     await model.fit(xsTensor, ysTensor, {
-      epochs: 25,
-      batchSize: 32,
-      validationSplit: 0.2,
+      epochs: mlSettings.epochs,
+      batchSize: mlSettings.batchSize,
+      validationSplit: mlSettings.validationSplit,
       shuffle: true,
       verbose: 0,
     });
@@ -311,7 +318,7 @@ export async function generateCNNLSTMForecast(
       }).data().then(data => data[0]);
 
       const range = max - min;
-      const denormalizedChange = predictedChange * range * 0.5;
+      const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
       const normalizedNewPrice = (currentPrice - min) / range;
@@ -343,8 +350,10 @@ export async function generateCNNLSTMForecast(
  */
 export async function generateTFTForecast(
   stockData: StockData[],
-  forecastDays: number = 30
+  forecastDays: number = 30,
+  settings?: MLSettings
 ): Promise<MLPrediction[]> {
+  const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
     const closePrices = stockData.map(d => d.close);
     if (closePrices.length < 60) {
@@ -352,7 +361,7 @@ export async function generateTFTForecast(
     }
 
     const { normalized, min, max } = normalizeData(closePrices);
-    const lookback = 10;
+    const lookback = mlSettings.lookbackWindow;
     const { X, y } = createSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
@@ -368,7 +377,7 @@ export async function generateTFTForecast(
       inputShape: [lookback, 1],
       kernelInitializer: 'glorotUniform',
     }));
-    model.add(tf.layers.dropout({ rate: 0.1 }));
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
     model.add(tf.layers.dense({
       units: 16,
@@ -380,16 +389,16 @@ export async function generateTFTForecast(
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
-      optimizer: tf.train.adam(0.001),
+      optimizer: tf.train.adam(mlSettings.learningRate),
       loss: 'meanSquaredError',
       metrics: ['mae'],
     });
 
     // Train
     await model.fit(xsTensor, ysTensor, {
-      epochs: 20,
-      batchSize: 32,
-      validationSplit: 0.2,
+      epochs: mlSettings.epochs,
+      batchSize: mlSettings.batchSize,
+      validationSplit: mlSettings.validationSplit,
       shuffle: true,
       verbose: 0,
     });
@@ -407,7 +416,7 @@ export async function generateTFTForecast(
       }).data().then(data => data[0]);
 
       const range = max - min;
-      const denormalizedChange = predictedChange * range * 0.5;
+      const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
       const normalizedNewPrice = (currentPrice - min) / range;

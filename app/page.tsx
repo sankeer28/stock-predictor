@@ -326,7 +326,7 @@ export default function Home() {
 
           // Generate Prophet forecast
           try {
-            const prophetForecast = generateProphetWithChangepoints(stockResult.data, forecastHorizon);
+            const prophetForecast = generateProphetWithChangepoints(stockResult.data, forecastHorizon, 5, mlSettings);
             setProphetForecastData(prophetForecast);
           } catch (prophetError) {
             console.error('Prophet forecast error:', prophetError);
@@ -389,31 +389,31 @@ export default function Home() {
             console.log('Starting all neural network models in parallel...');
 
             // Start all models at once (parallel training)
-            const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon)
+            const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, gru: forecast }));
                 return forecast;
               });
 
-            const tftPromise = generateTFTForecast(stockResult.data, forecastHorizon)
+            const tftPromise = generateTFTForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, tft: forecast }));
                 return forecast;
               });
 
-            const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon)
+            const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, cnn: forecast }));
                 return forecast;
               });
 
-            const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon)
+            const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
                 return forecast;
               });
 
-            const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon)
+            const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, lstm: forecast }));
                 return forecast;
@@ -513,7 +513,7 @@ export default function Home() {
 
           // Generate Prophet forecast
           try {
-            const prophetForecast = generateProphetWithChangepoints(stockData, forecastHorizon);
+            const prophetForecast = generateProphetWithChangepoints(stockData, forecastHorizon, 5, mlSettings);
             setProphetForecastData(prophetForecast);
           } catch (prophetError) {
             console.error('Prophet forecast error:', prophetError);
@@ -557,31 +557,31 @@ export default function Home() {
               });
 
               // Neural network models (parallel training)
-              const gruPromise = generateGRUForecast(stockData, forecastHorizon)
+              const gruPromise = generateGRUForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, gru: forecast }));
                   return forecast;
                 });
 
-              const tftPromise = generateTFTForecast(stockData, forecastHorizon)
+              const tftPromise = generateTFTForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, tft: forecast }));
                   return forecast;
                 });
 
-              const cnnPromise = generate1DCNNForecast(stockData, forecastHorizon)
+              const cnnPromise = generate1DCNNForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, cnn: forecast }));
                   return forecast;
                 });
 
-              const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon)
+              const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
                   return forecast;
                 });
 
-              const lstmPromise = generateMLForecast(stockData, forecastHorizon)
+              const lstmPromise = generateMLForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, lstm: forecast }));
                   return forecast;
@@ -620,7 +620,7 @@ export default function Home() {
 
       updateForecast();
     }
-  }, [forecastHorizon]);
+  }, [forecastHorizon, mlSettings]);
 
   const handleSearch = () => {
     if (inputSymbol.trim()) {
