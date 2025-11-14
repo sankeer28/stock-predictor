@@ -77,6 +77,87 @@ export default function TradingSignals({ signal, currentPrice }: TradingSignalsP
     }
   };
 
+  const getIndicatorExplanation = (reason: string): string => {
+    const lowerReason = reason.toLowerCase();
+    
+    if (lowerReason.includes('rsi')) {
+      if (lowerReason.includes('oversold')) {
+        return 'RSI below 30 suggests the stock may be undervalued and due for a bounce';
+      } else if (lowerReason.includes('overbought')) {
+        return 'RSI above 70 indicates the stock may be overvalued and due for a correction';
+      }
+      return 'RSI measures momentum on a 0-100 scale to identify overbought/oversold conditions';
+    }
+    
+    if (lowerReason.includes('macd')) {
+      if (lowerReason.includes('bullish') || lowerReason.includes('crossover')) {
+        return 'MACD line crossing above signal line suggests increasing upward momentum';
+      } else if (lowerReason.includes('bearish')) {
+        return 'MACD line crossing below signal line suggests increasing downward momentum';
+      }
+      return 'MACD tracks the relationship between two moving averages to show trend changes';
+    }
+    
+    if (lowerReason.includes('moving average') || lowerReason.includes('ma ') || lowerReason.includes('sma')) {
+      if (lowerReason.includes('golden cross')) {
+        return 'Golden Cross: 50-day MA crossing above 200-day MA is a strong bullish signal';
+      } else if (lowerReason.includes('death cross')) {
+        return 'Death Cross: 50-day MA crossing below 200-day MA is a strong bearish signal';
+      } else if (lowerReason.includes('above')) {
+        return 'Price above moving average suggests an uptrend with support from the average';
+      } else if (lowerReason.includes('below')) {
+        return 'Price below moving average suggests a downtrend with resistance from the average';
+      }
+      return 'Moving averages smooth price data to identify trends and support/resistance levels';
+    }
+    
+    if (lowerReason.includes('bollinger')) {
+      if (lowerReason.includes('lower')) {
+        return 'Price near lower band suggests the stock is potentially oversold';
+      } else if (lowerReason.includes('upper')) {
+        return 'Price near upper band suggests the stock is potentially overbought';
+      }
+      return 'Bollinger Bands measure volatility and help identify overbought/oversold conditions';
+    }
+    
+    if (lowerReason.includes('volume')) {
+      if (lowerReason.includes('increasing') || lowerReason.includes('high')) {
+        return 'Rising volume confirms the strength and conviction behind the current price move';
+      } else if (lowerReason.includes('decreasing') || lowerReason.includes('low')) {
+        return 'Declining volume suggests weakening conviction in the current price trend';
+      }
+      return 'Volume indicates the strength of price movements and trader conviction';
+    }
+    
+    if (lowerReason.includes('momentum')) {
+      if (lowerReason.includes('strong')) {
+        return 'Strong momentum indicates the current trend is likely to continue';
+      } else if (lowerReason.includes('weak')) {
+        return 'Weak momentum suggests the current trend may be losing strength';
+      }
+      return 'Momentum measures the rate of price change to predict trend continuation';
+    }
+    
+    if (lowerReason.includes('support')) {
+      return 'Support levels are price points where buying pressure tends to prevent further decline';
+    }
+    
+    if (lowerReason.includes('resistance')) {
+      return 'Resistance levels are price points where selling pressure tends to prevent further rise';
+    }
+    
+    if (lowerReason.includes('trend')) {
+      if (lowerReason.includes('uptrend') || lowerReason.includes('up trend')) {
+        return 'Uptrend: Series of higher highs and higher lows indicates bullish momentum';
+      } else if (lowerReason.includes('downtrend') || lowerReason.includes('down trend')) {
+        return 'Downtrend: Series of lower highs and lower lows indicates bearish momentum';
+      }
+      return 'Trend analysis identifies the general direction of price movement over time';
+    }
+    
+    return 'Technical indicator providing insight into potential price movement';
+  };
+
   const config = getSignalConfig();
 
   return (
@@ -148,6 +229,8 @@ export default function TradingSignals({ signal, currentPrice }: TradingSignalsP
               reason.toLowerCase().includes('death') ||
               reason.toLowerCase().includes('weak') && reason.toLowerCase().includes('momentum');
 
+            const explanation = getIndicatorExplanation(reason);
+            
             return (
               <div
                 key={index}
@@ -163,7 +246,12 @@ export default function TradingSignals({ signal, currentPrice }: TradingSignalsP
                   <span className="text-lg mt-[-2px]">
                     {isBullish ? '📈' : isBearish ? '📉' : '➡️'}
                   </span>
-                  <span className="text-sm flex-1">{reason}</span>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium mb-1">{reason}</div>
+                    <div className="text-xs opacity-70" style={{ color: 'var(--text-4)' }}>
+                      {explanation}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
