@@ -152,17 +152,17 @@ export default function MLSettingsPanel({
                 </div>
                 <input
                   type="range"
-                  min="5"
-                  max="30"
-                  step="1"
+                  min="10"
+                  max="90"
+                  step="5"
                   value={settings.lookbackWindow}
                   onChange={(e) => handleSettingChange('lookbackWindow', parseInt(e.target.value))}
                   className="w-full"
                   style={{ accentColor: 'var(--accent)' }}
                 />
                 <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--text-5)' }}>
-                  <span>5 (Short-term)</span>
-                  <span>30 (Long-term)</span>
+                  <span>10 (Short-term)</span>
+                  <span>90 (Long-term)</span>
                 </div>
               </div>
 
