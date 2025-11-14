@@ -61,7 +61,6 @@ export default function Home() {
   // Chart display options
   const [showMA20, setShowMA20] = useState(true);
   const [showMA50, setShowMA50] = useState(true);
-  const [showMA200, setShowMA200] = useState(false);
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
@@ -894,13 +893,132 @@ export default function Home() {
               </div>
             )}
 
-            {/* Chart Controls */}
-            <div className="card mb-6 py-3">
-              <span className="card-label">Chart Controls</span>
+            {/* Technical Indicators - Compact Bar */}
+            <div className="card mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="card-label">Technical Indicators</span>
+                <span className="text-xs" style={{ color: 'var(--text-5)' }}>Toggle overlays on chart</span>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                  background: showMA20 ? 'var(--bg-3)' : 'var(--bg-4)',
+                  borderColor: showMA20 ? 'var(--accent)' : 'var(--bg-1)',
+                  borderLeftWidth: showMA20 ? '3px' : '1px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showMA20}
+                    onChange={(e) => setShowMA20(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showMA20 ? 'var(--accent)' : 'var(--bg-4)',
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>20-Day MA</div>
+                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Short-term</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                  background: showMA50 ? 'var(--bg-3)' : 'var(--bg-4)',
+                  borderColor: showMA50 ? 'var(--accent)' : 'var(--bg-1)',
+                  borderLeftWidth: showMA50 ? '3px' : '1px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showMA50}
+                    onChange={(e) => setShowMA50(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showMA50 ? 'var(--accent)' : 'var(--bg-4)',
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>50-Day MA</div>
+                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Mid-term</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                  background: showBB ? 'var(--bg-3)' : 'var(--bg-4)',
+                  borderColor: showBB ? 'var(--accent)' : 'var(--bg-1)',
+                  borderLeftWidth: showBB ? '3px' : '1px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showBB}
+                    onChange={(e) => setShowBB(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showBB ? 'var(--accent)' : 'var(--bg-4)',
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Bollinger</div>
+                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Volatility</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                  background: showVolume ? 'var(--bg-3)' : 'var(--bg-4)',
+                  borderColor: showVolume ? 'var(--accent)' : 'var(--bg-1)',
+                  borderLeftWidth: showVolume ? '3px' : '1px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showVolume}
+                    onChange={(e) => setShowVolume(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showVolume ? 'var(--accent)' : 'var(--bg-4)',
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Volume</div>
+                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Strength</div>
+                  </div>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                  background: showIndicators ? 'var(--bg-3)' : 'var(--bg-4)',
+                  borderColor: showIndicators ? 'var(--accent)' : 'var(--bg-1)',
+                  borderLeftWidth: showIndicators ? '3px' : '1px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={showIndicators}
+                    onChange={(e) => setShowIndicators(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    style={{
+                      borderColor: 'var(--bg-1)',
+                      background: showIndicators ? 'var(--accent)' : 'var(--bg-4)',
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>RSI/MACD</div>
+                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Momentum</div>
+                  </div>
+                </label>
+              </div>
+            </div>
 
-              {/* Chart Type Toggle */}
-              <div className="mb-3 pb-3 border-b" style={{ borderColor: 'var(--bg-1)' }}>
-                <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>CHART TYPE</div>
+            {/* Main Chart with Integrated Controls */}
+            <div className="card mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <span className="card-label">
+                  Price Chart with Forecast
+                  <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-5)' }}>
+                    ({useProphetForecast ? 'Prophet' : 'Custom ML'})
+                  </span>
+                </span>
+                
+                {/* Chart Type Toggle */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleChartTypeChange('line')}
@@ -911,7 +1029,7 @@ export default function Home() {
                       color: chartType === 'line' ? 'var(--text-0)' : 'var(--text-3)',
                     }}
                   >
-                    LINE
+                    📈 LINE
                   </button>
                   <button
                     onClick={() => handleChartTypeChange('candlestick')}
@@ -922,43 +1040,46 @@ export default function Home() {
                       color: chartType === 'candlestick' ? 'var(--text-0)' : 'var(--text-3)',
                     }}
                   >
-                    CANDLESTICK
+                    📊 CANDLESTICK
                   </button>
                 </div>
               </div>
 
-              {/* Forecast Method Toggle */}
-              <div className="mb-3 pb-3 border-b" style={{ borderColor: 'var(--bg-1)' }}>
-                <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>FORECAST METHOD</div>
-                <div className="flex gap-2 mb-3">
+              {/* Forecast Controls - Inline */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4 p-3 border" style={{
+                background: 'var(--bg-3)',
+                borderColor: 'var(--bg-1)',
+                borderLeftWidth: '3px',
+                borderLeftColor: 'var(--accent)'
+              }}>
+                <div className="flex gap-2">
                   <button
                     onClick={() => setUseProphetForecast(false)}
-                    className="px-3 py-1.5 text-xs font-medium border transition-all"
+                    className="flex-1 px-3 py-1.5 text-xs font-medium border transition-all"
                     style={{
-                      background: !useProphetForecast ? 'var(--success)' : 'var(--bg-3)',
+                      background: !useProphetForecast ? 'var(--success)' : 'var(--bg-4)',
                       borderColor: !useProphetForecast ? 'var(--success)' : 'var(--bg-1)',
                       color: !useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
                     }}
                   >
-                    CUSTOM ML
+                    🤖 CUSTOM ML
                   </button>
                   <button
                     onClick={() => setUseProphetForecast(true)}
-                    className="px-3 py-1.5 text-xs font-medium border transition-all"
+                    className="flex-1 px-3 py-1.5 text-xs font-medium border transition-all"
                     style={{
-                      background: useProphetForecast ? 'var(--info)' : 'var(--bg-3)',
+                      background: useProphetForecast ? 'var(--info)' : 'var(--bg-4)',
                       borderColor: useProphetForecast ? 'var(--info)' : 'var(--bg-1)',
                       color: useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
                     }}
                   >
-                    PROPHET
+                    🔮 PROPHET
                   </button>
                 </div>
 
-                {/* Forecast Days Input */}
-                <div className="mb-2">
-                  <label className="text-xs block mb-1.5 font-medium" style={{ color: 'var(--text-4)' }}>
-                    Forecast Horizon (Days)
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--text-4)' }}>
+                    Days:
                   </label>
                   <input
                     type="number"
@@ -966,122 +1087,27 @@ export default function Home() {
                     max="90"
                     value={forecastHorizon}
                     onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
-                    className="w-full px-3 py-2 border font-mono text-sm"
+                    className="w-full px-2 py-1.5 border font-mono text-xs"
                     style={{
-                      background: 'var(--bg-3)',
+                      background: 'var(--bg-4)',
                       borderColor: 'var(--bg-1)',
-                      borderLeftColor: 'var(--accent)',
-                      borderLeftWidth: '3px',
                       color: 'var(--text-2)',
                       outline: 'none'
                     }}
                   />
                 </div>
 
-                <div className="text-xs" style={{ color: 'var(--text-5)' }}>
+                <div className="flex items-center text-xs italic" style={{ color: 'var(--text-5)' }}>
                   {useProphetForecast
-                    ? 'Using Prophet: Trend + Seasonality decomposition with changepoint detection'
-                    : 'Using Custom ML: Linear regression with exponential smoothing'}
+                    ? '✨ Seasonality + Trends'
+                    : '⚡ ML Regression'}
                 </div>
               </div>
 
-              {/* Indicators & Options */}
-              <div className="text-xs mb-2 font-semibold" style={{ color: 'var(--text-4)' }}>INDICATORS & OPTIONS</div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showMA20}
-                    onChange={(e) => setShowMA20(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showMA20 ? 'var(--accent)' : 'var(--bg-3)',
-                    }}
-                  />
-                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>20-Day MA</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showMA50}
-                    onChange={(e) => setShowMA50(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showMA50 ? 'var(--accent)' : 'var(--bg-3)',
-                    }}
-                  />
-                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>50-Day MA</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showMA200}
-                    onChange={(e) => setShowMA200(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showMA200 ? 'var(--accent)' : 'var(--bg-3)',
-                    }}
-                  />
-                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>200-Day MA</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showBB}
-                    onChange={(e) => setShowBB(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showBB ? 'var(--accent)' : 'var(--bg-3)',
-                    }}
-                  />
-                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>Bollinger Bands</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showVolume}
-                    onChange={(e) => setShowVolume(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showVolume ? 'var(--accent)' : 'var(--bg-3)',
-                    }}
-                  />
-                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>Volume</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={showIndicators}
-                    onChange={(e) => setShowIndicators(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none checked:bg-[oklch(70%_0.12_170)] checked:border-[oklch(70%_0.12_170)] transition-all"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showIndicators ? 'var(--accent)' : 'var(--bg-3)',
-                    }}
-                  />
-                  <span className="text-sm group-hover:text-opacity-80 transition-opacity" style={{ color: 'var(--text-3)' }}>RSI/MACD</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Main Chart */}
-            <div className="card mb-6">
-              <span className="card-label">
-                Price Chart with Forecast
-                <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-5)' }}>
-                  ({useProphetForecast ? 'Prophet' : 'Custom ML'})
-                </span>
-              </span>
               <StockChart
                 data={chartData}
                 showMA20={showMA20}
                 showMA50={showMA50}
-                showMA200={showMA200}
                 showBB={showBB}
                 forecastData={useProphetForecast ? prophetForecastData : forecastData}
                 chartType={chartType}

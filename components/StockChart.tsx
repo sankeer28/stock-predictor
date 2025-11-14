@@ -24,7 +24,6 @@ interface StockChartProps {
   data: ChartDataPoint[];
   showMA20?: boolean;
   showMA50?: boolean;
-  showMA200?: boolean;
   showBB?: boolean;
   showForecast?: boolean;
   forecastData?: Array<{ date: string; predicted: number; upper: number; lower: number }>;
@@ -37,7 +36,6 @@ export default function StockChart({
   data,
   showMA20 = true,
   showMA50 = true,
-  showMA200 = false,
   showBB = false,
   showForecast = true,
   forecastData = [],
@@ -363,17 +361,6 @@ export default function StockChart({
           )}
 
           {/* Moving Averages */}
-          {showMA200 && (
-            <Line
-              yAxisId="price"
-              type="monotone"
-              dataKey="ma200"
-              stroke="oklch(70% 0.12 170)"
-              strokeWidth={2}
-              dot={false}
-              name="MA 200"
-            />
-          )}
           {showMA50 && (
             <Line
               yAxisId="price"
