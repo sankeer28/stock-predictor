@@ -79,7 +79,7 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div>
-            <span className="card-label">Pattern Analysis</span>
+            <span className="card-label">Live Pattern Analysis</span>
             <p className="text-xs" style={{ color: 'var(--text-4)' }}>
               Analysis of {patterns.length} detected pattern{patterns.length !== 1 ? 's' : ''}
             </p>
@@ -128,7 +128,7 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
                   className="text-3xl font-bold"
                   style={{ color: signalColor }}
                 >
-                  {scorePercent > 0 ? '+' : ''}{scorePercent}
+                  {analysis.score > 0 ? '+' : ''}{scorePercent}
                 </div>
                 <div className="text-xs" style={{ color: 'var(--text-4)' }}>Signal Score</div>
               </div>

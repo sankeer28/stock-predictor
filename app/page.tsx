@@ -141,6 +141,7 @@ export default function Home() {
   const [showPatterns, setShowPatterns] = useState(false);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
   const [dataInterval, setDataInterval] = useState<string>(DEFAULT_FREQUENCY_OPTION.interval);
+  const [visibleDateRange, setVisibleDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
   const currentFrequency = React.useMemo(
     () => getFrequencyOption(dataFrequencyId),
     [dataFrequencyId]
@@ -857,6 +858,10 @@ export default function Home() {
     fetchData(symbol, { forceRecalc: true, frequencyId: nextId });
   };
 
+  const handleVisibleRangeChange = (startDate: string, endDate: string) => {
+    setVisibleDateRange({ startDate, endDate });
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
@@ -1364,6 +1369,7 @@ export default function Home() {
                 patterns={showPatterns ? chartPatterns : []}
                 enablePatterns={showPatterns}
                 dataInterval={dataInterval}
+                onVisibleRangeChange={handleVisibleRangeChange}
               />
             </div>
 
@@ -1492,6 +1498,8 @@ export default function Home() {
               {chartPatterns.length > 0 && (
                 <PatternAnalysis
                   patterns={chartPatterns}
+                  startDate={visibleDateRange?.startDate}
+                  endDate={visibleDateRange?.endDate}
                   inlineMobile={true}
                 />
               )}
@@ -1526,6 +1534,8 @@ export default function Home() {
               <div className="mt-4">
                 <PatternAnalysis
                   patterns={chartPatterns}
+                  startDate={visibleDateRange?.startDate}
+                  endDate={visibleDateRange?.endDate}
                 />
               </div>
             )}

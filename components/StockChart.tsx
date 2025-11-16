@@ -571,6 +571,7 @@ interface StockChartProps {
   patterns?: ChartPattern[];
   dataInterval?: string;
   enablePatterns?: boolean;
+  onVisibleRangeChange?: (startDate: string, endDate: string) => void;
 }
 
 
@@ -586,6 +587,7 @@ export default function StockChart({
   patterns = [],
   dataInterval = '1d',
   enablePatterns = false,
+  onVisibleRangeChange,
 }: StockChartProps) {
   // Combine historical and forecast data - memoized to avoid recalculation
   const combinedData = React.useMemo(() => {
@@ -812,6 +814,17 @@ export default function StockChart({
     }
     setViewPatterns(patterns);
   }, [enablePatterns, visibleData, visibleStartIndex, data, patterns]);
+
+  // Notify parent of visible range changes
+  useEffect(() => {
+    if (onVisibleRangeChange && data.length > 0) {
+      const startDate = data[visibleStartIndex]?.date;
+      const endDate = data[visibleEndIndex]?.date;
+      if (startDate && endDate) {
+        onVisibleRangeChange(startDate, endDate);
+      }
+    }
+  }, [visibleStartIndex, visibleEndIndex, data, onVisibleRangeChange]);
 
   const visiblePatterns = React.useMemo(() => {
     if (!enablePatterns || !viewPatterns?.length) return [];
