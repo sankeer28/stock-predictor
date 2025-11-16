@@ -80,6 +80,8 @@ export default function StockChart({
   });
 
   const [activeRange, setActiveRange] = useState<number | 'all' | 'default' | null>('default');
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const chartRef = React.useRef<HTMLDivElement>(null);
 
   // Update brush range when data changes - show recent history + forecast
   useEffect(() => {
@@ -95,6 +97,8 @@ export default function StockChart({
 
   const handleTimeRange = (range: number | 'all' | 'default') => {
     setActiveRange(range);
+    setZoomLevel(1); // Reset zoom level
+    
     if (range === 'default') {
       // Show last 30 days + forecast
       const startIndex = Math.max(0, historicalDataLength - 30);
@@ -117,9 +121,95 @@ export default function StockChart({
     }
   };
 
+  // Zoom in/out functions
+  const handleZoomIn = () => {
+    const { startIndex, endIndex } = brushRange;
+    const currentRange = endIndex - startIndex;
+    const newRange = Math.max(5, Math.floor(currentRange * 0.7)); // Zoom in by 30%
+    const center = Math.floor((startIndex + endIndex) / 2);
+    const newStartIndex = Math.max(0, center - Math.floor(newRange / 2));
+    const newEndIndex = Math.min(combinedData.length - 1, newStartIndex + newRange);
+    
+    setBrushRange({ startIndex: newStartIndex, endIndex: newEndIndex });
+    setBrushKey(prev => prev + 1);
+    setActiveRange(null); // Clear preset
+    setZoomLevel(prev => Math.min(prev + 0.3, 3));
+  };
+
+  const handleZoomOut = () => {
+    const { startIndex, endIndex } = brushRange;
+    const currentRange = endIndex - startIndex;
+    const newRange = Math.min(combinedData.length, Math.floor(currentRange * 1.4)); // Zoom out by 40%
+    const center = Math.floor((startIndex + endIndex) / 2);
+    const newStartIndex = Math.max(0, center - Math.floor(newRange / 2));
+    const newEndIndex = Math.min(combinedData.length - 1, newStartIndex + newRange);
+    
+    setBrushRange({ startIndex: newStartIndex, endIndex: newEndIndex });
+    setBrushKey(prev => prev + 1);
+    setActiveRange(null);
+    setZoomLevel(prev => Math.max(prev - 0.3, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    handleTimeRange('default');
+  };
+
+  // Mouse wheel zoom
+  useEffect(() => {
+    const chartElement = chartRef.current;
+    if (!chartElement) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          handleZoomIn();
+        } else {
+          handleZoomOut();
+        }
+      }
+    };
+
+    chartElement.addEventListener('wheel', handleWheel, { passive: false });
+    return () => chartElement.removeEventListener('wheel', handleWheel);
+  }, [brushRange, combinedData.length]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only trigger if not in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === '+' || e.key === '=') {
+        handleZoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        handleZoomOut();
+      } else if (e.key === '0' || e.key === 'r' || e.key === 'R') {
+        handleResetZoom();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [brushRange, combinedData.length]);
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const { startIndex, endIndex } = brushRange;
+    const visibleRange = endIndex - startIndex;
+    
+    // Show year if viewing more than 180 days (6 months)
+    if (visibleRange > 180) {
+      // For long ranges, show abbreviated format with year
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: '2-digit' // Use 2-digit year (e.g., '23 instead of 2023)
+      });
+    } else {
+      // For short ranges, just month and day
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
   };
 
   const formatPrice = (value: number | undefined | null) => {
@@ -139,29 +229,43 @@ export default function StockChart({
   return (
     <div className="w-full">
       {/* Time Range Buttons */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <button
-          onClick={() => handleTimeRange('default')}
-          className="px-3 py-1 text-xs font-medium border transition-all"
-          style={{
-            background: activeRange === 'default' ? 'var(--accent)' : 'var(--bg-3)',
-            borderColor: activeRange === 'default' ? 'var(--accent)' : 'var(--bg-1)',
-            color: activeRange === 'default' ? 'var(--text-0)' : 'var(--text-3)',
-          }}
-        >
-          DEFAULT
-        </button>
-        <button
-          onClick={() => handleTimeRange(30)}
-          className="px-3 py-1 text-xs font-medium border transition-all"
-          style={{
-            background: activeRange === 30 ? 'var(--accent)' : 'var(--bg-3)',
-            borderColor: activeRange === 30 ? 'var(--accent)' : 'var(--bg-1)',
-            color: activeRange === 30 ? 'var(--text-0)' : 'var(--text-3)',
-          }}
-        >
-          1M
-        </button>
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        {/* Quick Time Range */}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => handleTimeRange('default')}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background: activeRange === 'default' ? 'var(--accent)' : 'var(--bg-3)',
+              borderColor: activeRange === 'default' ? 'var(--accent)' : 'var(--bg-1)',
+              color: activeRange === 'default' ? 'var(--text-0)' : 'var(--text-3)',
+            }}
+          >
+            DEFAULT
+          </button>
+          <button
+            onClick={() => handleTimeRange(5)}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background: activeRange === 5 ? 'var(--accent)' : 'var(--bg-3)',
+              borderColor: activeRange === 5 ? 'var(--accent)' : 'var(--bg-1)',
+              color: activeRange === 5 ? 'var(--text-0)' : 'var(--text-3)',
+            }}
+            title="5 Days View"
+          >
+            5D
+          </button>
+          <button
+            onClick={() => handleTimeRange(30)}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background: activeRange === 30 ? 'var(--accent)' : 'var(--bg-3)',
+              borderColor: activeRange === 30 ? 'var(--accent)' : 'var(--bg-1)',
+              color: activeRange === 30 ? 'var(--text-0)' : 'var(--text-3)',
+            }}
+          >
+            1M
+          </button>
         <button
           onClick={() => handleTimeRange(90)}
           className="px-3 py-1 text-xs font-medium border transition-all"
@@ -196,6 +300,28 @@ export default function StockChart({
           1Y
         </button>
         <button
+          onClick={() => handleTimeRange(730)}
+          className="px-3 py-1 text-xs font-medium border transition-all"
+          style={{
+            background: activeRange === 730 ? 'var(--accent)' : 'var(--bg-3)',
+            borderColor: activeRange === 730 ? 'var(--accent)' : 'var(--bg-1)',
+            color: activeRange === 730 ? 'var(--text-0)' : 'var(--text-3)',
+          }}
+        >
+          2Y
+        </button>
+        <button
+          onClick={() => handleTimeRange(1095)}
+          className="px-3 py-1 text-xs font-medium border transition-all"
+          style={{
+            background: activeRange === 1095 ? 'var(--accent)' : 'var(--bg-3)',
+            borderColor: activeRange === 1095 ? 'var(--accent)' : 'var(--bg-1)',
+            color: activeRange === 1095 ? 'var(--text-0)' : 'var(--text-3)',
+          }}
+        >
+          3Y
+        </button>
+        <button
           onClick={() => handleTimeRange('all')}
           className="px-3 py-1 text-xs font-medium border transition-all"
           style={{
@@ -203,12 +329,76 @@ export default function StockChart({
             borderColor: activeRange === 'all' ? 'var(--accent)' : 'var(--bg-1)',
             color: activeRange === 'all' ? 'var(--text-0)' : 'var(--text-3)',
           }}
+          title="All available history (5 years)"
         >
-          ALL
+          5Y (ALL)
         </button>
+        </div>
+
+        {/* Divider */}
+        <div style={{ 
+          width: '1px', 
+          height: '24px', 
+          background: 'var(--bg-1)',
+          margin: '0 4px'
+        }} />
+
+        {/* Zoom Controls */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleZoomIn}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background: 'var(--bg-3)',
+              borderColor: 'var(--bg-1)',
+              color: 'var(--text-3)',
+            }}
+            title="Zoom In (or press +)"
+          >
+            🔍+
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background: 'var(--bg-3)',
+              borderColor: 'var(--bg-1)',
+              color: 'var(--text-3)',
+            }}
+            title="Zoom Out (or press -)"
+          >
+            🔍-
+          </button>
+          <button
+            onClick={handleResetZoom}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background: 'var(--bg-3)',
+              borderColor: 'var(--bg-1)',
+              color: 'var(--text-3)',
+            }}
+            title="Reset Zoom (or press R)"
+          >
+            ↺ Reset
+          </button>
+        </div>
+
+        {/* Zoom Level Indicator */}
+        <div className="text-xs" style={{ color: 'var(--text-4)', marginLeft: '8px' }}>
+          Zoom: {(zoomLevel * 100).toFixed(0)}%
+        </div>
       </div>
 
-      <div className="w-full h-[550px]">
+      {/* Interactive Controls Help */}
+      <div className="text-xs mb-2 p-2 border" style={{ 
+        background: 'var(--bg-2)', 
+        borderColor: 'var(--bg-1)',
+        color: 'var(--text-4)'
+      }}>
+        <strong style={{ color: 'var(--text-3)' }}>💡 Interactive Controls:</strong> Drag the brush at bottom to pan • Ctrl+Scroll to zoom • Keyboard: +/- zoom, R reset • Click buttons above
+      </div>
+
+      <div ref={chartRef} className="w-full h-[550px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartType === 'candlestick' ? candlestickData : combinedData}
@@ -264,7 +454,15 @@ export default function StockChart({
               if (value === undefined || value === null) return 'N/A';
               return formatPrice(Number(value));
             }}
-            labelFormatter={formatDate}
+            labelFormatter={(dateStr: string) => {
+              // Tooltip always shows full date with year for clarity
+              const date = new Date(dateStr);
+              return date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric' 
+              });
+            }}
             contentStyle={{
               backgroundColor: 'oklch(23% 0 0)',
               border: '2px solid oklch(70% 0.12 170)',

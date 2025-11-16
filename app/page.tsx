@@ -37,7 +37,7 @@ import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '
 export default function Home() {
   const [symbol, setSymbol] = useState('AAPL');
   const [inputSymbol, setInputSymbol] = useState('AAPL');
-  const [days, setDays] = useState(365);
+  const [days, setDays] = useState(1825); // 5 years of data
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -237,8 +237,8 @@ export default function Home() {
     setMlTraining(false); // Reset training state
 
     try {
-      // Fetch stock data
-      const stockResponse = await fetch(`/api/stock?symbol=${stockSymbol}&days=${days}`);
+      // Fetch stock data (5 years for full history)
+      const stockResponse = await fetch(`/api/stock?symbol=${stockSymbol}&days=1825`);
       if (!stockResponse.ok) {
         throw new Error('Failed to fetch stock data');
       }
