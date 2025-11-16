@@ -1,39 +1,68 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Search, TrendingUp, Loader2, AlertCircle, Github } from 'lucide-react';
-import StockChart from '@/components/StockChart';
-import TechnicalIndicatorsChart from '@/components/TechnicalIndicatorsChart';
-import NewsPanel from '@/components/NewsPanel';
-import TradingSignals from '@/components/TradingSignals';
-import Sidebar, { SearchHistoryItem } from '@/components/Sidebar';
-import CompanyInfo from '@/components/CompanyInfo';
-import MLPredictions from '@/components/MLPredictions';
-import PatternAnalysis from '@/components/PatternAnalysis';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
-import { detectChartPatterns } from '@/lib/chartPatterns';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
-import { generateMLForecast, getMLForecastInsights, MLForecast } from '@/lib/mlForecasting';
-import { generateProphetWithChangepoints, ProphetForecast } from '@/lib/prophetForecast';
-import MLSettingsPanel from '@/components/MLSettingsPanel';
-import { MLSettings, MLPreset, DEFAULT_ML_SETTINGS, getPresetSettings } from '@/types/mlSettings';
-import {
-  generateLinearRegression,
-  generatePolynomialRegression,
-  generateMovingAverageForecast,
-  generateEMAForecast,
-  generateARIMAForecast,
-  generateProphetLiteForecast,
-  MLPrediction
-} from '@/lib/mlAlgorithms';
-import {
-  generateGRUForecast,
-  generateCNNLSTMForecast,
-  generateEnsembleFromPredictions,
-} from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint, ChartPattern } from '@/types';
 import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '@/lib/predictionsCache';
+import { MLSettings, MLPreset, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
+import type { SearchHistoryItem } from '@/components/Sidebar';
+
+// Lazy load heavy components with dynamic imports
+const StockChart = dynamic(() => import('@/components/StockChart'), {
+  loading: () => <div className="h-96 flex items-center justify-center" style={{ background: 'var(--bg-3)' }}>
+    <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
+  </div>,
+  ssr: false
+});
+
+const TechnicalIndicatorsChart = dynamic(() => import('@/components/TechnicalIndicatorsChart'), {
+  loading: () => <div className="h-64 flex items-center justify-center" style={{ background: 'var(--bg-3)' }}>
+    <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent)' }} />
+  </div>,
+  ssr: false
+});
+
+const NewsPanel = dynamic(() => import('@/components/NewsPanel'), { ssr: false });
+const TradingSignals = dynamic(() => import('@/components/TradingSignals'), { ssr: false });
+const Sidebar = dynamic(() => import('@/components/Sidebar'), { ssr: false });
+const CompanyInfo = dynamic(() => import('@/components/CompanyInfo'), { ssr: false });
+const MLPredictions = dynamic(() => import('@/components/MLPredictions'), { ssr: false });
+const PatternAnalysis = dynamic(() => import('@/components/PatternAnalysis'), { ssr: false });
+const MLSettingsPanel = dynamic(() => import('@/components/MLSettingsPanel'), { ssr: false });
+
+// Lazy load heavy ML libraries only when needed
+const loadMLLibraries = async () => {
+  const [
+    { generateMLForecast },
+    { generateProphetWithChangepoints },
+    { generateLinearRegression, generateEMAForecast, generateARIMAForecast, generateProphetLiteForecast },
+    { generateGRUForecast, generateCNNLSTMForecast, generateEnsembleFromPredictions },
+    { detectChartPatterns }
+  ] = await Promise.all([
+    import('@/lib/mlForecasting'),
+    import('@/lib/prophetForecast'),
+    import('@/lib/mlAlgorithms'),
+    import('@/lib/advancedMLModels'),
+    import('@/lib/chartPatterns')
+  ]);
+
+  return {
+    generateMLForecast,
+    generateProphetWithChangepoints,
+    generateLinearRegression,
+    generateEMAForecast,
+    generateARIMAForecast,
+    generateProphetLiteForecast,
+    generateGRUForecast,
+    generateCNNLSTMForecast,
+    generateEnsembleFromPredictions,
+    detectChartPatterns
+  };
+};
 
 const DATA_FREQUENCY_OPTIONS = [
   {
@@ -118,7 +147,7 @@ export default function Home() {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [chartPatterns, setChartPatterns] = useState<ChartPattern[]>([]);
   const [forecastData, setForecastData] = useState<any[]>([]);
-  const [prophetForecastData, setProphetForecastData] = useState<ProphetForecast[]>([]);
+  const [prophetForecastData, setProphetForecastData] = useState<any[]>([]);
   const [useProphetForecast, setUseProphetForecast] = useState(false);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
   const [newsSentiments, setNewsSentiments] = useState<any[]>([]);
@@ -161,21 +190,23 @@ export default function Home() {
       return;
     }
 
-    // Debounce pattern detection and run it asynchronously
+    // Lazy load pattern detection library and run it asynchronously
     const timer = setTimeout(() => {
-      // Use requestIdleCallback to run pattern detection when browser is idle
-      if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(() => {
-          const patterns = detectChartPatterns(chartData);
-          setChartPatterns(patterns);
-        }, { timeout: 2000 });
-      } else {
-        // Fallback for browsers without requestIdleCallback
-        setTimeout(() => {
-          const patterns = detectChartPatterns(chartData);
-          setChartPatterns(patterns);
-        }, 0);
-      }
+      loadMLLibraries().then(({ detectChartPatterns }) => {
+        // Use requestIdleCallback to run pattern detection when browser is idle
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => {
+            const patterns = detectChartPatterns(chartData);
+            setChartPatterns(patterns);
+          }, { timeout: 2000 });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(() => {
+            const patterns = detectChartPatterns(chartData);
+            setChartPatterns(patterns);
+          }, 0);
+        }
+      });
     }, 300);
 
     return () => clearTimeout(timer);
@@ -183,14 +214,14 @@ export default function Home() {
 
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
-    lstm?: MLForecast[];
-    arima?: MLPrediction[];
-    prophetLite?: MLPrediction[];
-    gru?: MLPrediction[];
-    ensemble?: MLPrediction[];
-    cnnLstm?: MLPrediction[];
-    linearRegression?: MLPrediction[];
-    ema?: MLPrediction[];
+    lstm?: any[];
+    arima?: any[];
+    prophetLite?: any[];
+    gru?: any[];
+    ensemble?: any[];
+    cnnLstm?: any[];
+    linearRegression?: any[];
+    ema?: any[];
   }>({});
   const [mlTraining, setMlTraining] = useState(false);
   const [mlFromCache, setMlFromCache] = useState(false);
@@ -456,7 +487,7 @@ export default function Home() {
       setSymbol(stockSymbol);
 
       // Generate forecasts in background (non-blocking)
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
           // Generate custom forecast
           const simpleForecast = generateForecast(stockResult.data, forecastHorizon);
@@ -468,8 +499,9 @@ export default function Home() {
           setForecastData(simpleForecast);
           setForecastInsights(simpleInsights);
 
-          // Generate Prophet forecast
+          // Lazy load and generate Prophet forecast
           try {
+            const { generateProphetWithChangepoints } = await loadMLLibraries();
             const prophetForecast = generateProphetWithChangepoints(stockResult.data, forecastHorizon, 5, mlSettings);
             setProphetForecastData(prophetForecast);
           } catch (prophetError) {
@@ -512,11 +544,14 @@ export default function Home() {
         setMlTraining(true);
         setTimeout(async () => {
           try {
+            // Lazy load ML libraries first
+            const mlLibs = await loadMLLibraries();
+
             // Fast algorithms (non-neural network) - run first for immediate display
-            const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
-            const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
-            const arimaForecast = generateARIMAForecast(stockResult.data, forecastHorizon);
-            const prophetLite = generateProphetLiteForecast(stockResult.data, forecastHorizon);
+            const linearReg = mlLibs.generateLinearRegression(stockResult.data, forecastHorizon);
+            const emaForecast = mlLibs.generateEMAForecast(stockResult.data, forecastHorizon);
+            const arimaForecast = mlLibs.generateARIMAForecast(stockResult.data, forecastHorizon);
+            const prophetLite = mlLibs.generateProphetLiteForecast(stockResult.data, forecastHorizon);
 
             const predictions = {
               linearRegression: linearReg,
@@ -531,7 +566,7 @@ export default function Home() {
             console.log('Starting optimized neural network models...');
 
             // Start all models at once (parallel training)
-            const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon, mlSettings)
+            const gruPromise = mlLibs.generateGRUForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, gru: forecast }));
                 return forecast;
@@ -541,7 +576,7 @@ export default function Home() {
                 return null;
               });
 
-            const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings)
+            const cnnLstmPromise = mlLibs.generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
                 return forecast;
@@ -551,7 +586,7 @@ export default function Home() {
                 return null;
               });
 
-            const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon, mlSettings)
+            const lstmPromise = mlLibs.generateMLForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, lstm: forecast }));
                 return forecast;
@@ -565,11 +600,11 @@ export default function Home() {
             const [gru, cnnLstm, lstm] = await Promise.all([gruPromise, cnnLstmPromise, lstmPromise]);
 
             // Generate ensemble INSTANTLY from already-trained models (no retraining!)
-            const ensemble = generateEnsembleFromPredictions(
+            const ensemble = mlLibs.generateEnsembleFromPredictions(
               { gru, cnnLstm, lstm },
               forecastHorizon
             );
-            
+
             if (ensemble) {
               setMlPredictions(prev => ({ ...prev, ensemble }));
             }
@@ -662,8 +697,9 @@ export default function Home() {
           setForecastData(simpleForecast);
           setForecastInsights(simpleInsights);
 
-          // Generate Prophet forecast
+          // Lazy load and generate Prophet forecast
           try {
+            const { generateProphetWithChangepoints } = await loadMLLibraries();
             const prophetForecast = generateProphetWithChangepoints(stockData, forecastHorizon, 5, mlSettings);
             setProphetForecastData(prophetForecast);
           } catch (prophetError) {
@@ -692,11 +728,14 @@ export default function Home() {
             setMlTraining(true);
             setTimeout(async () => {
             try {
+              // Lazy load ML libraries first
+              const mlLibs = await loadMLLibraries();
+
               // Fast algorithms (non-neural network)
-              const linearReg = generateLinearRegression(stockData, forecastHorizon);
-              const emaForecast = generateEMAForecast(stockData, forecastHorizon);
-              const arimaForecast = generateARIMAForecast(stockData, forecastHorizon);
-              const prophetLite = generateProphetLiteForecast(stockData, forecastHorizon);
+              const linearReg = mlLibs.generateLinearRegression(stockData, forecastHorizon);
+              const emaForecast = mlLibs.generateEMAForecast(stockData, forecastHorizon);
+              const arimaForecast = mlLibs.generateARIMAForecast(stockData, forecastHorizon);
+              const prophetLite = mlLibs.generateProphetLiteForecast(stockData, forecastHorizon);
 
               const predictions = {
                 linearRegression: linearReg,
@@ -708,7 +747,7 @@ export default function Home() {
               setMlPredictions(predictions);
 
               // Neural network models (optimized for serverless)
-              const gruPromise = generateGRUForecast(stockData, forecastHorizon, mlSettings)
+              const gruPromise = mlLibs.generateGRUForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, gru: forecast }));
                   return forecast;
@@ -718,7 +757,7 @@ export default function Home() {
                   return null;
                 });
 
-              const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings)
+              const cnnLstmPromise = mlLibs.generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
                   return forecast;
@@ -728,7 +767,7 @@ export default function Home() {
                   return null;
                 });
 
-              const lstmPromise = generateMLForecast(stockData, forecastHorizon, mlSettings)
+              const lstmPromise = mlLibs.generateMLForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, lstm: forecast }));
                   return forecast;
@@ -741,11 +780,11 @@ export default function Home() {
               const [gru, cnnLstm, lstm] = await Promise.all([gruPromise, cnnLstmPromise, lstmPromise]);
 
               // Generate ensemble INSTANTLY from already-trained models (no retraining!)
-              const ensemble = generateEnsembleFromPredictions(
+              const ensemble = mlLibs.generateEnsembleFromPredictions(
                 { gru, cnnLstm, lstm },
                 forecastHorizon
               );
-              
+
               if (ensemble) {
                 setMlPredictions(prev => ({ ...prev, ensemble }));
               }

@@ -1,7 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
 
 :root {
   /* Terminal Theme Colors */
@@ -46,7 +45,7 @@
 body {
   background: var(--bg-4);
   color: var(--text-3);
-  font-family: 'DM Mono', 'Courier New', monospace;
+  font-family: var(--font-dm-mono), 'Courier New', monospace;
   font-weight: 400;
   letter-spacing: -0.02ch;
   line-height: 1.6;
@@ -175,7 +174,7 @@ input[type="number"] {
   border: 1px solid var(--bg-1);
   color: var(--text-2);
   padding: 12px 16px;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-dm-mono), monospace;
   transition: all var(--transition);
 }
 
