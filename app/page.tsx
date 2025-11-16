@@ -9,6 +9,7 @@ import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint, ChartPattern } from '@/types';
 import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '@/lib/predictionsCache';
 import { MLSettings, MLPreset, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
+import { PatternSettings, PatternPreset, DEFAULT_PATTERN_SETTINGS } from '@/types/patternSettings';
 import type { SearchHistoryItem } from '@/components/Sidebar';
 
 // Lazy load heavy components with dynamic imports
@@ -33,6 +34,7 @@ const CompanyInfo = dynamic(() => import('@/components/CompanyInfo'), { ssr: fal
 const MLPredictions = dynamic(() => import('@/components/MLPredictions'), { ssr: false });
 const PatternAnalysis = dynamic(() => import('@/components/PatternAnalysis'), { ssr: false });
 const MLSettingsPanel = dynamic(() => import('@/components/MLSettingsPanel'), { ssr: false });
+const PatternSettingsPanel = dynamic(() => import('@/components/PatternSettingsPanel'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -186,51 +188,6 @@ export default function Home() {
   // State for pattern detection loading
   const [patternDetecting, setPatternDetecting] = useState(false);
 
-  // Function to manually detect patterns
-  const detectPatterns = React.useCallback(() => {
-    if (!chartData.length) {
-      setChartPatterns([]);
-      return;
-    }
-
-    setPatternDetecting(true);
-    loadMLLibraries().then(({ detectChartPatterns }) => {
-      // Use requestIdleCallback to run pattern detection when browser is idle
-      if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(() => {
-          const patterns = detectChartPatterns(chartData);
-          setChartPatterns(patterns);
-          setPatternDetecting(false);
-        }, { timeout: 2000 });
-      } else {
-        // Fallback for browsers without requestIdleCallback
-        setTimeout(() => {
-          const patterns = detectChartPatterns(chartData);
-          setChartPatterns(patterns);
-          setPatternDetecting(false);
-        }, 0);
-      }
-    }).catch(error => {
-      console.error('Pattern detection error:', error);
-      setPatternDetecting(false);
-    });
-  }, [chartData]);
-
-  useEffect(() => {
-    // Only detect patterns when the toggle is enabled
-    if (!showPatterns || !chartData.length) {
-      setChartPatterns([]);
-      return;
-    }
-
-    // Debounce pattern detection
-    const timer = setTimeout(() => {
-      detectPatterns();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [chartData, showPatterns, detectPatterns]);
-
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
     lstm?: any[];
@@ -250,6 +207,10 @@ export default function Home() {
   const [mlSettings, setMlSettings] = useState<MLSettings>(DEFAULT_ML_SETTINGS);
   const [mlPreset, setMlPreset] = useState<MLPreset>('balanced');
 
+  // Pattern Settings
+  const [patternSettings, setPatternSettings] = useState<PatternSettings>(DEFAULT_PATTERN_SETTINGS);
+  const [patternPreset, setPatternPreset] = useState<PatternPreset>('balanced');
+
   // Memoize ML settings callbacks to prevent unnecessary re-renders
   const handleMlSettingsChange = React.useCallback((newSettings: MLSettings) => {
     setMlSettings(newSettings);
@@ -258,6 +219,76 @@ export default function Home() {
   const handleMlPresetChange = React.useCallback((newPreset: MLPreset) => {
     setMlPreset(newPreset);
   }, []);
+
+  // Memoize Pattern settings callbacks to prevent unnecessary re-renders
+  const handlePatternSettingsChange = React.useCallback((newSettings: PatternSettings) => {
+    setPatternSettings(newSettings);
+  }, []);
+
+  const handlePatternPresetChange = React.useCallback((newPreset: PatternPreset) => {
+    setPatternPreset(newPreset);
+  }, []);
+
+  // Function to manually detect patterns
+  const detectPatterns = React.useCallback(() => {
+    if (!chartData.length) {
+      setChartPatterns([]);
+      return;
+    }
+
+    console.log('🔍 Starting pattern detection with settings:', patternSettings);
+    console.log('📊 Chart data points:', chartData.length);
+
+    setPatternDetecting(true);
+    loadMLLibraries().then(({ detectChartPatterns }) => {
+      // Use requestIdleCallback to run pattern detection when browser is idle
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => {
+          const startTime = performance.now();
+          const patterns = detectChartPatterns(chartData, patternSettings);
+          const endTime = performance.now();
+
+          console.log(`✅ Pattern detection completed in ${(endTime - startTime).toFixed(2)}ms`);
+          console.log(`📈 Detected ${patterns.length} patterns:`, patterns.map(p => `${p.type} (${(p.confidence * 100).toFixed(0)}%)`));
+
+          setChartPatterns(patterns);
+          setPatternDetecting(false);
+        }, { timeout: 2000 });
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(() => {
+          const startTime = performance.now();
+          const patterns = detectChartPatterns(chartData, patternSettings);
+          const endTime = performance.now();
+
+          console.log(`✅ Pattern detection completed in ${(endTime - startTime).toFixed(2)}ms`);
+          console.log(`📈 Detected ${patterns.length} patterns:`, patterns.map(p => `${p.type} (${(p.confidence * 100).toFixed(0)}%)`));
+
+          setChartPatterns(patterns);
+          setPatternDetecting(false);
+        }, 0);
+      }
+    }).catch(error => {
+      console.error('❌ Pattern detection error:', error);
+      setPatternDetecting(false);
+    });
+  }, [chartData, patternSettings]);
+
+  // Auto-detect patterns when data or settings change
+  useEffect(() => {
+    // Only detect patterns when the toggle is enabled
+    if (!showPatterns || !chartData.length) {
+      setChartPatterns([]);
+      return;
+    }
+
+    // Debounce pattern detection
+    const timer = setTimeout(() => {
+      detectPatterns();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [chartData, showPatterns, detectPatterns]);
 
   // Load search history and ML settings from localStorage on mount
   useEffect(() => {
@@ -280,6 +311,16 @@ export default function Home() {
       if (savedMLPreset) {
         setMlPreset(savedMLPreset as MLPreset);
       }
+
+      // Load Pattern settings
+      const savedPatternSettings = localStorage.getItem('patternSettings');
+      const savedPatternPreset = localStorage.getItem('patternPreset');
+      if (savedPatternSettings) {
+        setPatternSettings(JSON.parse(savedPatternSettings));
+      }
+      if (savedPatternPreset) {
+        setPatternPreset(savedPatternPreset as PatternPreset);
+      }
     } catch (e) {
       console.error('Failed to load from localStorage:', e);
     }
@@ -294,6 +335,16 @@ export default function Home() {
       console.error('Error saving ML settings:', error);
     }
   }, [mlSettings, mlPreset]);
+
+  // Save Pattern settings to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('patternSettings', JSON.stringify(patternSettings));
+      localStorage.setItem('patternPreset', patternPreset);
+    } catch (error) {
+      console.error('Error saving Pattern settings:', error);
+    }
+  }, [patternSettings, patternPreset]);
 
   // Save search history to localStorage
   const saveSearchHistory = (history: SearchHistoryItem[]) => {
@@ -1557,6 +1608,19 @@ export default function Home() {
                 inlineMobile={true}
               />
 
+              {/* Pattern Settings Panel - Mobile (Below ML Predictions) */}
+              {showPatterns && (
+                <PatternSettingsPanel
+                  settings={patternSettings}
+                  onSettingsChange={handlePatternSettingsChange}
+                  onPresetChange={handlePatternPresetChange}
+                  currentPreset={patternPreset}
+                  inlineMobile={true}
+                  patternCount={chartPatterns.length}
+                  isDetecting={patternDetecting}
+                />
+              )}
+
               {/* Pattern Analysis - Mobile */}
               {showPatterns && chartPatterns.length > 0 && (
                 <PatternAnalysis
@@ -1594,7 +1658,21 @@ export default function Home() {
               }}
             />
 
-            {/* Pattern Analysis - Below ML Predictions */}
+            {/* Pattern Settings Panel - Below ML Predictions */}
+            {showPatterns && (
+              <div className="mt-4">
+                <PatternSettingsPanel
+                  settings={patternSettings}
+                  onSettingsChange={handlePatternSettingsChange}
+                  onPresetChange={handlePatternPresetChange}
+                  currentPreset={patternPreset}
+                  patternCount={chartPatterns.length}
+                  isDetecting={patternDetecting}
+                />
+              </div>
+            )}
+
+            {/* Pattern Analysis - Below Pattern Settings */}
             {showPatterns && chartPatterns.length > 0 && (
               <div className="mt-4">
                 <PatternAnalysis

@@ -176,13 +176,22 @@ export default function PatternAnalysis({
               }}
             >
               <RefreshCw className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-3)' }}>
-                {isDetecting ? (
-                  <>🔄 Detecting patterns...</>
-                ) : (
-                  <>Click refresh button to manually re-detect all patterns on the entire chart</>
-                )}
-              </span>
+              <div className="flex-1">
+                <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-2)' }}>
+                  {isDetecting ? (
+                    <>🔄 Re-detecting patterns on chart...</>
+                  ) : (
+                    <>Click ↻ to re-run pattern detection</>
+                  )}
+                </div>
+                <div className="text-[10px]" style={{ color: 'var(--text-4)' }}>
+                  {isDetecting ? (
+                    <>Scanning chart with new settings...</>
+                  ) : (
+                    <>Re-scans entire chart & draws new patterns</>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

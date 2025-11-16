@@ -4,6 +4,7 @@ import {
   ChartPatternMeta,
   ChartPatternType,
 } from '@/types';
+import { PatternSettings, DEFAULT_PATTERN_SETTINGS } from '@/types/patternSettings';
 
 const PATTERN_LABELS: Record<ChartPatternType, string> = {
   trendline_support: 'Trendline Support',
@@ -45,26 +46,10 @@ const PATTERN_DIRECTION: Record<ChartPatternType, ChartPattern['direction']> = {
   head_and_shoulders: 'bearish',
 };
 
-// Optimized detection windows - reduced for better performance
-const DETECTION_WINDOWS = [45, 90, 150];  // Reduced from 7 to 3 windows for faster detection
-const MIN_WINDOW = 25;  // Reduced from 45 for earlier pattern detection
-const MAX_PATTERNS = 15;  // Reduced from 20 for better performance
-const MAX_PATTERNS_PER_TYPE = 2;  // Reduced from 3 for better performance
+// Default constants (can be overridden by settings)
 const VOLATILITY_FLOOR = 0.002;
 const VOLATILITY_CAP = 0.2;
 const MAX_PATTERN_OVERLAP = 0.7;  // Slightly increased to allow more overlapping patterns
-// Confidence thresholds ensuring quality patterns (60%+ shown to user)
-const MIN_CONFIDENCE_PER_TYPE: Partial<Record<ChartPatternType, number>> = {
-  double_top: 0.65,
-  double_bottom: 0.65,
-  head_and_shoulders: 0.70,
-  wedge_up: 0.62,
-  wedge_down: 0.62,
-  triangle_ascending: 0.60,
-  triangle_descending: 0.60,
-  channel_up: 0.60,
-  channel_down: 0.60,
-};
 
 interface LineStats {
   slope: number;
@@ -86,63 +71,77 @@ interface LevelCluster {
   std: number;
 }
 
-export function detectChartPatterns(data: ChartDataPoint[]): ChartPattern[] {
+export function detectChartPatterns(
+  data: ChartDataPoint[],
+  settings: PatternSettings = DEFAULT_PATTERN_SETTINGS
+): ChartPattern[] {
+  const MIN_WINDOW = settings.minWindow;
+  const MAX_PATTERNS = settings.maxPatterns;
+  const MAX_PATTERNS_PER_TYPE = settings.maxPatternsPerType;
+  const DETECTION_WINDOWS = settings.detectionWindows;
+  const MIN_CONFIDENCE = settings.minConfidence;
+
   if (!data || data.length < MIN_WINDOW) {
     return [];
   }
 
   try {
+    // Always include full dataset as a window for detecting long-term patterns
+    const fullDatasetWindow = data.length;
     const windows = Array.from(
       new Set(
-        DETECTION_WINDOWS.map(size => Math.min(size, data.length)).filter(
-          size => size >= MIN_WINDOW
-        )
+        [...DETECTION_WINDOWS, fullDatasetWindow]
+          .map(size => Math.min(size, data.length))
+          .filter(size => size >= MIN_WINDOW)
+          .sort((a, b) => a - b) // Sort windows smallest to largest
       )
     );
 
     const patterns: ChartPattern[] = [];
-    const EARLY_EXIT_THRESHOLD = 30; // Stop if we have enough patterns
+    const EARLY_EXIT_THRESHOLD = Math.ceil(MAX_PATTERNS * 1.5); // Allow some buffer for filtering
 
     // Window-based pattern detection with early exit
     for (const windowSize of windows) {
       if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
-      
-      patterns.push(...detectTrendlines(data, windowSize));
+
+      patterns.push(...detectTrendlines(data, windowSize, MIN_WINDOW));
       if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
-      
-      patterns.push(...detectHorizontalSR(data, windowSize));
+
+      patterns.push(...detectHorizontalSR(data, windowSize, MIN_WINDOW));
       if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
-      
-      patterns.push(...detectWedges(data, windowSize));
+
+      patterns.push(...detectWedges(data, windowSize, MIN_WINDOW));
       if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
-      
-      patterns.push(...detectTriangles(data, windowSize));
+
+      patterns.push(...detectTriangles(data, windowSize, MIN_WINDOW));
       if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
-      
-      patterns.push(...detectChannels(data, windowSize));
+
+      patterns.push(...detectChannels(data, windowSize, MIN_WINDOW));
     }
 
     // Only detect these expensive patterns if we don't have enough yet
     if (patterns.length < EARLY_EXIT_THRESHOLD) {
-      patterns.push(...detectDoubleTops(data));
-      patterns.push(...detectDoubleBottoms(data));
-      patterns.push(...detectMultipleTops(data));
-      patterns.push(...detectMultipleBottoms(data));
-      patterns.push(...detectHeadAndShoulders(data));
+      patterns.push(...detectDoubleTops(data, MIN_WINDOW));
+      patterns.push(...detectDoubleBottoms(data, MIN_WINDOW));
+      patterns.push(...detectMultipleTops(data, MIN_WINDOW));
+      patterns.push(...detectMultipleBottoms(data, MIN_WINDOW));
+      patterns.push(...detectHeadAndShoulders(data, MIN_WINDOW));
     }
 
-    return consolidatePatterns(patterns);
+    // Filter by minimum confidence and consolidate
+    const filteredPatterns = patterns.filter(p => p.confidence >= MIN_CONFIDENCE);
+    return consolidatePatterns(filteredPatterns, MAX_PATTERNS, MAX_PATTERNS_PER_TYPE);
   } catch (error) {
     console.error('Pattern detection failed', error);
     return [];
   }
 }
 
-function detectTrendlines(data: ChartDataPoint[], windowSize: number): ChartPattern[] {
+function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow: number): ChartPattern[] {
   const startIndex = Math.max(0, data.length - windowSize);
   const slice = data.slice(startIndex);
 
-  if (slice.length < MIN_WINDOW) return [];
+  if (slice.length < minWindow) return [];
 
   const lows = slice.map(point => getLow(point));
   const highs = slice.map(point => getHigh(point));
@@ -219,10 +218,10 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number): ChartPatt
   return patterns;
 }
 
-function detectHorizontalSR(data: ChartDataPoint[], windowSize: number): ChartPattern[] {
+function detectHorizontalSR(data: ChartDataPoint[], windowSize: number, minWindow: number): ChartPattern[] {
   const startIndex = Math.max(0, data.length - windowSize);
   const slice = data.slice(startIndex);
-  if (slice.length < MIN_WINDOW) return [];
+  if (slice.length < minWindow) return [];
 
   const highs = slice.map(point => getHigh(point));
   const lows = slice.map(point => getLow(point));
@@ -272,10 +271,10 @@ function detectHorizontalSR(data: ChartDataPoint[], windowSize: number): ChartPa
   ];
 }
 
-function detectWedges(data: ChartDataPoint[], windowSize: number): ChartPattern[] {
+function detectWedges(data: ChartDataPoint[], windowSize: number, minWindow: number): ChartPattern[] {
   const startIndex = Math.max(0, data.length - windowSize);
   const slice = data.slice(startIndex);
-  if (slice.length < MIN_WINDOW) return [];
+  if (slice.length < minWindow) return [];
 
   const highs = slice.map(point => getHigh(point));
   const lows = slice.map(point => getLow(point));
@@ -358,10 +357,10 @@ function detectWedges(data: ChartDataPoint[], windowSize: number): ChartPattern[
   return patterns;
 }
 
-function detectTriangles(data: ChartDataPoint[], windowSize: number): ChartPattern[] {
+function detectTriangles(data: ChartDataPoint[], windowSize: number, minWindow: number): ChartPattern[] {
   const startIndex = Math.max(0, data.length - windowSize);
   const slice = data.slice(startIndex);
-  if (slice.length < MIN_WINDOW) return [];
+  if (slice.length < minWindow) return [];
 
   const highs = slice.map(point => getHigh(point));
   const lows = slice.map(point => getLow(point));
@@ -450,10 +449,10 @@ function detectTriangles(data: ChartDataPoint[], windowSize: number): ChartPatte
   return patterns;
 }
 
-function detectChannels(data: ChartDataPoint[], windowSize: number): ChartPattern[] {
+function detectChannels(data: ChartDataPoint[], windowSize: number, minWindow: number): ChartPattern[] {
   const startIndex = Math.max(0, data.length - windowSize);
   const slice = data.slice(startIndex);
-  if (slice.length < MIN_WINDOW) return [];
+  if (slice.length < minWindow) return [];
 
   const highs = slice.map(point => getHigh(point));
   const lows = slice.map(point => getLow(point));
@@ -529,7 +528,7 @@ function detectChannels(data: ChartDataPoint[], windowSize: number): ChartPatter
   return patterns;
 }
 
-function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
+function detectDoubleTops(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const peaks = findLocalExtrema(closes, 2, 'max');  // Reduced from 3 for more peaks
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
@@ -579,7 +578,7 @@ function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
   return results;
 }
 
-function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
+function detectDoubleBottoms(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const troughs = findLocalExtrema(closes, 2, 'min');  // Reduced from 3 for more troughs
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
@@ -629,7 +628,7 @@ function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
   return results;
 }
 
-function detectMultipleTops(data: ChartDataPoint[]): ChartPattern[] {
+function detectMultipleTops(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const peaks = findLocalExtrema(closes, 2, 'max').filter(index => index >= closes.length - 250);  // More history, smaller distance
   if (peaks.length < 3) return [];
@@ -661,7 +660,7 @@ function detectMultipleTops(data: ChartDataPoint[]): ChartPattern[] {
   ];
 }
 
-function detectMultipleBottoms(data: ChartDataPoint[]): ChartPattern[] {
+function detectMultipleBottoms(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const troughs = findLocalExtrema(closes, 2, 'min').filter(index => index >= closes.length - 250);  // More history, smaller distance
   if (troughs.length < 3) return [];
@@ -693,7 +692,7 @@ function detectMultipleBottoms(data: ChartDataPoint[]): ChartPattern[] {
   ];
 }
 
-function detectHeadAndShoulders(data: ChartDataPoint[]): ChartPattern[] {
+function detectHeadAndShoulders(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const peaks = findLocalExtrema(closes, 3, 'max');  // Reduced from 4 for more peaks
   if (peaks.length < 3) return [];
@@ -755,28 +754,23 @@ function detectHeadAndShoulders(data: ChartDataPoint[]): ChartPattern[] {
   return results;
 }
 
-function consolidatePatterns(patterns: ChartPattern[]): ChartPattern[] {
+function consolidatePatterns(
+  patterns: ChartPattern[],
+  maxPatterns: number = 20,
+  maxPatternsPerType: number = 3
+): ChartPattern[] {
   if (!patterns.length) return [];
-
-  // Global minimum confidence threshold of 60%
-  const GLOBAL_MIN_CONFIDENCE = 0.60;
 
   const sorted = [...patterns]
     .filter(pattern => pattern.startDate && pattern.endDate)
-    .filter(pattern => pattern.confidence >= GLOBAL_MIN_CONFIDENCE) // Filter by 60% minimum
     .sort((a, b) => b.confidence - a.confidence);
 
   const perTypeCount = new Map<ChartPatternType, number>();
   const result: ChartPattern[] = [];
 
   for (const pattern of sorted) {
-    // Check type-specific minimum (if it exists and is higher than global)
-    const minConfidence = MIN_CONFIDENCE_PER_TYPE[pattern.type];
-    if (typeof minConfidence === 'number' && pattern.confidence < Math.max(minConfidence, GLOBAL_MIN_CONFIDENCE)) {
-      continue;
-    }
     const count = perTypeCount.get(pattern.type) ?? 0;
-    if (count >= MAX_PATTERNS_PER_TYPE) continue;
+    if (count >= maxPatternsPerType) continue;
     const overlaps = result.some(
       existing =>
         existing.type === pattern.type &&
@@ -786,7 +780,7 @@ function consolidatePatterns(patterns: ChartPattern[]): ChartPattern[] {
 
     perTypeCount.set(pattern.type, count + 1);
     result.push(pattern);
-    if (result.length >= MAX_PATTERNS) break;
+    if (result.length >= maxPatterns) break;
   }
 
   return result;
