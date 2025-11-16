@@ -327,6 +327,164 @@ export function calculateOBV(stockData: StockData[]): number[] {
 }
 
 /**
+ * Calculate Williams %R - Momentum oscillator
+ */
+export function calculateWilliamsR(stockData: StockData[], period: number = 14): number[] {
+  const result: number[] = [];
+
+  for (let i = 0; i < stockData.length; i++) {
+    if (i < period - 1) {
+      result.push(NaN);
+      continue;
+    }
+
+    const slice = stockData.slice(i - period + 1, i + 1);
+    const high = Math.max(...slice.map(d => d.high));
+    const low = Math.min(...slice.map(d => d.low));
+    const close = stockData[i].close;
+
+    const williamsR = ((high - close) / (high - low || 1)) * -100;
+    result.push(williamsR);
+  }
+
+  return result;
+}
+
+/**
+ * Calculate CCI (Commodity Channel Index) - Momentum indicator
+ */
+export function calculateCCI(stockData: StockData[], period: number = 20): number[] {
+  const result: number[] = [];
+  const typicalPrices: number[] = stockData.map(d => (d.high + d.low + d.close) / 3);
+
+  for (let i = 0; i < stockData.length; i++) {
+    if (i < period - 1) {
+      result.push(NaN);
+      continue;
+    }
+
+    const slice = typicalPrices.slice(i - period + 1, i + 1);
+    const sma = slice.reduce((sum, val) => sum + val, 0) / period;
+    
+    // Calculate mean deviation
+    const meanDeviation = slice.reduce((sum, val) => sum + Math.abs(val - sma), 0) / period;
+    
+    const cci = (typicalPrices[i] - sma) / (0.015 * meanDeviation);
+    result.push(cci);
+  }
+
+  return result;
+}
+
+/**
+ * Calculate Ichimoku Cloud components
+ */
+export function calculateIchimoku(stockData: StockData[]): {
+  tenkanSen: number[];
+  kijunSen: number[];
+  senkouSpanA: number[];
+  senkouSpanB: number[];
+  chikouSpan: number[];
+} {
+  const tenkanPeriod = 9;
+  const kijunPeriod = 26;
+  const senkouBPeriod = 52;
+  const displacement = 26;
+
+  const tenkanSen: number[] = [];
+  const kijunSen: number[] = [];
+  const senkouSpanA: number[] = [];
+  const senkouSpanB: number[] = [];
+  const chikouSpan: number[] = [];
+
+  // Helper function to calculate midpoint
+  const getMidpoint = (slice: StockData[]) => {
+    const high = Math.max(...slice.map(d => d.high));
+    const low = Math.min(...slice.map(d => d.low));
+    return (high + low) / 2;
+  };
+
+  for (let i = 0; i < stockData.length; i++) {
+    // Tenkan-sen (Conversion Line)
+    if (i >= tenkanPeriod - 1) {
+      const slice = stockData.slice(i - tenkanPeriod + 1, i + 1);
+      tenkanSen.push(getMidpoint(slice));
+    } else {
+      tenkanSen.push(NaN);
+    }
+
+    // Kijun-sen (Base Line)
+    if (i >= kijunPeriod - 1) {
+      const slice = stockData.slice(i - kijunPeriod + 1, i + 1);
+      kijunSen.push(getMidpoint(slice));
+    } else {
+      kijunSen.push(NaN);
+    }
+
+    // Senkou Span B (Leading Span B)
+    if (i >= senkouBPeriod - 1) {
+      const slice = stockData.slice(i - senkouBPeriod + 1, i + 1);
+      senkouSpanB.push(getMidpoint(slice));
+    } else {
+      senkouSpanB.push(NaN);
+    }
+
+    // Chikou Span (Lagging Span) - close price shifted back
+    chikouSpan.push(stockData[i].close);
+  }
+
+  // Senkou Span A (Leading Span A) - average of Tenkan and Kijun
+  for (let i = 0; i < stockData.length; i++) {
+    if (!isNaN(tenkanSen[i]) && !isNaN(kijunSen[i])) {
+      senkouSpanA.push((tenkanSen[i] + kijunSen[i]) / 2);
+    } else {
+      senkouSpanA.push(NaN);
+    }
+  }
+
+  return {
+    tenkanSen,
+    kijunSen,
+    senkouSpanA,
+    senkouSpanB,
+    chikouSpan,
+  };
+}
+
+/**
+ * Calculate MFI (Money Flow Index) - Volume-weighted RSI
+ */
+export function calculateMFI(stockData: StockData[], period: number = 14): number[] {
+  const result: number[] = [];
+  const typicalPrices: number[] = stockData.map(d => (d.high + d.low + d.close) / 3);
+  const moneyFlows: number[] = typicalPrices.map((tp, i) => tp * stockData[i].volume);
+
+  for (let i = 0; i < stockData.length; i++) {
+    if (i < period) {
+      result.push(NaN);
+      continue;
+    }
+
+    let positiveFlow = 0;
+    let negativeFlow = 0;
+
+    for (let j = i - period + 1; j <= i; j++) {
+      if (typicalPrices[j] > typicalPrices[j - 1]) {
+        positiveFlow += moneyFlows[j];
+      } else if (typicalPrices[j] < typicalPrices[j - 1]) {
+        negativeFlow += moneyFlows[j];
+      }
+    }
+
+    const moneyRatio = positiveFlow / (negativeFlow || 1);
+    const mfi = 100 - (100 / (1 + moneyRatio));
+    result.push(mfi);
+  }
+
+  return result;
+}
+
+/**
  * Calculate all technical indicators (enhanced with new indicators)
  */
 export function calculateAllIndicators(stockData: StockData[]): TechnicalIndicators {

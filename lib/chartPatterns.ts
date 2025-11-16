@@ -53,13 +53,17 @@ const MAX_PATTERNS_PER_TYPE = 3;  // Increased from 2 for more pattern variety
 const VOLATILITY_FLOOR = 0.002;
 const VOLATILITY_CAP = 0.2;
 const MAX_PATTERN_OVERLAP = 0.7;  // Slightly increased to allow more overlapping patterns
-// Reduced confidence thresholds for more sensitive detection
+// Confidence thresholds ensuring quality patterns (60%+ shown to user)
 const MIN_CONFIDENCE_PER_TYPE: Partial<Record<ChartPatternType, number>> = {
-  double_top: 0.5,  // Reduced from 0.6
-  double_bottom: 0.5,  // Reduced from 0.6
-  head_and_shoulders: 0.55,  // Reduced from 0.65
-  wedge_up: 0.45,  // Reduced from 0.55
-  wedge_down: 0.45,  // Reduced from 0.55
+  double_top: 0.65,
+  double_bottom: 0.65,
+  head_and_shoulders: 0.70,
+  wedge_up: 0.62,
+  wedge_down: 0.62,
+  triangle_ascending: 0.60,
+  triangle_descending: 0.60,
+  channel_up: 0.60,
+  channel_down: 0.60,
 };
 
 interface LineStats {
@@ -146,9 +150,9 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number): ChartPatt
       touches.avgDeviation <= supportTolerance * 1.2
     ) {
       const confidence = clamp(
-        0.3 +  // Lower base confidence
-          Math.min(0.35, touches.touches / slice.length) +
-          Math.min(0.35, lowStats.r2),
+        0.40 +  // Higher base confidence for quality patterns
+          Math.min(0.30, (touches.touches / slice.length) * 1.5) +
+          Math.min(0.30, lowStats.r2 * 1.2),
         0,
         0.95
       );
@@ -179,9 +183,9 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number): ChartPatt
       touches.avgDeviation <= resistanceTolerance * 1.2
     ) {
       const confidence = clamp(
-        0.3 +  // Lower base confidence
-          Math.min(0.35, touches.touches / slice.length) +
-          Math.min(0.35, highStats.r2),
+        0.40 +  // Higher base confidence for quality patterns
+          Math.min(0.30, (touches.touches / slice.length) * 1.5) +
+          Math.min(0.30, highStats.r2 * 1.2),
         0,
         0.95
       );
@@ -235,11 +239,11 @@ function detectHorizontalSR(data: ChartDataPoint[], windowSize: number): ChartPa
   const end = startIndex + Math.min(slice.length - 1, Math.max(...combinedIndexes) + 3);
 
   const confidence = clamp(
-    0.4 +
-      Math.min(0.3, combinedIndexes.length * 0.05) +
-      Math.min(0.25, (0.08 - bandWidth / midpoint) * 2),
+    0.45 +
+      Math.min(0.25, combinedIndexes.length * 0.06) +
+      Math.min(0.25, (0.08 - bandWidth / midpoint) * 2.5),
     0,
-    0.9
+    0.95
   );
 
   return [
@@ -295,24 +299,24 @@ function detectWedges(data: ChartDataPoint[], windowSize: number): ChartPattern[
 
   if (slopeHigh > 0 && slopeLow > 0 && slopeLow > slopeHigh * 1.2) {
     const confidence = clamp(
-      0.45 +
-        Math.min(0.25, (1 - compressionRatio) * 1.2) +
-        Math.min(0.15, (slopeLow - slopeHigh) * 350) +
-        Math.min(0.15, lowerTouches.touches * 0.05),
+      0.50 +
+        Math.min(0.25, (1 - compressionRatio) * 1.5) +
+        Math.min(0.15, (slopeLow - slopeHigh) * 400) +
+        Math.min(0.10, lowerTouches.touches * 0.06),
       0,
-      0.92
+      0.95
     );
     patterns.push(
       buildPattern(data, 'wedge_up', startIndex, data.length - 1, confidence, baseMeta)
     );
   } else if (slopeHigh < 0 && slopeLow < 0 && Math.abs(slopeHigh) > Math.abs(slopeLow) * 1.2) {
     const confidence = clamp(
-      0.45 +
-        Math.min(0.25, (1 - compressionRatio) * 1.2) +
-        Math.min(0.15, (Math.abs(slopeHigh) - Math.abs(slopeLow)) * 350) +
-        Math.min(0.15, upperTouches.touches * 0.05),
+      0.50 +
+        Math.min(0.25, (1 - compressionRatio) * 1.5) +
+        Math.min(0.15, (Math.abs(slopeHigh) - Math.abs(slopeLow)) * 400) +
+        Math.min(0.10, upperTouches.touches * 0.06),
       0,
-      0.92
+      0.95
     );
     patterns.push(
       buildPattern(data, 'wedge_down', startIndex, data.length - 1, confidence, baseMeta)
@@ -394,22 +398,22 @@ function detectTriangles(data: ChartDataPoint[], windowSize: number): ChartPatte
 
   if (Math.abs(slopeHigh) <= flatThreshold && slopeLow >= trendThreshold) {
     const confidence = clamp(
-      0.45 +
-        Math.min(0.25, slopeLow * 800) +
-        Math.min(0.2, (1 - rangeStats.compressionRatio) * 1.5) +
-        Math.min(0.1, lowerTouches.touches * 0.05),
+      0.50 +
+        Math.min(0.25, slopeLow * 1000) +
+        Math.min(0.20, (1 - rangeStats.compressionRatio) * 1.8) +
+        Math.min(0.10, lowerTouches.touches * 0.06),
       0,
-      0.9
+      0.95
     );
     patterns.push(buildPattern(data, 'triangle_ascending', start, end, confidence, baseMeta));
   } else if (Math.abs(slopeLow) <= flatThreshold && slopeHigh <= -trendThreshold) {
     const confidence = clamp(
-      0.45 +
-        Math.min(0.25, Math.abs(slopeHigh) * 800) +
-        Math.min(0.2, (1 - rangeStats.compressionRatio) * 1.5) +
-        Math.min(0.1, upperTouches.touches * 0.05),
+      0.50 +
+        Math.min(0.25, Math.abs(slopeHigh) * 1000) +
+        Math.min(0.20, (1 - rangeStats.compressionRatio) * 1.8) +
+        Math.min(0.10, upperTouches.touches * 0.06),
       0,
-      0.9
+      0.95
     );
     patterns.push(buildPattern(data, 'triangle_descending', start, end, confidence, baseMeta));
   } else if (
@@ -477,31 +481,31 @@ function detectChannels(data: ChartDataPoint[], windowSize: number): ChartPatter
   if (sameDirection && slopeDiff < 0.00035 && rangeDelta < 0.3) {
     if (highStats.slopePct > 0.00015) {
       const confidence = clamp(
-        0.4 +
-          Math.min(0.25, highStats.slopePct * 1200) +
-          Math.min(0.2, (0.3 - rangeDelta) * 0.8) +
-          Math.min(0.15, (upperTouches.touches + lowerTouches.touches) * 0.03),
+        0.50 +
+          Math.min(0.25, highStats.slopePct * 1500) +
+          Math.min(0.20, (0.3 - rangeDelta) * 1.0) +
+          Math.min(0.10, (upperTouches.touches + lowerTouches.touches) * 0.04),
         0,
-        0.9
+        0.95
       );
       patterns.push(buildPattern(data, 'channel_up', start, end, confidence, baseMeta));
     } else if (highStats.slopePct < -0.00015) {
       const confidence = clamp(
-        0.4 +
-          Math.min(0.25, Math.abs(highStats.slopePct) * 1200) +
-          Math.min(0.2, (0.3 - rangeDelta) * 0.8) +
-          Math.min(0.15, (upperTouches.touches + lowerTouches.touches) * 0.03),
+        0.50 +
+          Math.min(0.25, Math.abs(highStats.slopePct) * 1500) +
+          Math.min(0.20, (0.3 - rangeDelta) * 1.0) +
+          Math.min(0.10, (upperTouches.touches + lowerTouches.touches) * 0.04),
         0,
-        0.9
+        0.95
       );
       patterns.push(buildPattern(data, 'channel_down', start, end, confidence, baseMeta));
     } else {
       const confidence = clamp(
-        0.35 +
-          Math.min(0.2, (0.3 - rangeDelta) * 0.8) +
-          Math.min(0.15, (upperTouches.touches + lowerTouches.touches) * 0.03),
+        0.45 +
+          Math.min(0.25, (0.3 - rangeDelta) * 1.0) +
+          Math.min(0.15, (upperTouches.touches + lowerTouches.touches) * 0.04),
         0,
-        0.8
+        0.85
       );
       patterns.push(buildPattern(data, 'channel', start, end, confidence, baseMeta));
     }
@@ -538,9 +542,9 @@ function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
       const dropScore = postMove < 0 ? Math.min(0.25, Math.abs(postMove) * 3) : 0;
 
       const confidence = clamp(
-        0.45 + Math.min(0.3, (tolerance - diff) * 10) + dropScore,
+        0.55 + Math.min(0.25, (tolerance - diff) * 12) + Math.min(0.15, dropScore),
         0,
-        0.9
+        0.95
       );
 
       const start = Math.max(0, first - 5);
@@ -588,9 +592,9 @@ function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
       const bounceScore = postMove > 0 ? Math.min(0.25, postMove * 3) : 0;
 
       const confidence = clamp(
-        0.45 + Math.min(0.3, (tolerance - diff) * 10) + bounceScore,
+        0.55 + Math.min(0.25, (tolerance - diff) * 12) + Math.min(0.15, bounceScore),
         0,
-        0.9
+        0.95
       );
 
       const start = Math.max(0, first - 5);
@@ -625,9 +629,9 @@ function detectMultipleTops(data: ChartDataPoint[]): ChartPattern[] {
   const end = Math.min(data.length - 1, Math.max(...cluster.indexes) + 5);
 
   const confidence = clamp(
-    0.45 + Math.min(0.35, cluster.indexes.length * 0.08),
+    0.55 + Math.min(0.30, cluster.indexes.length * 0.10),
     0,
-    0.9
+    0.95
   );
 
   const padding = cluster.level * 0.01;
@@ -657,9 +661,9 @@ function detectMultipleBottoms(data: ChartDataPoint[]): ChartPattern[] {
   const end = Math.min(data.length - 1, Math.max(...cluster.indexes) + 5);
 
   const confidence = clamp(
-    0.45 + Math.min(0.35, cluster.indexes.length * 0.08),
+    0.55 + Math.min(0.30, cluster.indexes.length * 0.10),
     0,
-    0.9
+    0.95
   );
 
   const padding = cluster.level * 0.01;
@@ -710,9 +714,9 @@ function detectHeadAndShoulders(data: ChartDataPoint[]): ChartPattern[] {
     if (necklineDiff > Math.max(0.035, patternTolerance * 1.5)) continue;
 
     const confidence = clamp(
-      0.55 +
-        Math.min(0.25, headPremium * 3) +
-        Math.min(0.2, (0.04 - necklineDiff) * 3),
+      0.60 +
+        Math.min(0.20, headPremium * 4) +
+        Math.min(0.15, (0.04 - necklineDiff) * 4),
       0,
       0.95
     );
@@ -739,16 +743,21 @@ function detectHeadAndShoulders(data: ChartDataPoint[]): ChartPattern[] {
 function consolidatePatterns(patterns: ChartPattern[]): ChartPattern[] {
   if (!patterns.length) return [];
 
+  // Global minimum confidence threshold of 60%
+  const GLOBAL_MIN_CONFIDENCE = 0.60;
+
   const sorted = [...patterns]
     .filter(pattern => pattern.startDate && pattern.endDate)
+    .filter(pattern => pattern.confidence >= GLOBAL_MIN_CONFIDENCE) // Filter by 60% minimum
     .sort((a, b) => b.confidence - a.confidence);
 
   const perTypeCount = new Map<ChartPatternType, number>();
   const result: ChartPattern[] = [];
 
   for (const pattern of sorted) {
+    // Check type-specific minimum (if it exists and is higher than global)
     const minConfidence = MIN_CONFIDENCE_PER_TYPE[pattern.type];
-    if (typeof minConfidence === 'number' && pattern.confidence < minConfidence) {
+    if (typeof minConfidence === 'number' && pattern.confidence < Math.max(minConfidence, GLOBAL_MIN_CONFIDENCE)) {
       continue;
     }
     const count = perTypeCount.get(pattern.type) ?? 0;

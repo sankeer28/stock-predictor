@@ -92,6 +92,7 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
 // Prepare multi-feature data from stock data (OHLCV + technical indicators)
 function prepareMultiFeatureData(stockData: StockData[]): number[][] {
   const features: number[][] = [];
+  const n = stockData.length;
   
   // Price features
   features.push(stockData.map(d => d.close));      // 0: Close
@@ -99,11 +100,11 @@ function prepareMultiFeatureData(stockData: StockData[]): number[][] {
   features.push(stockData.map(d => d.high));       // 2: High
   features.push(stockData.map(d => d.low));        // 3: Low
   
-  // Volume feature (normalized by itself)
+  // Volume feature
   features.push(stockData.map(d => d.volume));     // 4: Volume
   
   // Price-based features
-  const typicalPrices = stockData.map((d, i) => (d.high + d.low + d.close) / 3);
+  const typicalPrices = stockData.map(d => (d.high + d.low + d.close) / 3);
   features.push(typicalPrices);                    // 5: Typical Price
   
   // Price range (volatility indicator)
@@ -112,12 +113,86 @@ function prepareMultiFeatureData(stockData: StockData[]): number[][] {
   
   // Returns (momentum indicator)
   const returns = [0];  // First return is 0
-  for (let i = 1; i < stockData.length; i++) {
+  for (let i = 1; i < n; i++) {
     returns.push((stockData[i].close - stockData[i - 1].close) / stockData[i - 1].close);
   }
   features.push(returns);                          // 7: Returns
   
-  return features;
+  // Short-term momentum (5-period rate of change)
+  const shortMomentum = new Array(5).fill(0);
+  for (let i = 5; i < n; i++) {
+    shortMomentum.push((stockData[i].close - stockData[i - 5].close) / stockData[i - 5].close);
+  }
+  features.push(shortMomentum);                    // 8: Short-term Momentum
+  
+  // Medium-term momentum (14-period rate of change)
+  const mediumMomentum = new Array(14).fill(0);
+  for (let i = 14; i < n; i++) {
+    mediumMomentum.push((stockData[i].close - stockData[i - 14].close) / stockData[i - 14].close);
+  }
+  features.push(mediumMomentum);                   // 9: Medium-term Momentum
+  
+  // Volume momentum (comparing to average)
+  const volumeMA20 = [];
+  for (let i = 0; i < n; i++) {
+    if (i < 20) {
+      volumeMA20.push(stockData[i].volume);
+    } else {
+      const avg = stockData.slice(i - 19, i + 1).reduce((sum, d) => sum + d.volume, 0) / 20;
+      volumeMA20.push(avg);
+    }
+  }
+  const volumeRatio = stockData.map((d, i) => d.volume / (volumeMA20[i] || 1));
+  features.push(volumeRatio);                      // 10: Volume Ratio
+  
+  // True Range (volatility)
+  const trueRange = [priceRanges[0]];
+  for (let i = 1; i < n; i++) {
+    const tr = Math.max(
+      stockData[i].high - stockData[i].low,
+      Math.abs(stockData[i].high - stockData[i - 1].close),
+      Math.abs(stockData[i].low - stockData[i - 1].close)
+    );
+    trueRange.push(tr);
+  }
+  features.push(trueRange);                        // 11: True Range
+  
+  // Price position within range (where close is relative to high/low)
+  const pricePosition = stockData.map(d => {
+    const range = d.high - d.low;
+    return range === 0 ? 0.5 : (d.close - d.low) / range;
+  });
+  features.push(pricePosition);                    // 12: Price Position
+  
+  // Simple Moving Average convergence (10 vs 20 period)
+  const sma10 = [];
+  const sma20 = [];
+  for (let i = 0; i < n; i++) {
+    if (i < 10) {
+      sma10.push(stockData[i].close);
+    } else {
+      const avg = stockData.slice(i - 9, i + 1).reduce((sum, d) => sum + d.close, 0) / 10;
+      sma10.push(avg);
+    }
+    
+    if (i < 20) {
+      sma20.push(stockData[i].close);
+    } else {
+      const avg = stockData.slice(i - 19, i + 1).reduce((sum, d) => sum + d.close, 0) / 20;
+      sma20.push(avg);
+    }
+  }
+  const maConvergence = sma10.map((v, i) => (v - sma20[i]) / (sma20[i] || 1));
+  features.push(maConvergence);                    // 13: MA Convergence
+  
+  // Gap indicator (difference between open and previous close)
+  const gaps = [0];
+  for (let i = 1; i < n; i++) {
+    gaps.push((stockData[i].open - stockData[i - 1].close) / stockData[i - 1].close);
+  }
+  features.push(gaps);                             // 14: Price Gaps
+  
+  return features;  // Total: 15 features
 }
 
 /**
@@ -145,10 +220,10 @@ export async function generateGRUForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build GRU model with multi-feature input
+    // Build GRU model with multi-feature input (15 features)
     const model = tf.sequential();
     model.add(tf.layers.gru({
-      units: 24,  // Increased for multi-feature processing
+      units: 32,  // Increased from 24 for 15-feature processing
       returnSequences: false,
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
       kernelInitializer: 'glorotUniform',
@@ -156,6 +231,8 @@ export async function generateGRUForecast(
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
+    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));  // Extra layer for complex patterns
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout * 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
@@ -221,15 +298,22 @@ export async function generateGRUForecast(
       const newTimeStep: number[] = [];
       
       // For features we can't predict (open, high, low), use close as estimate
-      newTimeStep.push(normalizedNewPrice);  // close
-      newTimeStep.push(normalizedNewPrice);  // open (approximate)
-      newTimeStep.push(normalizedNewPrice * 1.005);  // high (slightly higher)
-      newTimeStep.push(normalizedNewPrice * 0.995);  // low (slightly lower)
+      newTimeStep.push(normalizedNewPrice);  // 0: close
+      newTimeStep.push(normalizedNewPrice);  // 1: open (approximate)
+      newTimeStep.push(normalizedNewPrice * 1.005);  // 2: high (slightly higher)
+      newTimeStep.push(normalizedNewPrice * 0.995);  // 3: low (slightly lower)
       
-      // Volume and other features - use recent average
+      // For all other features (4-14), use exponentially weighted moving average
       for (let f = 4; f < numFeatures; f++) {
-        const recentAvg = currentSequence.slice(-3).reduce((sum, ts) => sum + ts[f], 0) / 3;
-        newTimeStep.push(recentAvg);
+        const weights = [0.5, 0.3, 0.2];  // Recent points weighted more heavily
+        const recentPoints = currentSequence.slice(-3);
+        let weightedSum = 0;
+        let weightTotal = 0;
+        for (let j = 0; j < recentPoints.length; j++) {
+          weightedSum += recentPoints[j][f] * weights[j];
+          weightTotal += weights[j];
+        }
+        newTimeStep.push(weightedSum / weightTotal);
       }
       
       currentSequence.shift();
@@ -279,12 +363,12 @@ export async function generate1DCNNForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build 1D CNN model with multi-feature input
+    // Build 1D CNN model with multi-feature input (15 features)
     const model = tf.sequential();
 
     // Conv1D layer for pattern recognition across features
     model.add(tf.layers.conv1d({
-      filters: 24,  // Increased for multi-feature processing
+      filters: 32,  // Increased from 24 for 15-feature processing
       kernelSize: 3,
       activation: 'relu',
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
@@ -294,7 +378,8 @@ export async function generate1DCNNForecast(
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
     model.add(tf.layers.flatten());
-    model.add(tf.layers.dense({ units: 4, activation: 'relu' }));  // Reduced from 8
+    model.add(tf.layers.dense({ units: 16, activation: 'relu' }));  // Increased from 4
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout * 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
@@ -342,14 +427,22 @@ export async function generate1DCNNForecast(
       const normalizedNewPrice = (currentPrice - mins[0]) / range;
       const newTimeStep: number[] = [];
       
-      newTimeStep.push(normalizedNewPrice);
-      newTimeStep.push(normalizedNewPrice);
-      newTimeStep.push(normalizedNewPrice * 1.005);
-      newTimeStep.push(normalizedNewPrice * 0.995);
+      newTimeStep.push(normalizedNewPrice);  // close
+      newTimeStep.push(normalizedNewPrice);  // open
+      newTimeStep.push(normalizedNewPrice * 1.005);  // high
+      newTimeStep.push(normalizedNewPrice * 0.995);  // low
       
+      // Use exponentially weighted moving average for other features
       for (let f = 4; f < numFeatures; f++) {
-        const recentAvg = currentSequence.slice(-3).reduce((sum, ts) => sum + ts[f], 0) / 3;
-        newTimeStep.push(recentAvg);
+        const weights = [0.5, 0.3, 0.2];
+        const recentPoints = currentSequence.slice(-3);
+        let weightedSum = 0;
+        let weightTotal = 0;
+        for (let j = 0; j < recentPoints.length; j++) {
+          weightedSum += recentPoints[j][f] * weights[j];
+          weightTotal += weights[j];
+        }
+        newTimeStep.push(weightedSum / weightTotal);
       }
       
       currentSequence.shift();
@@ -399,12 +492,12 @@ export async function generateCNNLSTMForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build Hybrid CNN-LSTM model with multi-feature input
+    // Build Hybrid CNN-LSTM model with multi-feature input (15 features)
     const model = tf.sequential();
 
     // CNN for feature extraction across multiple features
     model.add(tf.layers.conv1d({
-      filters: 16,  // Increased for multi-feature processing
+      filters: 24,  // Increased from 16 for 15-feature processing
       kernelSize: 2,
       activation: 'relu',
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
@@ -414,13 +507,14 @@ export async function generateCNNLSTMForecast(
 
     // LSTM for temporal modeling
     model.add(tf.layers.lstm({
-      units: 12,  // Reduced from 16
+      units: 16,  // Increased from 12 for better temporal learning
       returnSequences: false,
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
-    model.add(tf.layers.dense({ units: 4, activation: 'relu' }));  // Reduced from 8
+    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));  // Increased from 4
+    model.add(tf.layers.dropout({ rate: mlSettings.dropout * 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
@@ -468,14 +562,22 @@ export async function generateCNNLSTMForecast(
       const normalizedNewPrice = (currentPrice - mins[0]) / range;
       const newTimeStep: number[] = [];
       
-      newTimeStep.push(normalizedNewPrice);
-      newTimeStep.push(normalizedNewPrice);
-      newTimeStep.push(normalizedNewPrice * 1.005);
-      newTimeStep.push(normalizedNewPrice * 0.995);
+      newTimeStep.push(normalizedNewPrice);  // close
+      newTimeStep.push(normalizedNewPrice);  // open
+      newTimeStep.push(normalizedNewPrice * 1.005);  // high
+      newTimeStep.push(normalizedNewPrice * 0.995);  // low
       
+      // Use exponentially weighted moving average for other features
       for (let f = 4; f < numFeatures; f++) {
-        const recentAvg = currentSequence.slice(-3).reduce((sum, ts) => sum + ts[f], 0) / 3;
-        newTimeStep.push(recentAvg);
+        const weights = [0.5, 0.3, 0.2];
+        const recentPoints = currentSequence.slice(-3);
+        let weightedSum = 0;
+        let weightTotal = 0;
+        for (let j = 0; j < recentPoints.length; j++) {
+          weightedSum += recentPoints[j][f] * weights[j];
+          weightTotal += weights[j];
+        }
+        newTimeStep.push(weightedSum / weightTotal);
       }
       
       currentSequence.shift();
