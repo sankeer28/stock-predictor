@@ -793,26 +793,36 @@ export default function StockChart({
       return;
     }
 
-    const MIN_VISIBLE_POINTS = 25;
-    if (visibleData.length >= MIN_VISIBLE_POINTS) {
-      const recalculated = detectChartPatterns(visibleData);
-      if (recalculated.length) {
-        const shifted = recalculated.map(pattern => {
-          const globalStartIndex = pattern.startIndex + visibleStartIndex;
-          const globalEndIndex = pattern.endIndex + visibleStartIndex;
-          return {
-            ...pattern,
-            startIndex: globalStartIndex,
-            endIndex: globalEndIndex,
-            startDate: data[globalStartIndex]?.date ?? pattern.startDate,
-            endDate: data[globalEndIndex]?.date ?? pattern.endDate,
-          };
-        });
-        setViewPatterns(shifted);
-        return;
+    // Debounce pattern detection to avoid blocking UI during zoom/pan
+    const timer = setTimeout(() => {
+      const MIN_VISIBLE_POINTS = 25;
+      if (visibleData.length >= MIN_VISIBLE_POINTS) {
+        // Run pattern detection asynchronously to not block UI
+        requestIdleCallback(() => {
+          const recalculated = detectChartPatterns(visibleData);
+          if (recalculated.length) {
+            const shifted = recalculated.map(pattern => {
+              const globalStartIndex = pattern.startIndex + visibleStartIndex;
+              const globalEndIndex = pattern.endIndex + visibleStartIndex;
+              return {
+                ...pattern,
+                startIndex: globalStartIndex,
+                endIndex: globalEndIndex,
+                startDate: data[globalStartIndex]?.date ?? pattern.startDate,
+                endDate: data[globalEndIndex]?.date ?? pattern.endDate,
+              };
+            });
+            setViewPatterns(shifted);
+          } else {
+            setViewPatterns(patterns);
+          }
+        }, { timeout: 1000 });
+      } else {
+        setViewPatterns(patterns);
       }
-    }
-    setViewPatterns(patterns);
+    }, 500); // Wait 500ms after zoom/pan stops
+
+    return () => clearTimeout(timer);
   }, [enablePatterns, visibleData, visibleStartIndex, data, patterns]);
 
   // Notify parent of visible range changes
@@ -1179,7 +1189,7 @@ export default function StockChart({
         borderColor: 'var(--bg-1)',
         color: 'var(--text-4)'
       }}>
-        <strong style={{ color: 'var(--text-3)' }}>💡 Interactive Controls:</strong> Drag the brush at bottom to pan • Ctrl+Scroll to zoom • Keyboard: +/- zoom, R reset • Click buttons above
+        <strong style={{ color: 'var(--text-3)' }}>💡 Interactive Controls:</strong> Drag the slider at bottom to pan • Ctrl+Scroll to zoom • Keyboard: +/- zoom, R reset • Click buttons above
       </div>
 
       {enablePatterns && data.length > 0 && (

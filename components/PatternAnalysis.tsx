@@ -3,6 +3,7 @@
 import { ChartPattern } from '@/types';
 import { analyzePatterns, PatternAnalysisResult } from '@/lib/patternAnalysis';
 import { useState, useEffect, useMemo } from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface PatternAnalysisProps {
   patterns: ChartPattern[];
@@ -13,11 +14,33 @@ interface PatternAnalysisProps {
 
 export default function PatternAnalysis({ patterns, startDate, endDate, inlineMobile }: PatternAnalysisProps) {
   const [expanded, setExpanded] = useState(true);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [debouncedDateRange, setDebouncedDateRange] = useState({ startDate, endDate });
 
-  // Analyze patterns whenever they change or date range changes
+  // Debounce date range changes to avoid recalculating on every zoom/pan
+  useEffect(() => {
+    // If dates are initially undefined, don't debounce
+    if (!startDate || !endDate) {
+      setDebouncedDateRange({ startDate, endDate });
+      setIsCalculating(false);
+      return;
+    }
+
+    setIsCalculating(true);
+    const timer = setTimeout(() => {
+      setDebouncedDateRange({ startDate, endDate });
+      setIsCalculating(false);
+    }, 300); // Wait 300ms after last change
+
+    return () => clearTimeout(timer);
+  }, [startDate, endDate]);
+
+  // Analyze patterns - use actual dates if debounced dates are undefined
   const analysis = useMemo(() => {
-    return analyzePatterns(patterns, startDate, endDate);
-  }, [patterns, startDate, endDate]);
+    const effectiveStartDate = debouncedDateRange.startDate || startDate;
+    const effectiveEndDate = debouncedDateRange.endDate || endDate;
+    return analyzePatterns(patterns, effectiveStartDate, effectiveEndDate);
+  }, [patterns, debouncedDateRange.startDate, debouncedDateRange.endDate, startDate, endDate]);
 
   // Get signal color
   const getSignalColor = (signal: PatternAnalysisResult['signal']) => {
@@ -79,7 +102,15 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div>
-            <span className="card-label">Live Pattern Analysis</span>
+            <div className="flex items-center gap-2">
+              <span className="card-label">Live Pattern Analysis</span>
+              {isCalculating && (
+                <Loader2 
+                  className="w-3 h-3 animate-spin" 
+                  style={{ color: 'var(--accent)' }} 
+                />
+              )}
+            </div>
             <p className="text-xs" style={{ color: 'var(--text-4)' }}>
               Analysis of {patterns.length} detected pattern{patterns.length !== 1 ? 's' : ''}
             </p>
@@ -103,7 +134,7 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
       </div>
 
       {expanded && (
-        <>
+        <div style={{ opacity: isCalculating ? 0.6 : 1, transition: 'opacity 0.2s' }}>
           {/* Signal Badge */}
           <div 
             className="border-2 p-4 mb-4"
@@ -332,7 +363,7 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

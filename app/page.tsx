@@ -156,14 +156,31 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!chartData.length) {
+    // Only detect patterns when the toggle is enabled
+    if (!showPatterns || !chartData.length) {
       setChartPatterns([]);
       return;
     }
 
-    const patterns = detectChartPatterns(chartData);
-    setChartPatterns(patterns);
-  }, [chartData]);
+    // Debounce pattern detection and run it asynchronously
+    const timer = setTimeout(() => {
+      // Use requestIdleCallback to run pattern detection when browser is idle
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => {
+          const patterns = detectChartPatterns(chartData);
+          setChartPatterns(patterns);
+        }, { timeout: 2000 });
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(() => {
+          const patterns = detectChartPatterns(chartData);
+          setChartPatterns(patterns);
+        }, 0);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [chartData, showPatterns]);
 
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
@@ -859,7 +876,10 @@ export default function Home() {
   };
 
   const handleVisibleRangeChange = (startDate: string, endDate: string) => {
-    setVisibleDateRange({ startDate, endDate });
+    // Only update visible range if patterns are enabled
+    if (showPatterns) {
+      setVisibleDateRange({ startDate, endDate });
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -1495,7 +1515,7 @@ export default function Home() {
               />
 
               {/* Pattern Analysis - Mobile */}
-              {chartPatterns.length > 0 && (
+              {showPatterns && chartPatterns.length > 0 && (
                 <PatternAnalysis
                   patterns={chartPatterns}
                   startDate={visibleDateRange?.startDate}
@@ -1530,7 +1550,7 @@ export default function Home() {
             />
 
             {/* Pattern Analysis - Below ML Predictions */}
-            {chartPatterns.length > 0 && (
+            {showPatterns && chartPatterns.length > 0 && (
               <div className="mt-4">
                 <PatternAnalysis
                   patterns={chartPatterns}

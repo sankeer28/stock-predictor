@@ -45,11 +45,11 @@ const PATTERN_DIRECTION: Record<ChartPatternType, ChartPattern['direction']> = {
   head_and_shoulders: 'bearish',
 };
 
-// Enhanced detection windows for more frequent pattern detection
-const DETECTION_WINDOWS = [30, 45, 60, 90, 120, 150, 200];
+// Optimized detection windows - reduced for better performance
+const DETECTION_WINDOWS = [45, 90, 150];  // Reduced from 7 to 3 windows for faster detection
 const MIN_WINDOW = 25;  // Reduced from 45 for earlier pattern detection
-const MAX_PATTERNS = 20;  // Increased from 12 to detect more patterns
-const MAX_PATTERNS_PER_TYPE = 3;  // Increased from 2 for more pattern variety
+const MAX_PATTERNS = 15;  // Reduced from 20 for better performance
+const MAX_PATTERNS_PER_TYPE = 2;  // Reduced from 3 for better performance
 const VOLATILITY_FLOOR = 0.002;
 const VOLATILITY_CAP = 0.2;
 const MAX_PATTERN_OVERLAP = 0.7;  // Slightly increased to allow more overlapping patterns
@@ -101,20 +101,35 @@ export function detectChartPatterns(data: ChartDataPoint[]): ChartPattern[] {
     );
 
     const patterns: ChartPattern[] = [];
+    const EARLY_EXIT_THRESHOLD = 30; // Stop if we have enough patterns
 
-    windows.forEach(windowSize => {
+    // Window-based pattern detection with early exit
+    for (const windowSize of windows) {
+      if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
+      
       patterns.push(...detectTrendlines(data, windowSize));
+      if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
+      
       patterns.push(...detectHorizontalSR(data, windowSize));
+      if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
+      
       patterns.push(...detectWedges(data, windowSize));
+      if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
+      
       patterns.push(...detectTriangles(data, windowSize));
+      if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
+      
       patterns.push(...detectChannels(data, windowSize));
-    });
+    }
 
-    patterns.push(...detectDoubleTops(data));
-    patterns.push(...detectDoubleBottoms(data));
-    patterns.push(...detectMultipleTops(data));
-    patterns.push(...detectMultipleBottoms(data));
-    patterns.push(...detectHeadAndShoulders(data));
+    // Only detect these expensive patterns if we don't have enough yet
+    if (patterns.length < EARLY_EXIT_THRESHOLD) {
+      patterns.push(...detectDoubleTops(data));
+      patterns.push(...detectDoubleBottoms(data));
+      patterns.push(...detectMultipleTops(data));
+      patterns.push(...detectMultipleBottoms(data));
+      patterns.push(...detectHeadAndShoulders(data));
+    }
 
     return consolidatePatterns(patterns);
   } catch (error) {

@@ -30,17 +30,28 @@ export function analyzePatterns(
   // Filter patterns by date range if provided
   let relevantPatterns = patterns;
   if (startDate && endDate) {
+    const rangeStart = new Date(startDate).getTime();
+    const rangeEnd = new Date(endDate).getTime();
+    
     relevantPatterns = patterns.filter(pattern => {
+      // Handle invalid dates gracefully
       const patternStart = new Date(pattern.startDate).getTime();
       const patternEnd = new Date(pattern.endDate).getTime();
-      const rangeStart = new Date(startDate).getTime();
-      const rangeEnd = new Date(endDate).getTime();
+      
+      if (isNaN(patternStart) || isNaN(patternEnd)) {
+        return true; // Include patterns with invalid dates to be safe
+      }
 
-      // Check if pattern overlaps with the view range
+      // Add a small buffer (1 day) to make filtering more lenient
+      const bufferMs = 24 * 60 * 60 * 1000; // 1 day in milliseconds
+      const adjustedRangeStart = rangeStart - bufferMs;
+      const adjustedRangeEnd = rangeEnd + bufferMs;
+
+      // Check if pattern overlaps with the view range (with buffer)
       return (
-        (patternStart >= rangeStart && patternStart <= rangeEnd) ||
-        (patternEnd >= rangeStart && patternEnd <= rangeEnd) ||
-        (patternStart <= rangeStart && patternEnd >= rangeEnd)
+        (patternStart >= adjustedRangeStart && patternStart <= adjustedRangeEnd) ||
+        (patternEnd >= adjustedRangeStart && patternEnd <= adjustedRangeEnd) ||
+        (patternStart <= adjustedRangeStart && patternEnd >= adjustedRangeEnd)
       );
     });
   }
