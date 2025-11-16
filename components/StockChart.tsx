@@ -1344,9 +1344,13 @@ export default function StockChart({
             startIndex={brushRange.startIndex}
             endIndex={brushRange.endIndex}
             onChange={(range) => {
-              // Reset active range when manually dragging
+              // Update brush range when manually dragging
               if (range && range.startIndex !== undefined && range.endIndex !== undefined) {
-                setActiveRange(null);
+                setBrushRange({
+                  startIndex: range.startIndex,
+                  endIndex: range.endIndex,
+                });
+                setActiveRange(null); // Clear preset selection
               }
             }}
             travellerWidth={10}

@@ -3,16 +3,25 @@
 import { ChartPattern } from '@/types';
 import { analyzePatterns, PatternAnalysisResult } from '@/lib/patternAnalysis';
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 interface PatternAnalysisProps {
   patterns: ChartPattern[];
   startDate?: string;
   endDate?: string;
   inlineMobile?: boolean;
+  onRefreshPatterns?: () => void;
+  isDetecting?: boolean;
 }
 
-export default function PatternAnalysis({ patterns, startDate, endDate, inlineMobile }: PatternAnalysisProps) {
+export default function PatternAnalysis({
+  patterns,
+  startDate,
+  endDate,
+  inlineMobile,
+  onRefreshPatterns,
+  isDetecting = false
+}: PatternAnalysisProps) {
   const [expanded, setExpanded] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
   const [debouncedDateRange, setDebouncedDateRange] = useState({ startDate, endDate });
@@ -104,10 +113,10 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
           <div>
             <div className="flex items-center gap-2">
               <span className="card-label">Live Pattern Analysis</span>
-              {isCalculating && (
-                <Loader2 
-                  className="w-3 h-3 animate-spin" 
-                  style={{ color: 'var(--accent)' }} 
+              {(isCalculating || isDetecting) && (
+                <Loader2
+                  className="w-3 h-3 animate-spin"
+                  style={{ color: 'var(--accent)' }}
                 />
               )}
             </div>
@@ -116,25 +125,67 @@ export default function PatternAnalysis({ patterns, startDate, endDate, inlineMo
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="transition-colors"
-          style={{ color: 'var(--text-3)' }}
-        >
-          {expanded ? (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+        <div className="flex items-center gap-2">
+          {/* Refresh Button */}
+          {onRefreshPatterns && (
+            <button
+              onClick={onRefreshPatterns}
+              disabled={isDetecting}
+              className="p-1.5 border transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-opacity-10"
+              style={{
+                background: 'var(--bg-3)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)',
+              }}
+              title="Re-detect patterns"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${isDetecting ? 'animate-spin' : ''}`}
+              />
+            </button>
           )}
-        </button>
+          {/* Collapse Button */}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="transition-colors"
+            style={{ color: 'var(--text-3)' }}
+          >
+            {expanded ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {expanded && (
-        <div style={{ opacity: isCalculating ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+        <div style={{ opacity: (isCalculating || isDetecting) ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+          {/* Refresh Info Banner */}
+          {onRefreshPatterns && (
+            <div
+              className="border-2 p-2 mb-4 flex items-center gap-2"
+              style={{
+                background: 'var(--bg-3)',
+                borderColor: 'var(--accent)',
+                borderLeftWidth: '3px',
+              }}
+            >
+              <RefreshCw className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <span className="text-xs" style={{ color: 'var(--text-3)' }}>
+                {isDetecting ? (
+                  <>🔄 Detecting patterns...</>
+                ) : (
+                  <>Click refresh button to manually re-detect all patterns on the entire chart</>
+                )}
+              </span>
+            </div>
+          )}
+
           {/* Signal Badge */}
           <div 
             className="border-2 p-4 mb-4"

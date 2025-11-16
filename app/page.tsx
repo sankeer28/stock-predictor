@@ -183,6 +183,39 @@ export default function Home() {
     }, 0);
   };
 
+  // State for pattern detection loading
+  const [patternDetecting, setPatternDetecting] = useState(false);
+
+  // Function to manually detect patterns
+  const detectPatterns = React.useCallback(() => {
+    if (!chartData.length) {
+      setChartPatterns([]);
+      return;
+    }
+
+    setPatternDetecting(true);
+    loadMLLibraries().then(({ detectChartPatterns }) => {
+      // Use requestIdleCallback to run pattern detection when browser is idle
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => {
+          const patterns = detectChartPatterns(chartData);
+          setChartPatterns(patterns);
+          setPatternDetecting(false);
+        }, { timeout: 2000 });
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(() => {
+          const patterns = detectChartPatterns(chartData);
+          setChartPatterns(patterns);
+          setPatternDetecting(false);
+        }, 0);
+      }
+    }).catch(error => {
+      console.error('Pattern detection error:', error);
+      setPatternDetecting(false);
+    });
+  }, [chartData]);
+
   useEffect(() => {
     // Only detect patterns when the toggle is enabled
     if (!showPatterns || !chartData.length) {
@@ -190,27 +223,13 @@ export default function Home() {
       return;
     }
 
-    // Lazy load pattern detection library and run it asynchronously
+    // Debounce pattern detection
     const timer = setTimeout(() => {
-      loadMLLibraries().then(({ detectChartPatterns }) => {
-        // Use requestIdleCallback to run pattern detection when browser is idle
-        if (typeof requestIdleCallback !== 'undefined') {
-          requestIdleCallback(() => {
-            const patterns = detectChartPatterns(chartData);
-            setChartPatterns(patterns);
-          }, { timeout: 2000 });
-        } else {
-          // Fallback for browsers without requestIdleCallback
-          setTimeout(() => {
-            const patterns = detectChartPatterns(chartData);
-            setChartPatterns(patterns);
-          }, 0);
-        }
-      });
+      detectPatterns();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [chartData, showPatterns]);
+  }, [chartData, showPatterns, detectPatterns]);
 
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
@@ -1545,6 +1564,8 @@ export default function Home() {
                   startDate={visibleDateRange?.startDate}
                   endDate={visibleDateRange?.endDate}
                   inlineMobile={true}
+                  onRefreshPatterns={detectPatterns}
+                  isDetecting={patternDetecting}
                 />
               )}
             </div>
@@ -1580,6 +1601,8 @@ export default function Home() {
                   patterns={chartPatterns}
                   startDate={visibleDateRange?.startDate}
                   endDate={visibleDateRange?.endDate}
+                  onRefreshPatterns={detectPatterns}
+                  isDetecting={patternDetecting}
                 />
               </div>
             )}
