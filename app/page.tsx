@@ -89,7 +89,7 @@ const DATA_FREQUENCY_OPTIONS = [
 type DataFrequencyOption = typeof DATA_FREQUENCY_OPTIONS[number];
 type DataFrequencyId = DataFrequencyOption['id'];
 
-const DEFAULT_DATA_FREQUENCY_ID: DataFrequencyId = '1d';
+const DEFAULT_DATA_FREQUENCY_ID: DataFrequencyId = '1h';
 const DEFAULT_FREQUENCY_OPTION =
   DATA_FREQUENCY_OPTIONS.find(option => option.id === DEFAULT_DATA_FREQUENCY_ID)!;
 
@@ -135,8 +135,9 @@ export default function Home() {
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
-  const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
+  const [chartType, setChartType] = useState<'line' | 'candlestick'>('line');
   const [showVolume, setShowVolume] = useState(true);
+  const [showPatterns, setShowPatterns] = useState(false);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
   const [dataInterval, setDataInterval] = useState<string>(DEFAULT_FREQUENCY_OPTION.interval);
   const currentFrequency = React.useMemo(
@@ -1192,6 +1193,27 @@ export default function Home() {
                     <div className="text-xs" style={{ color: 'var(--text-5)' }}>Momentum</div>
                   </div>
                 </label>
+              
+              <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                background: showPatterns ? 'var(--bg-3)' : 'var(--bg-4)',
+                borderColor: showPatterns ? 'var(--accent)' : 'var(--bg-1)',
+                borderLeftWidth: showPatterns ? '3px' : '1px'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={showPatterns}
+                  onChange={(e) => setShowPatterns(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                  style={{
+                    borderColor: 'var(--bg-1)',
+                    background: showPatterns ? 'var(--accent)' : 'var(--bg-4)',
+                  }}
+                />
+                <div className="flex-1">
+                  <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Chart Patterns</div>
+                  <div className="text-xs" style={{ color: 'var(--text-5)' }}>(beta)</div>
+                </div>
+              </label>
               </div>
             </div>
 
@@ -1337,7 +1359,8 @@ export default function Home() {
                 forecastData={useProphetForecast ? prophetForecastData : forecastData}
                 chartType={chartType}
                 showVolume={showVolume}
-                patterns={chartPatterns}
+                patterns={showPatterns ? chartPatterns : []}
+                enablePatterns={showPatterns}
                 dataInterval={dataInterval}
               />
             </div>

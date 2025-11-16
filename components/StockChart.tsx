@@ -20,6 +20,7 @@ import {
   Cell,
 } from 'recharts';
 import { ChartDataPoint, ChartPattern } from '@/types';
+import { detectChartPatterns } from '@/lib/chartPatterns';
 
 const PATTERN_DIRECTION_STYLES: Record<
   ChartPattern['direction'],
@@ -50,6 +51,7 @@ interface StockChartProps {
   showVolume?: boolean;
   patterns?: ChartPattern[];
   dataInterval?: string;
+  enablePatterns?: boolean;
 }
 
 
@@ -64,6 +66,7 @@ export default function StockChart({
   showVolume = true,
   patterns = [],
   dataInterval = '1d',
+  enablePatterns = false,
 }: StockChartProps) {
   // Combine historical and forecast data - memoized to avoid recalculation
   const combinedData = React.useMemo(() => {
@@ -129,17 +132,72 @@ export default function StockChart({
   const [zoomLevel, setZoomLevel] = useState(1);
   const chartRef = React.useRef<HTMLDivElement>(null);
 
-  const visiblePatterns = React.useMemo(() => {
-    if (!patterns?.length) return [];
-    const start = brushRange.startIndex ?? 0;
-    const end = brushRange.endIndex ?? combinedData.length - 1;
-    const cappedEnd = Math.min(end, data.length - 1);
-    return patterns.filter(
-      pattern => pattern.endIndex >= start && pattern.startIndex <= cappedEnd
-    );
-  }, [patterns, brushRange, combinedData.length, data.length]);
+  const [viewPatterns, setViewPatterns] = useState<ChartPattern[]>(
+    enablePatterns ? patterns : []
+  );
 
-  const patternBadges = React.useMemo(() => patterns.slice(0, 6), [patterns]);
+  const clampIndex = React.useCallback(
+    (value: number, min: number, max: number) => {
+      return Math.min(Math.max(value, min), max);
+    },
+    []
+  );
+
+  const getTrimmedPatternDates = React.useCallback(
+    (pattern: ChartPattern) => {
+      if (!data.length) {
+        return {
+          startDate: pattern.startDate,
+          endDate: pattern.endDate,
+        };
+      }
+
+      const span = pattern.endIndex - pattern.startIndex;
+      if (span <= 2) {
+        const start = clampIndex(pattern.startIndex, 0, data.length - 1);
+        const end = clampIndex(pattern.endIndex, start, data.length - 1);
+        return {
+          startDate: data[start]?.date ?? pattern.startDate,
+          endDate: data[end]?.date ?? pattern.endDate,
+        };
+      }
+
+      const trim = Math.max(1, Math.floor(span * 0.2));
+      const trimmedStartIndex = clampIndex(pattern.startIndex + trim, 0, data.length - 2);
+      const trimmedEndIndex = clampIndex(
+        pattern.endIndex - trim,
+        trimmedStartIndex + 1,
+        data.length - 1
+      );
+
+      return {
+        startDate: data[trimmedStartIndex]?.date ?? pattern.startDate,
+        endDate: data[trimmedEndIndex]?.date ?? pattern.endDate,
+      };
+    },
+    [data, clampIndex]
+  );
+
+  const getTrimmedPatternPrices = React.useCallback((minPrice: number, maxPrice: number) => {
+    if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) {
+      return { y1: minPrice, y2: maxPrice };
+    }
+
+    const range = maxPrice - minPrice;
+    if (range <= 0) {
+      return { y1: minPrice, y2: maxPrice };
+    }
+
+      const pad = Math.max(range * 0.2, 0.015 * Math.max(Math.abs(maxPrice), Math.abs(minPrice)));
+    const y1 = minPrice + pad;
+    const y2 = maxPrice - pad;
+
+    if (y2 <= y1) {
+      return { y1: minPrice, y2: maxPrice };
+    }
+
+    return { y1, y2 };
+  }, []);
 
   const normalizedInterval = (dataInterval || '1d').toLowerCase();
   const isIntradayInterval = React.useMemo(() => {
@@ -190,6 +248,66 @@ export default function StockChart({
     setBrushKey(prev => prev + 1); // Force brush remount
     setActiveRange('default'); // Set default as active
   }, [historicalDataLength, combinedData.length, getStartIndexForDays]);
+
+  const visibleStartIndex = React.useMemo(() => {
+    if (!data.length) return 0;
+    return clampIndex(brushRange.startIndex ?? 0, 0, historicalDataLength - 1);
+  }, [brushRange.startIndex, clampIndex, data.length, historicalDataLength]);
+
+  const visibleEndIndex = React.useMemo(() => {
+    if (!data.length) return 0;
+    const historicalEnd = historicalDataLength - 1;
+    const end = Math.min(brushRange.endIndex ?? historicalEnd, historicalEnd);
+    return clampIndex(end, visibleStartIndex, historicalEnd);
+  }, [brushRange.endIndex, clampIndex, data.length, historicalDataLength, visibleStartIndex]);
+
+  const visibleData = React.useMemo(() => {
+    if (!data.length) return [];
+    return data.slice(visibleStartIndex, visibleEndIndex + 1);
+  }, [data, visibleStartIndex, visibleEndIndex]);
+
+  useEffect(() => {
+    if (!enablePatterns) {
+      setViewPatterns([]);
+      return;
+    }
+
+    const MIN_VISIBLE_POINTS = 25;
+    if (visibleData.length >= MIN_VISIBLE_POINTS) {
+      const recalculated = detectChartPatterns(visibleData);
+      if (recalculated.length) {
+        const shifted = recalculated.map(pattern => {
+          const globalStartIndex = pattern.startIndex + visibleStartIndex;
+          const globalEndIndex = pattern.endIndex + visibleStartIndex;
+          return {
+            ...pattern,
+            startIndex: globalStartIndex,
+            endIndex: globalEndIndex,
+            startDate: data[globalStartIndex]?.date ?? pattern.startDate,
+            endDate: data[globalEndIndex]?.date ?? pattern.endDate,
+          };
+        });
+        setViewPatterns(shifted);
+        return;
+      }
+    }
+    setViewPatterns(patterns);
+  }, [enablePatterns, visibleData, visibleStartIndex, data, patterns]);
+
+  const visiblePatterns = React.useMemo(() => {
+    if (!enablePatterns || !viewPatterns?.length) return [];
+    const start = brushRange.startIndex ?? 0;
+    const end = brushRange.endIndex ?? combinedData.length - 1;
+    const cappedEnd = Math.min(end, data.length - 1);
+    return viewPatterns.filter(
+      pattern => pattern.endIndex >= start && pattern.startIndex <= cappedEnd
+    );
+  }, [enablePatterns, viewPatterns, brushRange, combinedData.length, data.length]);
+
+  const patternBadges = React.useMemo(
+    () => visiblePatterns.slice(0, 6),
+    [visiblePatterns]
+  );
 
   const handleTimeRange = (range: number | 'all' | 'default') => {
     setActiveRange(range);
@@ -532,8 +650,8 @@ export default function StockChart({
         <strong style={{ color: 'var(--text-3)' }}>💡 Interactive Controls:</strong> Drag the brush at bottom to pan • Ctrl+Scroll to zoom • Keyboard: +/- zoom, R reset • Click buttons above
       </div>
 
-      {data.length > 0 && (
-        patterns.length > 0 ? (
+      {enablePatterns && data.length > 0 && (
+        visiblePatterns.length > 0 ? (
           <div
             className="mb-4 p-3 border"
             style={{
@@ -545,7 +663,7 @@ export default function StockChart({
               className="text-xs font-semibold uppercase tracking-wide"
               style={{ color: 'var(--text-4)' }}
             >
-              patterns ({patterns.length})
+              patterns WIP ({visiblePatterns.length})
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               {patternBadges.map(pattern => {
@@ -577,9 +695,17 @@ export default function StockChart({
             className="mb-4 text-xs italic"
             style={{ color: 'var(--text-5)' }}
           >
-            No Finviz-style patterns detected on this timeframe.
+            No patterns detected on this timeframe.
           </div>
         )
+      )}
+      {!enablePatterns && (
+        <div
+          className="mb-4 text-xs italic"
+          style={{ color: 'var(--text-5)' }}
+        >
+          Chart patterns overlay disabled (toggle in controls above).
+        </div>
       )}
 
       <div ref={chartRef} className="w-full h-[550px]">
@@ -670,6 +796,8 @@ export default function StockChart({
               typeof pattern.meta?.priceMax === 'number'
                 ? pattern.meta.priceMax
                 : priceExtents.max;
+            const { startDate, endDate } = getTrimmedPatternDates(pattern);
+            const { y1, y2 } = getTrimmedPatternPrices(minPrice, maxPrice);
             const labelValue = `${pattern.label} ${(pattern.confidence * 100).toFixed(
               0
             )}%`;
@@ -678,10 +806,10 @@ export default function StockChart({
               <ReferenceArea
                 key={`${pattern.id}-${pattern.startDate}`}
                 yAxisId="price"
-                x1={pattern.startDate}
-                x2={pattern.endDate}
-                y1={minPrice}
-                y2={maxPrice}
+                x1={startDate}
+                x2={endDate}
+                y1={y1}
+                y2={y2}
                 stroke={style.stroke}
                 fill={style.fill}
                 fillOpacity={0.08}

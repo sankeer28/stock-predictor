@@ -52,6 +52,13 @@ const MAX_PATTERNS_PER_TYPE = 2;
 const VOLATILITY_FLOOR = 0.002;
 const VOLATILITY_CAP = 0.2;
 const MAX_PATTERN_OVERLAP = 0.65;
+const MIN_CONFIDENCE_PER_TYPE: Partial<Record<ChartPatternType, number>> = {
+  double_top: 0.6,
+  double_bottom: 0.6,
+  head_and_shoulders: 0.65,
+  wedge_up: 0.55,
+  wedge_down: 0.55,
+};
 
 interface LineStats {
   slope: number;
@@ -505,7 +512,8 @@ function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const peaks = findLocalExtrema(closes, 3, 'max');
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const tolerance = getAdaptiveTolerance(0.009, volatilityPct, 1.6);
+  const baseTolerance = 0.012;
+  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.04);
   const minSeparation = 5;
   const results: ChartPattern[] = [];
 
@@ -554,7 +562,8 @@ function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
   const troughs = findLocalExtrema(closes, 3, 'min');
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const tolerance = getAdaptiveTolerance(0.009, volatilityPct, 1.6);
+  const baseTolerance = 0.012;
+  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.04);
   const minSeparation = 5;
   const results: ChartPattern[] = [];
 
@@ -736,6 +745,10 @@ function consolidatePatterns(patterns: ChartPattern[]): ChartPattern[] {
   const result: ChartPattern[] = [];
 
   for (const pattern of sorted) {
+    const minConfidence = MIN_CONFIDENCE_PER_TYPE[pattern.type];
+    if (typeof minConfidence === 'number' && pattern.confidence < minConfidence) {
+      continue;
+    }
     const count = perTypeCount.get(pattern.type) ?? 0;
     if (count >= MAX_PATTERNS_PER_TYPE) continue;
     const overlaps = result.some(
