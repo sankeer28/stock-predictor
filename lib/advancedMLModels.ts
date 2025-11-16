@@ -339,14 +339,103 @@ export async function generateCNNLSTMForecast(
 
 /**
  * Ensemble Model - Combines multiple predictions for better accuracy
- * Uses weighted average based on recent model performance
+ * FAST VERSION: Uses pre-computed predictions instead of retraining
+ * 
+ * @param existingPredictions - Already trained model predictions
+ * @param forecastDays - Number of days to forecast
+ */
+export function generateEnsembleFromPredictions(
+  existingPredictions: {
+    gru?: MLPrediction[] | null;
+    cnn?: MLPrediction[] | null;
+    cnnLstm?: MLPrediction[] | null;
+    lstm?: { predicted: number; date: string }[] | null;
+  },
+  forecastDays: number = 30
+): MLPrediction[] | null {
+  try {
+    // Collect all valid predictions
+    const validModels: MLPrediction[][] = [];
+    
+    if (existingPredictions.gru && existingPredictions.gru.length > 0) {
+      validModels.push(existingPredictions.gru);
+    }
+    if (existingPredictions.cnn && existingPredictions.cnn.length > 0) {
+      validModels.push(existingPredictions.cnn);
+    }
+    if (existingPredictions.cnnLstm && existingPredictions.cnnLstm.length > 0) {
+      validModels.push(existingPredictions.cnnLstm);
+    }
+    if (existingPredictions.lstm && existingPredictions.lstm.length > 0) {
+      // Convert LSTM format to MLPrediction format
+      validModels.push(existingPredictions.lstm.map(p => ({
+        date: p.date,
+        predicted: p.predicted,
+        algorithm: 'LSTM'
+      })));
+    }
+    
+    if (validModels.length < 2) {
+      console.warn('Not enough models for ensemble (need at least 2)');
+      return null;
+    }
+
+    // Combine predictions using weighted median approach
+    const ensemblePredictions: MLPrediction[] = [];
+
+    for (let i = 0; i < forecastDays; i++) {
+      // Get predictions from all models for this day
+      const predictions = validModels
+        .filter(model => i < model.length)
+        .map(model => model[i].predicted);
+      
+      if (predictions.length === 0) break;
+
+      // Use median instead of mean for robustness against outliers
+      const sortedPredictions = [...predictions].sort((a, b) => a - b);
+      const medianPrediction = sortedPredictions[Math.floor(sortedPredictions.length / 2)];
+      
+      // Calculate weighted average (more weight to values closer to median)
+      const weights = predictions.map(p => {
+        const distance = Math.abs(p - medianPrediction) / Math.max(medianPrediction, 1);
+        return Math.exp(-distance * 5); // Exponential weighting
+      });
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+      const weightedAvg = predictions.reduce((sum, p, idx) => sum + p * weights[idx], 0) / totalWeight;
+
+      // Blend median and weighted average (60% median for stability)
+      const finalPrediction = medianPrediction * 0.6 + weightedAvg * 0.4;
+
+      // Use date from first valid model
+      const date = validModels.find(m => i < m.length)?.[i].date || '';
+
+      ensemblePredictions.push({
+        date,
+        predicted: finalPrediction,
+        algorithm: 'Ensemble',
+      });
+    }
+
+    console.log(`✅ Ensemble created from ${validModels.length} models (instant, no retraining!)`);
+    return ensemblePredictions;
+  } catch (error) {
+    console.error('Ensemble error:', error);
+    return null;
+  }
+}
+
+/**
+ * DEPRECATED: Old slow version that retrains models
+ * Use generateEnsembleFromPredictions() instead
  */
 export async function generateEnsembleForecast(
   stockData: StockData[],
   forecastDays: number = 30,
   settings?: MLSettings
 ): Promise<MLPrediction[]> {
+  console.warn('⚠️ Using slow ensemble (retraining models). Use generateEnsembleFromPredictions() instead!');
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
+  
   try {
     // Generate predictions from multiple models
     const [gruPreds, cnnPreds, cnnLstmPreds] = await Promise.all([
@@ -355,43 +444,10 @@ export async function generateEnsembleForecast(
       generateCNNLSTMForecast(stockData, forecastDays, mlSettings).catch(() => null),
     ]);
 
-    // Filter out failed models
-    const validModels = [gruPreds, cnnPreds, cnnLstmPreds].filter(p => p !== null) as MLPrediction[][];
-    
-    if (validModels.length === 0) {
-      throw new Error('All ensemble models failed');
-    }
-
-    // Combine predictions using weighted average
-    const ensemblePredictions: MLPrediction[] = [];
-    const lastDate = new Date(stockData[stockData.length - 1].date);
-
-    for (let i = 0; i < forecastDays; i++) {
-      const predictions = validModels.map(model => model[i].predicted);
-      
-      // Use median instead of mean for robustness against outliers
-      const sortedPredictions = predictions.sort((a, b) => a - b);
-      const medianPrediction = sortedPredictions[Math.floor(sortedPredictions.length / 2)];
-      
-      // Also calculate weighted average (more weight to middle values)
-      const weights = predictions.map(p => {
-        const distance = Math.abs(p - medianPrediction) / medianPrediction;
-        return Math.exp(-distance * 5); // Exponential weighting
-      });
-      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-      const weightedAvg = predictions.reduce((sum, p, idx) => sum + p * weights[idx], 0) / totalWeight;
-
-      // Blend median and weighted average
-      const finalPrediction = medianPrediction * 0.6 + weightedAvg * 0.4;
-
-      ensemblePredictions.push({
-        date: new Date(lastDate.getTime() + (i + 1) * 86400000).toISOString().split('T')[0],
-        predicted: finalPrediction,
-        algorithm: 'Ensemble',
-      });
-    }
-
-    return ensemblePredictions;
+    return generateEnsembleFromPredictions(
+      { gru: gruPreds, cnn: cnnPreds, cnnLstm: cnnLstmPreds },
+      forecastDays
+    ) || [];
   } catch (error) {
     console.error('Ensemble error:', error);
     throw error;

@@ -291,8 +291,9 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
               ✨ OPTIMIZED FOR SERVERLESS
             </div>
             <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-              Models are optimized for fast training on Vercel. Removed redundant models (TFT was fake, removed Polynomial & Moving Average).
-              Added Prophet-Lite and Ensemble for better accuracy.
+              <strong>Speed Optimized:</strong> Ensemble now generates INSTANTLY (no retraining!). 
+              Removed fake TFT and redundant models. Added Prophet-Lite for trend analysis.
+              All neural networks optimized for Vercel serverless.
             </div>
           </div>
           

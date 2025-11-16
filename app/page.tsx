@@ -28,7 +28,7 @@ import {
   generateGRUForecast,
   generate1DCNNForecast,
   generateCNNLSTMForecast,
-  generateEnsembleForecast,
+  generateEnsembleFromPredictions,
 } from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
@@ -429,13 +429,14 @@ export default function Home() {
             // Wait for neural networks to complete
             const [gru, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
 
-            // Generate ensemble from successful neural network models
-            let ensemble = null;
-            try {
-              ensemble = await generateEnsembleForecast(stockResult.data, forecastHorizon, mlSettings);
+            // Generate ensemble INSTANTLY from already-trained models (no retraining!)
+            const ensemble = generateEnsembleFromPredictions(
+              { gru, cnn, cnnLstm, lstm },
+              forecastHorizon
+            );
+            
+            if (ensemble) {
               setMlPredictions(prev => ({ ...prev, ensemble }));
-            } catch (ensembleError) {
-              console.error('Ensemble model failed:', ensembleError);
             }
 
             // Save all predictions to cache
@@ -615,13 +616,14 @@ export default function Home() {
 
               const [gru, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
 
-              // Generate ensemble from successful models
-              let ensemble = null;
-              try {
-                ensemble = await generateEnsembleForecast(stockData, forecastHorizon, mlSettings);
+              // Generate ensemble INSTANTLY from already-trained models (no retraining!)
+              const ensemble = generateEnsembleFromPredictions(
+                { gru, cnn, cnnLstm, lstm },
+                forecastHorizon
+              );
+              
+              if (ensemble) {
                 setMlPredictions(prev => ({ ...prev, ensemble }));
-              } catch (ensembleError) {
-                console.error('Ensemble model failed:', ensembleError);
               }
 
               // Save all predictions to cache

@@ -85,8 +85,11 @@ export function calculateModelAccuracy(
   else if (overallScore >= 50) grade = 'D';
   else grade = 'F';
 
+  // Get algorithm name (handle both MLPrediction and MLForecast)
+  const algorithmName = 'algorithm' in predictions[0] ? predictions[0].algorithm : 'Unknown';
+
   return {
-    algorithm: predictions[0].algorithm,
+    algorithm: algorithmName,
     mape,
     rmse,
     mae,
@@ -165,8 +168,11 @@ export function backtestModel(
       else if (overallScore >= 50) grade = 'D';
       else grade = 'F';
 
+      // Get algorithm name (handle both MLPrediction and MLForecast)
+      const algorithmName = 'algorithm' in predictions[0] ? predictions[0].algorithm : 'Unknown';
+
       resolve({
-        algorithm: predictions[0].algorithm,
+        algorithm: algorithmName,
         mape,
         rmse,
         mae,

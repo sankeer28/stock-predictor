@@ -196,6 +196,7 @@ Query params:
 ## Recent Improvements (v2.0)
 
 **Optimized for Serverless Deployment:**
+- ✅ **INSTANT Ensemble**: No retraining! Combines existing predictions in <1ms
 - ✅ Removed fake TFT model (was just dense layers, not a real transformer)
 - ✅ Removed redundant models (Polynomial Regression, Moving Average)
 - ✅ Added **Prophet-Lite**: Facebook Prophet-inspired forecasting with trend + seasonality
