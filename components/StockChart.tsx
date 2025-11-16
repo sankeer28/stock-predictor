@@ -18,6 +18,7 @@ import {
   Bar,
   BarChart,
   Cell,
+  Customized,
 } from 'recharts';
 import { ChartDataPoint, ChartPattern } from '@/types';
 import { detectChartPatterns } from '@/lib/chartPatterns';
@@ -38,6 +39,524 @@ const PATTERN_DIRECTION_STYLES: Record<
     stroke: 'oklch(72% 0.05 250)',
     fill: 'oklch(72% 0.05 250)',
   },
+};
+
+// Custom pattern renderer component with access to chart scales
+const PatternRenderer = ({ xAxisMap, yAxisMap, patterns, data }: any) => {
+  if (!patterns || !patterns.length || !xAxisMap || !yAxisMap) return null;
+  
+  const xScale = xAxisMap[0]?.scale;
+  const yScale = yAxisMap['price']?.scale;
+  
+  if (!xScale || !yScale) return null;
+
+  return (
+    <g className="pattern-overlays">
+      {patterns.map((pattern: ChartPattern) => {
+        const style = PATTERN_DIRECTION_STYLES[pattern.direction];
+        const patternData = data.slice(pattern.startIndex, Math.min(pattern.endIndex + 1, data.length));
+        
+        if (!patternData.length) return null;
+
+        const labelValue = `${pattern.label} ${(pattern.confidence * 100).toFixed(0)}%`;
+        
+        // Get coordinates - simpler approach
+        const x1 = xScale(pattern.startDate);
+        const x2 = xScale(pattern.endDate);
+        const midX = (x1 + x2) / 2;
+
+        // Calculate price range for the pattern
+        const prices = patternData.map((d: ChartDataPoint) => [d.low || d.close, d.high || d.close, d.close]).flat().filter(p => p);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+
+        switch (pattern.type) {
+          case 'trendline_support':
+          case 'trendline_resistance': {
+            const isSupport = pattern.type === 'trendline_support';
+            const trendPrices = patternData.map((d: ChartDataPoint) => isSupport ? (d.low || d.close) : (d.high || d.close));
+            const y1 = yScale(trendPrices[0]);
+            const y2 = yScale(trendPrices[trendPrices.length - 1]);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Diagonal trendline */}
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={style.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="8 4"
+                  opacity={0.85}
+                />
+                {/* Label */}
+                <text
+                  x={midX}
+                  y={Math.min(y1, y2) - 10}
+                  fill={style.stroke}
+                  fontSize={11}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="middle"
+                >
+                  {labelValue}
+                </text>
+                {/* Touch point circles */}
+                {patternData.map((d: ChartDataPoint, i: number) => {
+                  const price = isSupport ? (d.low || d.close) : (d.high || d.close);
+                  const px = x1 + (x2 - x1) * (i / (patternData.length - 1));
+                  const py = yScale(price);
+                  const lineY = y1 + (y2 - y1) * (i / (patternData.length - 1));
+                  if (Math.abs(py - lineY) < 10) {
+                    return (
+                      <circle
+                        key={i}
+                        cx={px}
+                        cy={py}
+                        r={3}
+                        fill={style.fill}
+                        opacity={0.7}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </g>
+            );
+          }
+
+          case 'wedge_up':
+          case 'wedge_down':
+          case 'wedge': {
+            const highs = patternData.map((d: ChartDataPoint) => d.high || d.close);
+            const lows = patternData.map((d: ChartDataPoint) => d.low || d.close);
+            const y1High = yScale(highs[0]);
+            const y2High = yScale(highs[highs.length - 1]);
+            const y1Low = yScale(lows[0]);
+            const y2Low = yScale(lows[lows.length - 1]);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Wedge fill */}
+                <path
+                  d={`M ${x1} ${y1High} L ${x2} ${y2High} L ${x2} ${y2Low} L ${x1} ${y1Low} Z`}
+                  fill={style.fill}
+                  fillOpacity={0.08}
+                  stroke="none"
+                />
+                {/* Upper line */}
+                <line
+                  x1={x1}
+                  y1={y1High}
+                  x2={x2}
+                  y2={y2High}
+                  stroke={style.stroke}
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  opacity={0.7}
+                />
+                {/* Lower line */}
+                <line
+                  x1={x1}
+                  y1={y1Low}
+                  x2={x2}
+                  y2={y2Low}
+                  stroke={style.stroke}
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  opacity={0.7}
+                />
+                {/* Label */}
+                <text
+                  x={midX}
+                  y={(y1High + y2High + y1Low + y2Low) / 4}
+                  fill={style.stroke}
+                  fontSize={11}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="middle"
+                >
+                  {labelValue}
+                </text>
+                {/* Convergence arrows */}
+                <path
+                  d={`M ${x2 - 20} ${y2High + 10} L ${x2 - 10} ${(y2High + y2Low) / 2} L ${x2 - 20} ${y2Low - 10}`}
+                  stroke={style.stroke}
+                  strokeWidth={1.5}
+                  fill="none"
+                  opacity={0.6}
+                />
+              </g>
+            );
+          }
+
+          case 'triangle_ascending':
+          case 'triangle_descending':
+          case 'triangle_symmetrical': {
+            const highs = patternData.map((d: ChartDataPoint) => d.high || d.close);
+            const lows = patternData.map((d: ChartDataPoint) => d.low || d.close);
+            const maxHigh = Math.max(...highs);
+            const minLow = Math.min(...lows);
+            
+            let y1Upper, y2Upper, y1Lower, y2Lower;
+            
+            if (pattern.type === 'triangle_ascending') {
+              y1Upper = y2Upper = yScale(maxHigh);
+              y1Lower = yScale(lows[0]);
+              y2Lower = yScale(lows[lows.length - 1]);
+            } else if (pattern.type === 'triangle_descending') {
+              y1Upper = yScale(highs[0]);
+              y2Upper = yScale(highs[highs.length - 1]);
+              y1Lower = y2Lower = yScale(minLow);
+            } else {
+              y1Upper = yScale(highs[0]);
+              y2Upper = yScale(highs[highs.length - 1]);
+              y1Lower = yScale(lows[0]);
+              y2Lower = yScale(lows[lows.length - 1]);
+            }
+            
+            return (
+              <g key={pattern.id}>
+                {/* Triangle fill */}
+                <path
+                  d={`M ${x1} ${y1Upper} L ${x2} ${y2Upper} L ${x2} ${y2Lower} L ${x1} ${y1Lower} Z`}
+                  fill={style.fill}
+                  fillOpacity={0.1}
+                  stroke={style.stroke}
+                  strokeWidth={1.5}
+                  strokeDasharray="5 3"
+                  opacity={0.5}
+                />
+                {/* Upper line */}
+                <line
+                  x1={x1}
+                  y1={y1Upper}
+                  x2={x2}
+                  y2={y2Upper}
+                  stroke={style.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="6 3"
+                  opacity={0.8}
+                />
+                {/* Lower line */}
+                <line
+                  x1={x1}
+                  y1={y1Lower}
+                  x2={x2}
+                  y2={y2Lower}
+                  stroke={style.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="6 3"
+                  opacity={0.8}
+                />
+                {/* Label */}
+                <text
+                  x={midX}
+                  y={(y1Upper + y2Upper + y1Lower + y2Lower) / 4}
+                  fill={style.stroke}
+                  fontSize={11}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="middle"
+                >
+                  {labelValue}
+                </text>
+                {/* Breakout arrow */}
+                {pattern.direction !== 'neutral' && (
+                  <path
+                    d={pattern.direction === 'bullish'
+                      ? `M ${x2 + 5} ${(y2Upper + y2Lower) / 2} L ${x2 + 15} ${(y2Upper + y2Lower) / 2 - 10} M ${x2 + 5} ${(y2Upper + y2Lower) / 2} L ${x2 + 15} ${(y2Upper + y2Lower) / 2 + 10}`
+                      : `M ${x2 + 5} ${(y2Upper + y2Lower) / 2} L ${x2 + 15} ${(y2Upper + y2Lower) / 2 + 10} M ${x2 + 5} ${(y2Upper + y2Lower) / 2} L ${x2 + 15} ${(y2Upper + y2Lower) / 2 - 10}`
+                    }
+                    stroke={style.stroke}
+                    strokeWidth={2}
+                    fill="none"
+                    opacity={0.7}
+                  />
+                )}
+              </g>
+            );
+          }
+
+          case 'channel_up':
+          case 'channel_down':
+          case 'channel': {
+            const highs = patternData.map((d: ChartDataPoint) => d.high || d.close);
+            const lows = patternData.map((d: ChartDataPoint) => d.low || d.close);
+            const y1High = yScale(highs[0]);
+            const y2High = yScale(highs[highs.length - 1]);
+            const y1Low = yScale(lows[0]);
+            const y2Low = yScale(lows[lows.length - 1]);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Channel fill */}
+                <path
+                  d={`M ${x1} ${y1High} L ${x2} ${y2High} L ${x2} ${y2Low} L ${x1} ${y1Low} Z`}
+                  fill={style.fill}
+                  fillOpacity={0.06}
+                  stroke="none"
+                />
+                {/* Upper line */}
+                <line
+                  x1={x1}
+                  y1={y1High}
+                  x2={x2}
+                  y2={y2High}
+                  stroke={style.stroke}
+                  strokeWidth={2}
+                  strokeDasharray="8 4"
+                  opacity={0.7}
+                />
+                {/* Lower line */}
+                <line
+                  x1={x1}
+                  y1={y1Low}
+                  x2={x2}
+                  y2={y2Low}
+                  stroke={style.stroke}
+                  strokeWidth={2}
+                  strokeDasharray="8 4"
+                  opacity={0.7}
+                />
+                {/* Label */}
+                <text
+                  x={midX}
+                  y={(y1High + y2High + y1Low + y2Low) / 4}
+                  fill={style.stroke}
+                  fontSize={11}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="middle"
+                >
+                  {labelValue}
+                </text>
+                {/* Parallel indicators */}
+                <line x1={midX - 15} y1={(y1High + y2High) / 2} x2={midX - 15} y2={(y1Low + y2Low) / 2} stroke={style.stroke} strokeWidth={1.5} opacity={0.5} />
+                <line x1={midX + 15} y1={(y1High + y2High) / 2} x2={midX + 15} y2={(y1Low + y2Low) / 2} stroke={style.stroke} strokeWidth={1.5} opacity={0.5} />
+              </g>
+            );
+          }
+
+          case 'double_top':
+          case 'double_bottom': {
+            const level = pattern.meta?.level as number || (pattern.type === 'double_top' ? maxPrice : minPrice);
+            const isTop = pattern.type === 'double_top';
+            const yLevel = yScale(level);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Level line */}
+                <line
+                  x1={x1}
+                  y1={yLevel}
+                  x2={x2}
+                  y2={yLevel}
+                  stroke={style.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="6 3"
+                  opacity={0.8}
+                />
+                {/* Label with background */}
+                <rect
+                  x={x1 + 5}
+                  y={yLevel + (isTop ? -20 : 5)}
+                  width={labelValue.length * 6.5}
+                  height={14}
+                  fill="oklch(23% 0 0)"
+                  fillOpacity={0.85}
+                  rx={2}
+                />
+                <text
+                  x={x1 + 8}
+                  y={yLevel + (isTop ? -9 : 16)}
+                  fill={style.stroke}
+                  fontSize={10}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="start"
+                >
+                  {labelValue}
+                </text>
+              </g>
+            );
+          }
+
+          case 'head_and_shoulders': {
+            const head = pattern.meta?.head as number || maxPrice;
+            const neckline = pattern.meta?.neckline as number || minPrice;
+            const yHead = yScale(head);
+            const yNeckline = yScale(neckline);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Pattern area - subtle */}
+                <rect
+                  x={x1}
+                  y={yHead}
+                  width={x2 - x1}
+                  height={Math.abs(yNeckline - yHead)}
+                  fill={style.fill}
+                  fillOpacity={0.05}
+                  stroke="none"
+                />
+                {/* Neckline - main feature */}
+                <line
+                  x1={x1}
+                  y1={yNeckline}
+                  x2={x2}
+                  y2={yNeckline}
+                  stroke={style.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="8 4"
+                  opacity={0.85}
+                />
+                {/* Label with background */}
+                <rect
+                  x={x1 + 5}
+                  y={yHead - 20}
+                  width={labelValue.length * 6.5}
+                  height={14}
+                  fill="oklch(23% 0 0)"
+                  fillOpacity={0.85}
+                  rx={2}
+                />
+                <text
+                  x={x1 + 8}
+                  y={yHead - 9}
+                  fill={style.stroke}
+                  fontSize={10}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="start"
+                >
+                  {labelValue}
+                </text>
+              </g>
+            );
+          }
+
+          case 'horizontal_sr': {
+            const resistance = pattern.meta?.resistance as number;
+            const support = pattern.meta?.support as number;
+            
+            if (!resistance || !support) return null;
+            
+            const yResistance = yScale(resistance);
+            const ySupport = yScale(support);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Zone fill */}
+                <rect
+                  x={x1}
+                  y={yResistance}
+                  width={x2 - x1}
+                  height={ySupport - yResistance}
+                  fill={style.fill}
+                  fillOpacity={0.08}
+                  stroke="none"
+                />
+                {/* Resistance line */}
+                <line
+                  x1={x1}
+                  y1={yResistance}
+                  x2={x2}
+                  y2={yResistance}
+                  stroke={style.stroke}
+                  strokeWidth={2}
+                  strokeDasharray="6 2"
+                  opacity={0.8}
+                />
+                {/* Support line */}
+                <line
+                  x1={x1}
+                  y1={ySupport}
+                  x2={x2}
+                  y2={ySupport}
+                  stroke={style.stroke}
+                  strokeWidth={2}
+                  strokeDasharray="6 2"
+                  opacity={0.8}
+                />
+                {/* Labels with backgrounds */}
+                <rect
+                  x={x1 + 5}
+                  y={yResistance - 18}
+                  width={Math.max(labelValue.length * 6.5, 120)}
+                  height={14}
+                  fill="oklch(23% 0 0)"
+                  fillOpacity={0.85}
+                  rx={2}
+                />
+                <text
+                  x={x1 + 8}
+                  y={yResistance - 7}
+                  fill={style.stroke}
+                  fontSize={10}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="start"
+                >
+                  {labelValue}
+                </text>
+              </g>
+            );
+          }
+
+          case 'multiple_top':
+          case 'multiple_bottom': {
+            const level = pattern.meta?.level as number || (pattern.type === 'multiple_top' ? maxPrice : minPrice);
+            const touches = pattern.meta?.touches as number || 3;
+            const isTop = pattern.type === 'multiple_top';
+            const yLevel = yScale(level);
+            
+            return (
+              <g key={pattern.id}>
+                {/* Level line */}
+                <line
+                  x1={x1}
+                  y1={yLevel}
+                  x2={x2}
+                  y2={yLevel}
+                  stroke={style.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="5 3"
+                  opacity={0.8}
+                />
+                {/* Label with background */}
+                <rect
+                  x={x1 + 5}
+                  y={yLevel + (isTop ? -20 : 5)}
+                  width={Math.max(labelValue.length * 6.5, 100)}
+                  height={14}
+                  fill="oklch(23% 0 0)"
+                  fillOpacity={0.85}
+                  rx={2}
+                />
+                <text
+                  x={x1 + 8}
+                  y={yLevel + (isTop ? -9 : 16)}
+                  fill={style.stroke}
+                  fontSize={10}
+                  fontWeight={600}
+                  fontFamily="DM Mono, monospace"
+                  textAnchor="start"
+                >
+                  {labelValue} • {touches}×
+                </text>
+              </g>
+            );
+          }
+
+          default:
+            return null;
+        }
+      })}
+    </g>
+  );
 };
 
 interface StockChartProps {
@@ -786,47 +1305,10 @@ export default function StockChart({
             }}
           />
 
-          {visiblePatterns.map(pattern => {
-            const style = PATTERN_DIRECTION_STYLES[pattern.direction];
-            const minPrice =
-              typeof pattern.meta?.priceMin === 'number'
-                ? pattern.meta.priceMin
-                : priceExtents.min;
-            const maxPrice =
-              typeof pattern.meta?.priceMax === 'number'
-                ? pattern.meta.priceMax
-                : priceExtents.max;
-            const { startDate, endDate } = getTrimmedPatternDates(pattern);
-            const { y1, y2 } = getTrimmedPatternPrices(minPrice, maxPrice);
-            const labelValue = `${pattern.label} ${(pattern.confidence * 100).toFixed(
-              0
-            )}%`;
-
-            return (
-              <ReferenceArea
-                key={`${pattern.id}-${pattern.startDate}`}
-                yAxisId="price"
-                x1={startDate}
-                x2={endDate}
-                y1={y1}
-                y2={y2}
-                stroke={style.stroke}
-                fill={style.fill}
-                fillOpacity={0.08}
-                strokeOpacity={0.6}
-                strokeDasharray="4 4"
-                ifOverflow="extendDomain"
-                label={{
-                  value: labelValue,
-                  position: 'top',
-                  fill: style.stroke,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  fontFamily: 'DM Mono, monospace',
-                }}
-              />
-            );
-          })}
+          {/* All Pattern Overlays - Now using custom renderer with proper coordinates */}
+          {enablePatterns && visiblePatterns.length > 0 && (
+            <Customized component={(props: any) => <PatternRenderer {...props} patterns={visiblePatterns} data={data} />} />
+          )}
 
           {/* Brush for zooming and panning */}
           <Brush
