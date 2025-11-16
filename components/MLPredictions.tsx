@@ -281,22 +281,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
         )}
 
         {/* Algorithm Info */}
-        <div className="mt-6 space-y-3">
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: '#f59e0b',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-2" style={{ color: '#f59e0b', fontWeight: 'bold' }}>
-              ✨ OPTIMIZED FOR SERVERLESS
-            </div>
-            <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-              <strong>Speed Optimized:</strong> Ensemble now generates INSTANTLY (no retraining!). 
-              Removed fake TFT and redundant models. Added Prophet-Lite for trend analysis.
-              All neural networks optimized for Vercel serverless.
-            </div>
-          </div>
-          
+        <div className="mt-6 space-y-3"> 
           <div className="p-3 border-2" style={{
             background: 'var(--bg-2)',
             borderColor: 'var(--info)',
