@@ -9,6 +9,7 @@ import TradingSignals from '@/components/TradingSignals';
 import Sidebar, { SearchHistoryItem } from '@/components/Sidebar';
 import CompanyInfo from '@/components/CompanyInfo';
 import MLPredictions from '@/components/MLPredictions';
+import PatternAnalysis from '@/components/PatternAnalysis';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { detectChartPatterns } from '@/lib/chartPatterns';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
@@ -1287,10 +1288,11 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--text-4)' }}>
+                  <label htmlFor="forecast-horizon" className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--text-4)' }}>
                     Days:
                   </label>
                   <input
+                    id="forecast-horizon"
                     type="number"
                     min="7"
                     max="90"
@@ -1485,6 +1487,14 @@ export default function Home() {
                 onRecalculate={() => fetchData(symbol, { forceRecalc: true })}
                 inlineMobile={true}
               />
+
+              {/* Pattern Analysis - Mobile */}
+              {chartPatterns.length > 0 && (
+                <PatternAnalysis
+                  patterns={chartPatterns}
+                  inlineMobile={true}
+                />
+              )}
             </div>
           </>
         )}
@@ -1510,6 +1520,15 @@ export default function Home() {
                 fetchData(symbol, { forceRecalc: true }); // Force recalculation
               }}
             />
+
+            {/* Pattern Analysis - Below ML Predictions */}
+            {chartPatterns.length > 0 && (
+              <div className="mt-4">
+                <PatternAnalysis
+                  patterns={chartPatterns}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
