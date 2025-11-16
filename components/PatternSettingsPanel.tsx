@@ -59,7 +59,7 @@ export default function PatternSettingsPanel({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Settings className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-          <span className="card-label">Pattern Detection</span>
+          <span className="card-label">Pattern Detection Settings</span>
         </div>
         <button
           onClick={() => setExpanded(!expanded)}
