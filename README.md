@@ -9,7 +9,9 @@ A professional, real-time stock analysis platform built with Next.js 14, TypeScr
   - RSI (Relative Strength Index)
   - MACD (Moving Average Convergence Divergence)
   - Bollinger Bands
-  - Volume analysis- Finviz-style chart pattern detection (trendlines, wedges, triangles, channels, double tops/bottoms, head & shoulders) plotted directly on the price chart
+  - Volume analysis
+  - Finviz-style chart pattern detection (trendlines, wedges, triangles, channels, double tops/bottoms, head & shoulders) plotted directly on the price chart
+  - Multi-frequency price data presets (default 1D, plus 5m, 15m, 1H, 1W, 1M) with instant refetch and on-chart visualization
 - **Price Forecasting**: Hybrid forecasting using exponential smoothing and linear regression
 - **ML Predictions**: 9 optimized algorithms including:
   - **Deep Learning**: LSTM, GRU, CNN, CNN-LSTM (TensorFlow.js)

@@ -49,6 +49,7 @@ interface StockChartProps {
   chartType?: 'line' | 'candlestick';
   showVolume?: boolean;
   patterns?: ChartPattern[];
+  dataInterval?: string;
 }
 
 
@@ -62,6 +63,7 @@ export default function StockChart({
   chartType = 'line',
   showVolume = true,
   patterns = [],
+  dataInterval = '1d',
 }: StockChartProps) {
   // Combine historical and forecast data - memoized to avoid recalculation
   const combinedData = React.useMemo(() => {
@@ -119,7 +121,7 @@ export default function StockChart({
 
   const [brushKey, setBrushKey] = useState(0);
   const [brushRange, setBrushRange] = useState<{ startIndex: number; endIndex: number }>({
-    startIndex: Math.max(0, historicalDataLength - 30), // Show last 30 days of historical data
+    startIndex: Math.max(0, historicalDataLength - 30), // Initial placeholder; updated via effect below
     endIndex: combinedData.length - 1, // Include all forecast data
   });
 
@@ -139,9 +141,47 @@ export default function StockChart({
 
   const patternBadges = React.useMemo(() => patterns.slice(0, 6), [patterns]);
 
+  const normalizedInterval = (dataInterval || '1d').toLowerCase();
+  const isIntradayInterval = React.useMemo(() => {
+    return normalizedInterval.includes('m') || normalizedInterval.includes('h');
+  }, [normalizedInterval]);
+
+  const getStartIndexForDays = React.useCallback(
+    (days: number) => {
+      if (!data.length || !Number.isFinite(days) || days <= 0) {
+        return 0;
+      }
+
+      const lastHistoricalIndex = historicalDataLength - 1;
+      if (lastHistoricalIndex < 0) {
+        return 0;
+      }
+
+      const lastPoint = data[lastHistoricalIndex];
+      const lastTimestamp = Date.parse(lastPoint?.date ?? '');
+      if (Number.isNaN(lastTimestamp)) {
+        return Math.max(0, historicalDataLength - Math.ceil(days));
+      }
+
+      const cutoff = lastTimestamp - days * 24 * 60 * 60 * 1000;
+      for (let i = 0; i < historicalDataLength; i++) {
+        const pointTimestamp = Date.parse(data[i]?.date ?? '');
+        if (Number.isNaN(pointTimestamp)) {
+          continue;
+        }
+        if (pointTimestamp >= cutoff) {
+          return Math.max(0, i - 1);
+        }
+      }
+
+      return 0;
+    },
+    [data, historicalDataLength]
+  );
+
   // Update brush range when data changes - show recent history + forecast
   useEffect(() => {
-    const startIndex = Math.max(0, historicalDataLength - 30);
+    const startIndex = getStartIndexForDays(30);
     const endIndex = combinedData.length - 1; // Include forecast
     setBrushRange({
       startIndex,
@@ -149,7 +189,7 @@ export default function StockChart({
     });
     setBrushKey(prev => prev + 1); // Force brush remount
     setActiveRange('default'); // Set default as active
-  }, [historicalDataLength, combinedData.length]);
+  }, [historicalDataLength, combinedData.length, getStartIndexForDays]);
 
   const handleTimeRange = (range: number | 'all' | 'default') => {
     setActiveRange(range);
@@ -157,7 +197,7 @@ export default function StockChart({
     
     if (range === 'default') {
       // Show last 30 days + forecast
-      const startIndex = Math.max(0, historicalDataLength - 30);
+      const startIndex = getStartIndexForDays(30);
       const endIndex = combinedData.length - 1;
       setBrushRange({ startIndex, endIndex });
       setBrushKey(prev => prev + 1); // Force brush remount
@@ -168,7 +208,7 @@ export default function StockChart({
     } else {
       // Show last N days of historical data (not including forecast)
       const endIndex = historicalDataLength - 1;
-      const startIndex = Math.max(0, historicalDataLength - range);
+      const startIndex = getStartIndexForDays(range);
       setBrushRange({
         startIndex,
         endIndex,
@@ -253,7 +293,22 @@ export default function StockChart({
     const date = new Date(dateStr);
     const { startIndex, endIndex } = brushRange;
     const visibleRange = endIndex - startIndex;
-    
+
+    if (Number.isNaN(date.getTime())) {
+      return dateStr;
+    }
+
+    if (isIntradayInterval) {
+      const showDate = visibleRange > 400;
+      return date.toLocaleString('en-US', {
+        month: showDate ? 'short' : undefined,
+        day: showDate ? 'numeric' : undefined,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+
     // Show year if viewing more than 180 days (6 months)
     if (visibleRange > 180) {
       // For long ranges, show abbreviated format with year
@@ -262,10 +317,33 @@ export default function StockChart({
         day: 'numeric',
         year: '2-digit' // Use 2-digit year (e.g., '23 instead of 2023)
       });
-    } else {
-      // For short ranges, just month and day
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
+
+    // For short ranges, just month and day
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatTooltipLabel = (dateStr: string) => {
+    const date = new Date(dateStr);
+    if (Number.isNaN(date.getTime())) {
+      return dateStr;
+    }
+
+    if (isIntradayInterval) {
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric' 
+    });
   };
 
   const formatPrice = (value: number | undefined | null) => {
@@ -560,15 +638,7 @@ export default function StockChart({
               if (value === undefined || value === null) return 'N/A';
               return formatPrice(Number(value));
             }}
-            labelFormatter={(dateStr: string) => {
-              // Tooltip always shows full date with year for clarity
-              const date = new Date(dateStr);
-              return date.toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric',
-                year: 'numeric' 
-              });
-            }}
+            labelFormatter={formatTooltipLabel}
             contentStyle={{
               backgroundColor: 'oklch(23% 0 0)',
               border: '2px solid oklch(70% 0.12 170)',

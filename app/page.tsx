@@ -35,10 +35,76 @@ import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint, ChartPattern } from '@/types';
 import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '@/lib/predictionsCache';
 
+const DATA_FREQUENCY_OPTIONS = [
+  {
+    id: '5m' as const,
+    label: '5m',
+    interval: '5m',
+    days: 25,
+    description: '5-minute bars • ~1 month',
+    category: 'intraday' as const,
+  },
+  {
+    id: '15m' as const,
+    label: '15m',
+    interval: '15m',
+    days: 60,
+    description: '15-minute bars • last 3 months',
+    category: 'intraday' as const,
+  },
+  {
+    id: '1h' as const,
+    label: '1H',
+    interval: '60m',
+    days: 365,
+    description: 'Hourly bars • last year',
+    category: 'intraday' as const,
+  },
+  {
+    id: '1d' as const,
+    label: '1D',
+    interval: '1d',
+    days: 1825,
+    description: 'Daily bars • 5 years',
+    category: 'session' as const,
+  },
+  {
+    id: '1wk' as const,
+    label: '1W',
+    interval: '1wk',
+    days: 1825,
+    description: 'Weekly bars • 5 years',
+    category: 'session' as const,
+  },
+  {
+    id: '1mo' as const,
+    label: '1M',
+    interval: '1mo',
+    days: 1825,
+    description: 'Monthly bars • 5 years',
+    category: 'session' as const,
+  },
+] as const;
+
+type DataFrequencyOption = typeof DATA_FREQUENCY_OPTIONS[number];
+type DataFrequencyId = DataFrequencyOption['id'];
+
+const DEFAULT_DATA_FREQUENCY_ID: DataFrequencyId = '1d';
+const DEFAULT_FREQUENCY_OPTION =
+  DATA_FREQUENCY_OPTIONS.find(option => option.id === DEFAULT_DATA_FREQUENCY_ID)!;
+
+const getFrequencyOption = (id?: DataFrequencyId): DataFrequencyOption =>
+  id ? DATA_FREQUENCY_OPTIONS.find(option => option.id === id) ?? DEFAULT_FREQUENCY_OPTION : DEFAULT_FREQUENCY_OPTION;
+
+type FetchDataOptions = {
+  forceRecalc?: boolean;
+  skipMLCalculations?: boolean;
+  frequencyId?: DataFrequencyId;
+};
+
 export default function Home() {
   const [symbol, setSymbol] = useState('AAPL');
   const [inputSymbol, setInputSymbol] = useState('AAPL');
-  const [days, setDays] = useState(1825); // 5 years of data
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -69,8 +135,14 @@ export default function Home() {
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
-  const [chartType, setChartType] = useState<'line' | 'candlestick'>('line');
+  const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
   const [showVolume, setShowVolume] = useState(true);
+  const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
+  const [dataInterval, setDataInterval] = useState<string>(DEFAULT_FREQUENCY_OPTION.interval);
+  const currentFrequency = React.useMemo(
+    () => getFrequencyOption(dataFrequencyId),
+    [dataFrequencyId]
+  );
 
   // Optimize chart type changes to avoid blocking UI
   const handleChartTypeChange = (type: 'line' | 'candlestick') => {
@@ -241,7 +313,15 @@ export default function Home() {
     }
   };
 
-  const fetchData = async (stockSymbol: string, forceRecalc: boolean = false, skipMLCalculations: boolean = false) => {
+  const fetchData = async (
+    stockSymbol: string,
+    options: FetchDataOptions = {}
+  ) => {
+    const { forceRecalc = false, skipMLCalculations = false, frequencyId } = options;
+    const targetFrequency = getFrequencyOption(frequencyId ?? dataFrequencyId);
+    const intervalParam = targetFrequency.interval;
+    const rangeDays = targetFrequency.days;
+
     setLoading(true);
     setError('');
     setNewsArticles([]); // Reset news to show loading state
@@ -251,8 +331,13 @@ export default function Home() {
     setMlTraining(false); // Reset training state
 
     try {
-      // Fetch stock data (5 years for full history)
-      const stockResponse = await fetch(`/api/stock?symbol=${stockSymbol}&days=1825`);
+      // Fetch stock data for the selected frequency/range
+      const params = new URLSearchParams({
+        symbol: stockSymbol,
+        days: String(rangeDays),
+        interval: intervalParam,
+      });
+      const stockResponse = await fetch(`/api/stock?${params.toString()}`);
       if (!stockResponse.ok) {
         throw new Error('Failed to fetch stock data');
       }
@@ -268,6 +353,7 @@ export default function Home() {
       setCompanyName(stockResult.companyName || stockSymbol);
   // Use client-side ET calculation to determine market status immediately
   setMarketState(getMarketStatus());
+      setDataInterval(stockResult.interval || intervalParam);
 
       // Fetch detailed company info from Massive API
       let massiveCompanyInfo = {};
@@ -739,7 +825,7 @@ export default function Home() {
     try {
       // Load the stock data for this symbol if different (skip ML calculations since we'll load from cache)
       if (cachedPred.symbol !== symbol) {
-        await fetchData(cachedPred.symbol, false, true); // forceRecalc=false, skipMLCalculations=true
+        await fetchData(cachedPred.symbol, { skipMLCalculations: true }); // Skip ML, just load data
       }
 
       // Update forecast horizon if different
@@ -759,6 +845,14 @@ export default function Home() {
         isLoadingFromCacheTable.current = false;
       }, 500);
     }
+  };
+
+  const handleFrequencyChange = (nextId: DataFrequencyId) => {
+    if (nextId === dataFrequencyId && stockData.length > 0 && !error) {
+      return;
+    }
+    setDataFrequencyId(nextId);
+    fetchData(symbol, { forceRecalc: true, frequencyId: nextId });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -1197,6 +1291,44 @@ export default function Home() {
                 </div>
               </div>
 
+              <div className="mb-4 border p-3" style={{ background: 'var(--bg-4)', borderColor: 'var(--bg-1)' }}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-4)' }}>
+                    Frequency
+                  </span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>
+                    {currentFrequency.description}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {DATA_FREQUENCY_OPTIONS.map(option => {
+                    const isActive = option.id === dataFrequencyId;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => handleFrequencyChange(option.id)}
+                        className="px-3 py-1.5 text-xs font-semibold border transition-all"
+                        style={{
+                          background: isActive ? 'var(--accent)' : 'var(--bg-3)',
+                          borderColor: isActive ? 'var(--accent)' : 'var(--bg-1)',
+                          color: isActive ? 'var(--text-0)' : 'var(--text-3)',
+                          opacity: loading && isActive ? 0.7 : 1,
+                        }}
+                        disabled={loading && isActive}
+                        title={option.description}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-[11px] mt-2" style={{ color: 'var(--text-5)' }}>
+                  {currentFrequency.category === 'intraday'
+                    ? 'Intraday data auto-limits the lookback based on Yahoo Finance constraints.'
+                    : 'Session data includes full historical coverage.'}
+                </div>
+              </div>
+
               <StockChart
                 data={chartData}
                 showMA20={showMA20}
@@ -1206,6 +1338,7 @@ export default function Home() {
                 chartType={chartType}
                 showVolume={showVolume}
                 patterns={chartPatterns}
+                dataInterval={dataInterval}
               />
             </div>
 
@@ -1326,7 +1459,7 @@ export default function Home() {
                 predictions={mlPredictions}
                 isTraining={mlTraining}
                 fromCache={mlFromCache}
-                onRecalculate={() => fetchData(symbol, true)}
+                onRecalculate={() => fetchData(symbol, { forceRecalc: true })}
                 inlineMobile={true}
               />
             </div>
@@ -1351,7 +1484,7 @@ export default function Home() {
               isTraining={mlTraining}
               fromCache={mlFromCache}
               onRecalculate={() => {
-                fetchData(symbol, true); // Pass true to force recalculation
+                fetchData(symbol, { forceRecalc: true }); // Force recalculation
               }}
             />
           </div>

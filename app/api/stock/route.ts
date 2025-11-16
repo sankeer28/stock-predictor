@@ -1,6 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StockData } from '@/types';
 
+const ALLOWED_INTERVALS = new Set([
+  '1m',
+  '2m',
+  '5m',
+  '15m',
+  '30m',
+  '60m',
+  '90m',
+  '1h',
+  '1d',
+  '5d',
+  '1wk',
+  '1mo',
+  '3mo',
+]);
+
+const INTERVAL_MAX_DAYS: Record<string, number> = {
+  '1m': 7,
+  '2m': 14,
+  '5m': 60,
+  '15m': 60,
+  '30m': 60,
+  '60m': 730,
+  '90m': 730,
+  '1h': 730,
+  '1d': 3650,
+  '5d': 3650,
+  '1wk': 3650,
+  '1mo': 3650,
+  '3mo': 3650,
+};
+
 /**
  * Fetch stock data from Yahoo Finance API
  * GET /api/stock?symbol=AAPL&days=365
@@ -8,7 +40,12 @@ import { StockData } from '@/types';
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const symbol = searchParams.get('symbol');
-  const days = parseInt(searchParams.get('days') || '365');
+  const requestedDays = parseInt(searchParams.get('days') || '365', 10);
+  const requestedInterval = (searchParams.get('interval') || '1d').toLowerCase();
+  const interval = ALLOWED_INTERVALS.has(requestedInterval) ? requestedInterval : '1d';
+  const maxDaysForInterval = INTERVAL_MAX_DAYS[interval] ?? 1825;
+  const fallbackDays = Number.isFinite(requestedDays) && requestedDays > 0 ? requestedDays : 365;
+  const effectiveDays = Math.min(fallbackDays, maxDaysForInterval);
 
   if (!symbol) {
     return NextResponse.json(
@@ -18,14 +55,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[Stock API] Fetching data for ${symbol}, days: ${days}`);
+    console.log(`[Stock API] Fetching data for ${symbol}, days: ${effectiveDays}, interval: ${interval}`);
 
-    // Calculate date range - add a day buffer to ensure we get the latest data
-    const endDate = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
-    const startDate = endDate - ((days + 1) * 24 * 60 * 60);
+    // Calculate date range - add a buffer only for daily+ data to avoid exceeding intraday limits
+    const isIntradayInterval = interval.includes('m') || interval === '60m' || interval === '90m' || interval === '1h';
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const daySeconds = 24 * 60 * 60;
+    const endDate = isIntradayInterval ? nowSeconds : nowSeconds + daySeconds;
+    const lookbackDays = isIntradayInterval ? effectiveDays : effectiveDays + 1;
+    const startDate = endDate - (lookbackDays * daySeconds);
 
     // Fetch from Yahoo Finance
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=1d`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=${interval}`;
     console.log(`[Stock API] Requesting: ${url}`);
 
     const response = await fetch(url, {
@@ -76,7 +117,7 @@ export async function GET(request: NextRequest) {
     const stockData: StockData[] = timestamps.map((timestamp: number, index: number) => {
       // Convert timestamp to date string in UTC to avoid timezone issues
       const date = new Date(timestamp * 1000);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = date.toISOString();
 
       return {
         date: dateStr,
@@ -150,6 +191,7 @@ export async function GET(request: NextRequest) {
       changePercent,
       companyName: result.meta.longName || result.meta.shortName || result.meta.symbol,
       marketState: result.meta.marketState || 'UNKNOWN',
+      interval,
       companyInfo,
       data: validData,
     });
