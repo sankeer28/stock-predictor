@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Settings, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import {
   MLSettings,
@@ -19,7 +19,7 @@ interface MLSettingsPanelProps {
   inlineMobile?: boolean;
 }
 
-export default function MLSettingsPanel({
+const MLSettingsPanel = React.memo(function MLSettingsPanel({
   settings,
   onSettingsChange,
   onPresetChange,
@@ -29,19 +29,19 @@ export default function MLSettingsPanel({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const handlePresetChange = (preset: MLPreset) => {
+  const handlePresetChange = useCallback((preset: MLPreset) => {
     onPresetChange(preset);
     onSettingsChange(getPresetSettings(preset));
-  };
+  }, [onPresetChange, onSettingsChange]);
 
-  const handleSettingChange = (key: keyof MLSettings, value: number) => {
+  const handleSettingChange = useCallback((key: keyof MLSettings, value: number) => {
     const newSettings = { ...settings, [key]: value };
     onSettingsChange(newSettings);
     // If user manually changes a setting, switch to custom preset
     if (currentPreset !== 'custom') {
       onPresetChange('custom');
     }
-  };
+  }, [settings, onSettingsChange, currentPreset, onPresetChange]);
 
   return (
     <div className={`card mb-6 ${inlineMobile ? 'w-full' : 'w-80'}`}>
@@ -364,4 +364,6 @@ export default function MLSettingsPanel({
       )}
     </div>
   );
-}
+});
+
+export default MLSettingsPanel;

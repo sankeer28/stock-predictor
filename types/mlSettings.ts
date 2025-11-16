@@ -18,47 +18,47 @@ export interface MLSettings {
   validationSplit: number;
 }
 
-// Research-based settings optimized for stock time series prediction
-// Based on papers: "Deep Learning for Stock Prediction" (2019), "LSTM Networks for Stock Forecasting" (2020)
+// Balanced settings - Optimized for SPEED (most users will use this)
+// Fast training while maintaining good accuracy
 export const DEFAULT_ML_SETTINGS: MLSettings = {
-  epochs: 80,                    // Optimal: 50-150 for LSTM on stocks (with early stopping)
-  learningRate: 0.001,          // Adam optimizer standard (proven effective)
-  batchSize: 32,                // Good balance: memory vs convergence
-  lookbackWindow: 30,           // ~1 month history (standard for daily data)
-  dropout: 0.25,                // Increased from 0.1 (research shows 0.2-0.3 optimal for time series)
-  l2Regularization: 0.001,      // Light regularization (prevents overfitting)
+  epochs: 30,                    // Reduced from 50 for much faster training
+  learningRate: 0.0015,         // Slightly higher for faster convergence
+  batchSize: 128,               // Doubled from 64 (much faster per epoch)
+  lookbackWindow: 15,           // Reduced from 20 (faster processing)
+  dropout: 0.15,                // Reduced for speed
+  l2Regularization: 0.0005,     // Lighter regularization for speed
   dampingFactor: 0.7,           // Reduced from 0.5 (less aggressive dampening)
   confidenceInterval: 1.96,     // 95% confidence (statistical standard)
-  earlyStoppingPatience: 8,     // Increased from 5 (allow more time to improve)
-  validationSplit: 0.2,         // 80/20 train/validation split (standard)
+  earlyStoppingPatience: 4,     // Reduced from 6 (stop much earlier)
+  validationSplit: 0.1,         // Reduced from 0.15 (more training data, faster)
 };
 
-// Conservative: More regularization, less volatile predictions
+// Conservative: More accurate, slower training (for users who want best accuracy)
 export const CONSERVATIVE_SETTINGS: MLSettings = {
-  epochs: 60,                   // Fewer epochs (faster, less overfitting)
+  epochs: 80,                   // More epochs for better accuracy
   learningRate: 0.0005,         // Lower LR (more stable, slower learning)
-  batchSize: 32,
-  lookbackWindow: 60,           // Longer history (~2 months for stability)
-  dropout: 0.3,                 // Higher dropout (more regularization)
+  batchSize: 32,                // Smaller batches (more accurate updates)
+  lookbackWindow: 40,           // Longer history for more context
+  dropout: 0.3,                 // Higher dropout for better regularization
   l2Regularization: 0.01,       // Stronger L2 (prevent overfitting)
   dampingFactor: 0.8,           // Strong dampening (smooth predictions)
   confidenceInterval: 2.58,     // 99% confidence (wider bands)
-  earlyStoppingPatience: 6,     // Less patience (stop sooner)
-  validationSplit: 0.25,        // More validation data
+  earlyStoppingPatience: 10,    // More patience for better convergence
+  validationSplit: 0.25,        // More validation for better accuracy assessment
 };
 
 // Aggressive: Less regularization, more responsive to recent patterns
 export const AGGRESSIVE_SETTINGS: MLSettings = {
-  epochs: 100,                  // More epochs (learn complex patterns)
+  epochs: 60,                   // Reduced from 100 (early stopping prevents overtraining)
   learningRate: 0.0015,         // Higher LR (faster learning, slightly increased from 0.001)
-  batchSize: 16,                // Smaller batches (more frequent updates)
-  lookbackWindow: 20,           // Shorter history (~3 weeks, react faster)
+  batchSize: 64,                // Increased from 16 for much faster training
+  lookbackWindow: 15,           // Reduced from 20 for faster processing
   dropout: 0.15,                // Lower dropout (learn more patterns, but not too low)
   l2Regularization: 0.0001,     // Minimal regularization
   dampingFactor: 0.6,           // Light dampening (more volatile predictions)
   confidenceInterval: 1.64,     // 90% confidence (tighter bands)
-  earlyStoppingPatience: 10,    // More patience (train longer)
-  validationSplit: 0.15,        // Less validation (more training data)
+  earlyStoppingPatience: 8,     // Reduced from 10 (faster stopping)
+  validationSplit: 0.1,         // Reduced from 0.15 (more training data)
 };
 
 export const BALANCED_SETTINGS: MLSettings = DEFAULT_ML_SETTINGS;

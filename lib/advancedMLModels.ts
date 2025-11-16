@@ -220,20 +220,18 @@ export async function generateGRUForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build GRU model with multi-feature input (15 features)
+    // Build GRU model with multi-feature input (15 features) - highly optimized for speed
     const model = tf.sequential();
     model.add(tf.layers.gru({
-      units: 32,  // Increased from 24 for 15-feature processing
+      units: 16,  // Reduced from 24 for much faster training
       returnSequences: false,
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
       kernelInitializer: 'glorotUniform',
-      recurrentInitializer: 'glorotUniform',
+      recurrentInitializer: 'orthogonal',  // Faster initialization
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
-    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));  // Extra layer for complex patterns
-    model.add(tf.layers.dropout({ rate: mlSettings.dropout * 0.5 }));
-    model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
+    model.add(tf.layers.dense({ units: 1, activation: 'linear' }));  // Direct to output (simpler, faster)
 
     model.compile({
       optimizer: tf.train.adam(mlSettings.learningRate),
@@ -492,12 +490,12 @@ export async function generateCNNLSTMForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build Hybrid CNN-LSTM model with multi-feature input (15 features)
+    // Build Hybrid CNN-LSTM model with multi-feature input (15 features) - highly optimized for speed
     const model = tf.sequential();
 
     // CNN for feature extraction across multiple features
     model.add(tf.layers.conv1d({
-      filters: 24,  // Increased from 16 for 15-feature processing
+      filters: 12,  // Reduced from 16 for much faster training
       kernelSize: 2,
       activation: 'relu',
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
@@ -507,15 +505,14 @@ export async function generateCNNLSTMForecast(
 
     // LSTM for temporal modeling
     model.add(tf.layers.lstm({
-      units: 16,  // Increased from 12 for better temporal learning
+      units: 8,  // Reduced from 12 for much faster training
       returnSequences: false,
+      recurrentInitializer: 'orthogonal',  // Faster initialization
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
-    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));  // Increased from 4
-    model.add(tf.layers.dropout({ rate: mlSettings.dropout * 0.5 }));
-    model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
+    model.add(tf.layers.dense({ units: 1, activation: 'linear' }));  // Direct to output (simpler, faster)
 
     model.compile({
       optimizer: tf.train.adam(mlSettings.learningRate),
@@ -523,13 +520,30 @@ export async function generateCNNLSTMForecast(
       metrics: ['mae'],
     });
 
-    // Train
+    // Train with early stopping
+    let bestValLoss = Infinity;
+    let patienceCounter = 0;
+
     await model.fit(xsTensor, ysTensor, {
       epochs: mlSettings.epochs,
       batchSize: mlSettings.batchSize,
       validationSplit: mlSettings.validationSplit,
       shuffle: true,
       verbose: 0,
+      callbacks: {
+        onEpochEnd: (epoch, logs) => {
+          const valLoss = logs?.val_loss || Infinity;
+          if (valLoss < bestValLoss) {
+            bestValLoss = valLoss;
+            patienceCounter = 0;
+          } else {
+            patienceCounter++;
+          }
+          if (patienceCounter >= mlSettings.earlyStoppingPatience) {
+            model.stopTraining = true;
+          }
+        }
+      }
     });
 
     // Make predictions with multi-features

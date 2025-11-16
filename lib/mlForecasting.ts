@@ -44,25 +44,18 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
 function buildLSTMModel(lookback: number, settings: MLSettings): tf.Sequential {
   const model = tf.sequential();
 
-  // LSTM layer with optimized size for serverless
+  // LSTM layer highly optimized for speed
   model.add(tf.layers.lstm({
-    units: 24,  // Reduced from 32 for faster training on serverless
+    units: 16,  // Reduced from 20 for much faster training
     returnSequences: false,
     inputShape: [lookback, 1],
     kernelInitializer: 'glorotUniform',  // More stable than glorotNormal
-    recurrentInitializer: 'glorotUniform',
+    recurrentInitializer: 'orthogonal',  // Faster initialization
     kernelRegularizer: tf.regularizers.l2({ l2: settings.l2Regularization }),
   }));
   model.add(tf.layers.dropout({ rate: settings.dropout }));
 
-  // Simplified dense layer
-  model.add(tf.layers.dense({
-    units: 4,  // Reduced from 8 for faster inference
-    activation: 'relu',
-    kernelInitializer: 'glorotUniform',
-  }));
-
-  // Output layer with linear activation (better for regression)
+  // Direct to output layer (simpler, faster)
   model.add(tf.layers.dense({
     units: 1,
     activation: 'linear'

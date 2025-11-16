@@ -28,7 +28,6 @@ import {
 } from '@/lib/mlAlgorithms';
 import {
   generateGRUForecast,
-  generate1DCNNForecast,
   generateCNNLSTMForecast,
   generateEnsembleFromPredictions,
 } from '@/lib/advancedMLModels';
@@ -189,7 +188,6 @@ export default function Home() {
     prophetLite?: MLPrediction[];
     gru?: MLPrediction[];
     ensemble?: MLPrediction[];
-    cnn?: MLPrediction[];
     cnnLstm?: MLPrediction[];
     linearRegression?: MLPrediction[];
     ema?: MLPrediction[];
@@ -201,6 +199,15 @@ export default function Home() {
   // ML Settings
   const [mlSettings, setMlSettings] = useState<MLSettings>(DEFAULT_ML_SETTINGS);
   const [mlPreset, setMlPreset] = useState<MLPreset>('balanced');
+
+  // Memoize ML settings callbacks to prevent unnecessary re-renders
+  const handleMlSettingsChange = React.useCallback((newSettings: MLSettings) => {
+    setMlSettings(newSettings);
+  }, []);
+
+  const handleMlPresetChange = React.useCallback((newPreset: MLPreset) => {
+    setMlPreset(newPreset);
+  }, []);
 
   // Load search history and ML settings from localStorage on mount
   useEffect(() => {
@@ -534,16 +541,6 @@ export default function Home() {
                 return null;
               });
 
-            const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon, mlSettings)
-              .then(forecast => {
-                setMlPredictions(prev => ({ ...prev, cnn: forecast }));
-                return forecast;
-              })
-              .catch(err => {
-                console.error('CNN failed:', err);
-                return null;
-              });
-
             const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
@@ -565,11 +562,11 @@ export default function Home() {
               });
 
             // Wait for neural networks to complete
-            const [gru, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+            const [gru, cnnLstm, lstm] = await Promise.all([gruPromise, cnnLstmPromise, lstmPromise]);
 
             // Generate ensemble INSTANTLY from already-trained models (no retraining!)
             const ensemble = generateEnsembleFromPredictions(
-              { gru, cnn, cnnLstm, lstm },
+              { gru, cnnLstm, lstm },
               forecastHorizon
             );
             
@@ -581,7 +578,6 @@ export default function Home() {
             const allPredictions = {
               ...predictions,
               ...(gru && { gru }),
-              ...(cnn && { cnn }),
               ...(cnnLstm && { cnnLstm }),
               ...(lstm && { lstm }),
               ...(ensemble && { ensemble }),
@@ -722,16 +718,6 @@ export default function Home() {
                   return null;
                 });
 
-              const cnnPromise = generate1DCNNForecast(stockData, forecastHorizon, mlSettings)
-                .then(forecast => {
-                  setMlPredictions(prev => ({ ...prev, cnn: forecast }));
-                  return forecast;
-                })
-                .catch(err => {
-                  console.error('CNN failed:', err);
-                  return null;
-                });
-
               const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
@@ -752,11 +738,11 @@ export default function Home() {
                   return null;
                 });
 
-              const [gru, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+              const [gru, cnnLstm, lstm] = await Promise.all([gruPromise, cnnLstmPromise, lstmPromise]);
 
               // Generate ensemble INSTANTLY from already-trained models (no retraining!)
               const ensemble = generateEnsembleFromPredictions(
-                { gru, cnn, cnnLstm, lstm },
+                { gru, cnnLstm, lstm },
                 forecastHorizon
               );
               
@@ -768,7 +754,6 @@ export default function Home() {
               const allPredictions = {
                 ...predictions,
                 ...(gru && { gru }),
-                ...(cnn && { cnn }),
                 ...(cnnLstm && { cnnLstm }),
                 ...(lstm && { lstm }),
                 ...(ensemble && { ensemble }),
@@ -1499,8 +1484,8 @@ export default function Home() {
               {/* ML Settings Panel */}
               <MLSettingsPanel
                 settings={mlSettings}
-                onSettingsChange={setMlSettings}
-                onPresetChange={setMlPreset}
+                onSettingsChange={handleMlSettingsChange}
+                onPresetChange={handleMlPresetChange}
                 currentPreset={mlPreset}
                 inlineMobile={true}
               />
@@ -1534,8 +1519,8 @@ export default function Home() {
             {/* ML Settings Panel */}
             <MLSettingsPanel
               settings={mlSettings}
-              onSettingsChange={setMlSettings}
-              onPresetChange={setMlPreset}
+              onSettingsChange={handleMlSettingsChange}
+              onPresetChange={handleMlPresetChange}
               currentPreset={mlPreset}
             />
 

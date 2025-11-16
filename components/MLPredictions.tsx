@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Brain, TrendingUp, Loader2, X, Menu } from 'lucide-react';
 import { MLPrediction } from '@/lib/mlAlgorithms';
 import { MLForecast } from '@/lib/mlForecasting';
@@ -13,7 +13,6 @@ interface MLPredictionsProps {
     prophetLite?: MLPrediction[];
     gru?: MLPrediction[];
     ensemble?: MLPrediction[];
-    cnn?: MLPrediction[];
     cnnLstm?: MLPrediction[];
     linearRegression?: MLPrediction[];
     ema?: MLPrediction[];
@@ -25,12 +24,12 @@ interface MLPredictionsProps {
   inlineMobile?: boolean;
 }
 
-export default function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate, inlineMobile }: MLPredictionsProps) {
+const MLPredictions = React.memo(function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate, inlineMobile }: MLPredictionsProps) {
   const [isOpen, setIsOpen] = useState<boolean>(!!inlineMobile);
   const [selectedDays, setSelectedDays] = useState<number>(7);
 
-  // Calculate summary statistics for each algorithm
-  const calculateStats = (preds: MLPrediction[] | MLForecast[] | undefined) => {
+  // Memoize the calculateStats function
+  const calculateStats = useCallback((preds: MLPrediction[] | MLForecast[] | undefined) => {
     if (!preds || preds.length === 0) return null;
 
     const targetIndex = Math.min(selectedDays - 1, preds.length - 1);
@@ -42,19 +41,19 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
       change,
       direction: change > 0 ? 'up' : 'down',
     };
-  };
+  }, [selectedDays, currentPrice]);
 
-  const algorithms = [
+  // Memoize the algorithms array to avoid recreation on every render
+  const algorithms = useMemo(() => [
     { name: '🏆 Ensemble', key: 'ensemble', data: predictions.ensemble, color: '#f59e0b', description: 'Best: Combines all models' },
     { name: 'LSTM', key: 'lstm', data: predictions.lstm, color: 'var(--accent)', description: 'Deep learning neural network' },
     { name: 'Prophet-Lite', key: 'prophetLite', data: predictions.prophetLite, color: '#10b981', description: 'Trend + seasonality analysis' },
     { name: 'GRU', key: 'gru', data: predictions.gru, color: '#3b82f6', description: 'Simplified LSTM, faster' },
     { name: 'CNN-LSTM', key: 'cnnLstm', data: predictions.cnnLstm, color: '#ec4899', description: 'Pattern recognition + time series' },
-    { name: '1D CNN', key: 'cnn', data: predictions.cnn, color: '#8b5cf6', description: 'Pattern recognition model' },
     { name: 'ARIMA', key: 'arima', data: predictions.arima, color: 'var(--info)', description: 'Statistical time series' },
     { name: 'Exponential MA', key: 'ema', data: predictions.ema, color: '#9333ea', description: 'Weighted moving average' },
     { name: 'Linear Regression', key: 'linearRegression', data: predictions.linearRegression, color: 'var(--success)', description: 'Simple trend analysis' },
-  ];
+  ], [predictions]);
 
   return (
     <>
@@ -63,6 +62,7 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-3 border-2 xl:hidden"
+          aria-label="Toggle ML Predictions"
           style={{
             position: 'fixed',
             right: '1rem',
@@ -304,4 +304,6 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
       )}
     </>
   );
-}
+});
+
+export default MLPredictions;
