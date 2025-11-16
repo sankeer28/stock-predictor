@@ -10,6 +10,7 @@ import Sidebar, { SearchHistoryItem } from '@/components/Sidebar';
 import CompanyInfo from '@/components/CompanyInfo';
 import MLPredictions from '@/components/MLPredictions';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
+import { detectChartPatterns } from '@/lib/chartPatterns';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateMLForecast, getMLForecastInsights, MLForecast } from '@/lib/mlForecasting';
 import { generateProphetWithChangepoints, ProphetForecast } from '@/lib/prophetForecast';
@@ -31,7 +32,7 @@ import {
   generateEnsembleFromPredictions,
 } from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
-import { StockData, NewsArticle, ChartDataPoint } from '@/types';
+import { StockData, NewsArticle, ChartDataPoint, ChartPattern } from '@/types';
 import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '@/lib/predictionsCache';
 
 export default function Home() {
@@ -49,6 +50,7 @@ export default function Home() {
   const [fundamentalsData, setFundamentalsData] = useState<any>(null);
   const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [chartPatterns, setChartPatterns] = useState<ChartPattern[]>([]);
   const [forecastData, setForecastData] = useState<any[]>([]);
   const [prophetForecastData, setProphetForecastData] = useState<ProphetForecast[]>([]);
   const [useProphetForecast, setUseProphetForecast] = useState(false);
@@ -77,6 +79,16 @@ export default function Home() {
       setChartType(type);
     }, 0);
   };
+
+  useEffect(() => {
+    if (!chartData.length) {
+      setChartPatterns([]);
+      return;
+    }
+
+    const patterns = detectChartPatterns(chartData);
+    setChartPatterns(patterns);
+  }, [chartData]);
 
   // ML predictions state
   const [mlPredictions, setMlPredictions] = useState<{
@@ -1193,6 +1205,7 @@ export default function Home() {
                 forecastData={useProphetForecast ? prophetForecastData : forecastData}
                 chartType={chartType}
                 showVolume={showVolume}
+                patterns={chartPatterns}
               />
             </div>
 

@@ -13,12 +13,31 @@ import {
   Area,
   ComposedChart,
   ReferenceLine,
+  ReferenceArea,
   Brush,
   Bar,
   BarChart,
   Cell,
 } from 'recharts';
-import { ChartDataPoint } from '@/types';
+import { ChartDataPoint, ChartPattern } from '@/types';
+
+const PATTERN_DIRECTION_STYLES: Record<
+  ChartPattern['direction'],
+  { stroke: string; fill: string }
+> = {
+  bullish: {
+    stroke: 'oklch(72% 0.15 150)',
+    fill: 'oklch(72% 0.15 150)',
+  },
+  bearish: {
+    stroke: 'oklch(72% 0.16 25)',
+    fill: 'oklch(72% 0.16 25)',
+  },
+  neutral: {
+    stroke: 'oklch(72% 0.05 250)',
+    fill: 'oklch(72% 0.05 250)',
+  },
+};
 
 interface StockChartProps {
   data: ChartDataPoint[];
@@ -29,6 +48,7 @@ interface StockChartProps {
   forecastData?: Array<{ date: string; predicted: number; upper: number; lower: number }>;
   chartType?: 'line' | 'candlestick';
   showVolume?: boolean;
+  patterns?: ChartPattern[];
 }
 
 
@@ -41,6 +61,7 @@ export default function StockChart({
   forecastData = [],
   chartType = 'line',
   showVolume = true,
+  patterns = [],
 }: StockChartProps) {
   // Combine historical and forecast data - memoized to avoid recalculation
   const combinedData = React.useMemo(() => {
@@ -73,6 +94,29 @@ export default function StockChart({
   // Calculate the index where forecast starts
   const historicalDataLength = data.length;
 
+  const priceExtents = React.useMemo(() => {
+    if (!data.length) {
+      return { min: 0, max: 0 };
+    }
+
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+
+    data.forEach(point => {
+      const low = typeof point.low === 'number' ? point.low : point.close;
+      const high = typeof point.high === 'number' ? point.high : point.close;
+      const close = point.close;
+
+      min = Math.min(min, low, close);
+      max = Math.max(max, high, close);
+    });
+
+    if (!isFinite(min)) min = 0;
+    if (!isFinite(max)) max = 0;
+
+    return { min, max };
+  }, [data]);
+
   const [brushKey, setBrushKey] = useState(0);
   const [brushRange, setBrushRange] = useState<{ startIndex: number; endIndex: number }>({
     startIndex: Math.max(0, historicalDataLength - 30), // Show last 30 days of historical data
@@ -82,6 +126,18 @@ export default function StockChart({
   const [activeRange, setActiveRange] = useState<number | 'all' | 'default' | null>('default');
   const [zoomLevel, setZoomLevel] = useState(1);
   const chartRef = React.useRef<HTMLDivElement>(null);
+
+  const visiblePatterns = React.useMemo(() => {
+    if (!patterns?.length) return [];
+    const start = brushRange.startIndex ?? 0;
+    const end = brushRange.endIndex ?? combinedData.length - 1;
+    const cappedEnd = Math.min(end, data.length - 1);
+    return patterns.filter(
+      pattern => pattern.endIndex >= start && pattern.startIndex <= cappedEnd
+    );
+  }, [patterns, brushRange, combinedData.length, data.length]);
+
+  const patternBadges = React.useMemo(() => patterns.slice(0, 6), [patterns]);
 
   // Update brush range when data changes - show recent history + forecast
   useEffect(() => {
@@ -398,6 +454,56 @@ export default function StockChart({
         <strong style={{ color: 'var(--text-3)' }}>💡 Interactive Controls:</strong> Drag the brush at bottom to pan • Ctrl+Scroll to zoom • Keyboard: +/- zoom, R reset • Click buttons above
       </div>
 
+      {data.length > 0 && (
+        patterns.length > 0 ? (
+          <div
+            className="mb-4 p-3 border"
+            style={{
+              background: 'var(--bg-3)',
+              borderColor: 'var(--bg-1)',
+            }}
+          >
+            <div
+              className="text-xs font-semibold uppercase tracking-wide"
+              style={{ color: 'var(--text-4)' }}
+            >
+              patterns ({patterns.length})
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {patternBadges.map(pattern => {
+                const colors = PATTERN_DIRECTION_STYLES[pattern.direction];
+                return (
+                  <span
+                    key={pattern.id}
+                    className="px-2 py-1 text-[11px] font-semibold border uppercase tracking-wide"
+                    style={{
+                      borderColor: colors.stroke,
+                      color: colors.stroke,
+                      background: 'var(--bg-4)',
+                    }}
+                    title={`${pattern.label} — ${(pattern.confidence * 100).toFixed(
+                      0
+                    )}% confidence`}
+                  >
+                    {pattern.label}{' '}
+                    <span style={{ color: 'var(--text-5)', fontWeight: 400 }}>
+                      {(pattern.confidence * 100).toFixed(0)}%
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="mb-4 text-xs italic"
+            style={{ color: 'var(--text-5)' }}
+          >
+            No Finviz-style patterns detected on this timeframe.
+          </div>
+        )
+      )}
+
       <div ref={chartRef} className="w-full h-[550px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
@@ -483,6 +589,46 @@ export default function StockChart({
               fontSize: '11px'
             }}
           />
+
+          {visiblePatterns.map(pattern => {
+            const style = PATTERN_DIRECTION_STYLES[pattern.direction];
+            const minPrice =
+              typeof pattern.meta?.priceMin === 'number'
+                ? pattern.meta.priceMin
+                : priceExtents.min;
+            const maxPrice =
+              typeof pattern.meta?.priceMax === 'number'
+                ? pattern.meta.priceMax
+                : priceExtents.max;
+            const labelValue = `${pattern.label} ${(pattern.confidence * 100).toFixed(
+              0
+            )}%`;
+
+            return (
+              <ReferenceArea
+                key={`${pattern.id}-${pattern.startDate}`}
+                yAxisId="price"
+                x1={pattern.startDate}
+                x2={pattern.endDate}
+                y1={minPrice}
+                y2={maxPrice}
+                stroke={style.stroke}
+                fill={style.fill}
+                fillOpacity={0.08}
+                strokeOpacity={0.6}
+                strokeDasharray="4 4"
+                ifOverflow="extendDomain"
+                label={{
+                  value: labelValue,
+                  position: 'top',
+                  fill: style.stroke,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  fontFamily: 'DM Mono, monospace',
+                }}
+              />
+            );
+          })}
 
           {/* Brush for zooming and panning */}
           <Brush

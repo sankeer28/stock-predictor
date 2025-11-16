@@ -70,3 +70,39 @@ export interface ChartDataPoint {
   macd?: number;
   macdSignal?: number;
 }
+
+export type ChartPatternDirection = 'bullish' | 'bearish' | 'neutral';
+
+export type ChartPatternType =
+  | 'trendline_support'
+  | 'trendline_resistance'
+  | 'horizontal_sr'
+  | 'wedge_up'
+  | 'wedge_down'
+  | 'wedge'
+  | 'triangle_ascending'
+  | 'triangle_descending'
+  | 'triangle_symmetrical'
+  | 'channel_up'
+  | 'channel'
+  | 'channel_down'
+  | 'double_top'
+  | 'double_bottom'
+  | 'multiple_top'
+  | 'multiple_bottom'
+  | 'head_and_shoulders';
+
+export type ChartPatternMeta = Record<string, number | string | boolean | undefined>;
+
+export interface ChartPattern {
+  id: string;
+  type: ChartPatternType;
+  label: string;
+  direction: ChartPatternDirection;
+  startIndex: number;
+  endIndex: number;
+  startDate: string;
+  endDate: string;
+  confidence: number;
+  meta?: ChartPatternMeta;
+}
