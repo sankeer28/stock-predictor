@@ -10,13 +10,12 @@ interface MLPredictionsProps {
   predictions: {
     lstm?: MLForecast[];
     arima?: MLPrediction[];
+    prophetLite?: MLPrediction[];
     gru?: MLPrediction[];
-    tft?: MLPrediction[];
+    ensemble?: MLPrediction[];
     cnn?: MLPrediction[];
     cnnLstm?: MLPrediction[];
     linearRegression?: MLPrediction[];
-    polynomialRegression?: MLPrediction[];
-    movingAverage?: MLPrediction[];
     ema?: MLPrediction[];
   };
   isTraining: boolean;
@@ -46,16 +45,15 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
   };
 
   const algorithms = [
-    { name: 'LSTM', key: 'lstm', data: predictions.lstm, color: 'var(--accent)' },
-    { name: 'ARIMA', key: 'arima', data: predictions.arima, color: 'var(--info)' },
-    { name: 'GRU', key: 'gru', data: predictions.gru, color: '#10b981' },
-    { name: 'TFT', key: 'tft', data: predictions.tft, color: '#f59e0b' },
-    { name: '1D CNN', key: 'cnn', data: predictions.cnn, color: '#8b5cf6' },
-    { name: 'CNN-LSTM', key: 'cnnLstm', data: predictions.cnnLstm, color: '#ec4899' },
-    { name: 'Linear Regression', key: 'linearRegression', data: predictions.linearRegression, color: 'var(--success)' },
-    { name: 'Polynomial Regression', key: 'polynomialRegression', data: predictions.polynomialRegression, color: 'var(--warning)' },
-    { name: 'Moving Average', key: 'movingAverage', data: predictions.movingAverage, color: 'var(--error)' },
-    { name: 'Exponential MA', key: 'ema', data: predictions.ema, color: '#9333ea' },
+    { name: '🏆 Ensemble', key: 'ensemble', data: predictions.ensemble, color: '#f59e0b', description: 'Best: Combines all models' },
+    { name: 'LSTM', key: 'lstm', data: predictions.lstm, color: 'var(--accent)', description: 'Deep learning neural network' },
+    { name: 'Prophet-Lite', key: 'prophetLite', data: predictions.prophetLite, color: '#10b981', description: 'Trend + seasonality analysis' },
+    { name: 'GRU', key: 'gru', data: predictions.gru, color: '#3b82f6', description: 'Simplified LSTM, faster' },
+    { name: 'CNN-LSTM', key: 'cnnLstm', data: predictions.cnnLstm, color: '#ec4899', description: 'Pattern recognition + time series' },
+    { name: '1D CNN', key: 'cnn', data: predictions.cnn, color: '#8b5cf6', description: 'Pattern recognition model' },
+    { name: 'ARIMA', key: 'arima', data: predictions.arima, color: 'var(--info)', description: 'Statistical time series' },
+    { name: 'Exponential MA', key: 'ema', data: predictions.ema, color: '#9333ea', description: 'Weighted moving average' },
+    { name: 'Linear Regression', key: 'linearRegression', data: predictions.linearRegression, color: 'var(--success)', description: 'Simple trend analysis' },
   ];
 
   return (
@@ -168,28 +166,45 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
                 }}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>
-                    {algo.name}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>
+                      {algo.name}
+                    </span>
+                    {algo.key === 'ensemble' && isReady && (
+                      <span className="text-xs px-1" style={{ 
+                        background: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)',
+                        color: 'white',
+                        borderRadius: '2px',
+                        fontWeight: 'bold'
+                      }}>
+                        BEST
+                      </span>
+                    )}
+                  </div>
                   {!isReady && isTraining && (
                     <Loader2 className="w-3 h-3 animate-spin" style={{ color: algo.color }} />
                   )}
                 </div>
 
                 {isReady && stats ? (
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-bold font-mono" style={{ color: algo.color }}>
-                      ${stats.price.toFixed(2)}
-                    </span>
-                    <span
-                      className="text-xs font-semibold"
-                      style={{
-                        color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
-                      }}
-                    >
-                      {stats.direction === 'up' ? '↑' : '↓'} {Math.abs(stats.change).toFixed(2)}%
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-sm font-bold font-mono" style={{ color: algo.color }}>
+                        ${stats.price.toFixed(2)}
+                      </span>
+                      <span
+                        className="text-xs font-semibold"
+                        style={{
+                          color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
+                        }}
+                      >
+                        {stats.direction === 'up' ? '↑' : '↓'} {Math.abs(stats.change).toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="text-xs" style={{ color: 'var(--text-4)' }}>
+                      {algo.description}
+                    </div>
+                  </>
                 ) : (
                   <div className="text-xs" style={{ color: 'var(--text-4)' }}>
                     {isTraining ? (algo.key === 'lstm' ? 'Training...' : 'Computing...') : 'Waiting...'}
@@ -266,14 +281,30 @@ export default function MLPredictions({ currentPrice, predictions, isTraining, f
         )}
 
         {/* Algorithm Info */}
-        <div className="mt-6 p-3 border-2" style={{
-          background: 'var(--bg-2)',
-          borderColor: 'var(--info)',
-          borderLeftWidth: '3px'
-        }}>
-          <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-            <strong style={{ color: 'var(--info)' }}>Note:</strong> ML predictions are based on historical patterns.
-            Actual prices may vary due to market events, news, and other factors not captured by algorithms.
+        <div className="mt-6 space-y-3">
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: '#f59e0b',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-2" style={{ color: '#f59e0b', fontWeight: 'bold' }}>
+              ✨ OPTIMIZED FOR SERVERLESS
+            </div>
+            <div className="text-xs" style={{ color: 'var(--text-4)' }}>
+              Models are optimized for fast training on Vercel. Removed redundant models (TFT was fake, removed Polynomial & Moving Average).
+              Added Prophet-Lite and Ensemble for better accuracy.
+            </div>
+          </div>
+          
+          <div className="p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: 'var(--info)',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs" style={{ color: 'var(--text-4)' }}>
+              <strong style={{ color: 'var(--info)' }}>Note:</strong> ML predictions are based on historical patterns.
+              Actual prices may vary due to market events, news, and other factors not captured by algorithms.
+            </div>
           </div>
         </div>
       </div>

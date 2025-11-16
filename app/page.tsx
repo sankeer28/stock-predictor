@@ -21,13 +21,14 @@ import {
   generateMovingAverageForecast,
   generateEMAForecast,
   generateARIMAForecast,
+  generateProphetLiteForecast,
   MLPrediction
 } from '@/lib/mlAlgorithms';
 import {
   generateGRUForecast,
   generate1DCNNForecast,
   generateCNNLSTMForecast,
-  generateTFTForecast,
+  generateEnsembleForecast,
 } from '@/lib/advancedMLModels';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint } from '@/types';
@@ -79,13 +80,12 @@ export default function Home() {
   const [mlPredictions, setMlPredictions] = useState<{
     lstm?: MLForecast[];
     arima?: MLPrediction[];
+    prophetLite?: MLPrediction[];
     gru?: MLPrediction[];
-    tft?: MLPrediction[];
+    ensemble?: MLPrediction[];
     cnn?: MLPrediction[];
     cnnLstm?: MLPrediction[];
     linearRegression?: MLPrediction[];
-    polynomialRegression?: MLPrediction[];
-    movingAverage?: MLPrediction[];
     ema?: MLPrediction[];
   }>({});
   const [mlTraining, setMlTraining] = useState(false);
@@ -367,68 +367,85 @@ export default function Home() {
         setMlTraining(true);
         setTimeout(async () => {
           try {
-            // Fast algorithms (non-neural network)
+            // Fast algorithms (non-neural network) - run first for immediate display
             const linearReg = generateLinearRegression(stockResult.data, forecastHorizon);
-            const polyReg = generatePolynomialRegression(stockResult.data, forecastHorizon);
-            const maForecast = generateMovingAverageForecast(stockResult.data, forecastHorizon);
             const emaForecast = generateEMAForecast(stockResult.data, forecastHorizon);
             const arimaForecast = generateARIMAForecast(stockResult.data, forecastHorizon);
+            const prophetLite = generateProphetLiteForecast(stockResult.data, forecastHorizon);
 
             const predictions = {
               linearRegression: linearReg,
-              polynomialRegression: polyReg,
-              movingAverage: maForecast,
               ema: emaForecast,
               arima: arimaForecast,
+              prophetLite,
             };
 
             setMlPredictions(predictions);
 
-            // Neural network models (train in parallel for speed)
-            console.log('Starting all neural network models in parallel...');
+            // Neural network models (optimized for serverless - only best performing models)
+            console.log('Starting optimized neural network models...');
 
             // Start all models at once (parallel training)
             const gruPromise = generateGRUForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, gru: forecast }));
                 return forecast;
-              });
-
-            const tftPromise = generateTFTForecast(stockResult.data, forecastHorizon, mlSettings)
-              .then(forecast => {
-                setMlPredictions(prev => ({ ...prev, tft: forecast }));
-                return forecast;
+              })
+              .catch(err => {
+                console.error('GRU failed:', err);
+                return null;
               });
 
             const cnnPromise = generate1DCNNForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, cnn: forecast }));
                 return forecast;
+              })
+              .catch(err => {
+                console.error('CNN failed:', err);
+                return null;
               });
 
             const cnnLstmPromise = generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
                 return forecast;
+              })
+              .catch(err => {
+                console.error('CNN-LSTM failed:', err);
+                return null;
               });
 
             const lstmPromise = generateMLForecast(stockResult.data, forecastHorizon, mlSettings)
               .then(forecast => {
                 setMlPredictions(prev => ({ ...prev, lstm: forecast }));
                 return forecast;
+              })
+              .catch(err => {
+                console.error('LSTM failed:', err);
+                return null;
               });
 
-            // Wait for all to complete
-            const [gru, tft, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+            // Wait for neural networks to complete
+            const [gru, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+
+            // Generate ensemble from successful neural network models
+            let ensemble = null;
+            try {
+              ensemble = await generateEnsembleForecast(stockResult.data, forecastHorizon, mlSettings);
+              setMlPredictions(prev => ({ ...prev, ensemble }));
+            } catch (ensembleError) {
+              console.error('Ensemble model failed:', ensembleError);
+            }
 
             // Save all predictions to cache
             const allPredictions = {
               ...predictions,
-              gru,
-              tft,
-              cnn,
-              cnnLstm,
-              lstm,
+              ...(gru && { gru }),
+              ...(cnn && { cnn }),
+              ...(cnnLstm && { cnnLstm }),
+              ...(lstm && { lstm }),
+              ...(ensemble && { ensemble }),
             };
 
             savePredictionsToCache(stockSymbol, allPredictions, forecastHorizon);
@@ -542,64 +559,79 @@ export default function Home() {
             try {
               // Fast algorithms (non-neural network)
               const linearReg = generateLinearRegression(stockData, forecastHorizon);
-              const polyReg = generatePolynomialRegression(stockData, forecastHorizon);
-              const maForecast = generateMovingAverageForecast(stockData, forecastHorizon);
               const emaForecast = generateEMAForecast(stockData, forecastHorizon);
               const arimaForecast = generateARIMAForecast(stockData, forecastHorizon);
+              const prophetLite = generateProphetLiteForecast(stockData, forecastHorizon);
 
-              setMlPredictions({
+              const predictions = {
                 linearRegression: linearReg,
-                polynomialRegression: polyReg,
-                movingAverage: maForecast,
                 ema: emaForecast,
                 arima: arimaForecast,
-              });
+                prophetLite,
+              };
 
-              // Neural network models (parallel training)
+              setMlPredictions(predictions);
+
+              // Neural network models (optimized for serverless)
               const gruPromise = generateGRUForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, gru: forecast }));
                   return forecast;
-                });
-
-              const tftPromise = generateTFTForecast(stockData, forecastHorizon, mlSettings)
-                .then(forecast => {
-                  setMlPredictions(prev => ({ ...prev, tft: forecast }));
-                  return forecast;
+                })
+                .catch(err => {
+                  console.error('GRU failed:', err);
+                  return null;
                 });
 
               const cnnPromise = generate1DCNNForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, cnn: forecast }));
                   return forecast;
+                })
+                .catch(err => {
+                  console.error('CNN failed:', err);
+                  return null;
                 });
 
               const cnnLstmPromise = generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
                   return forecast;
+                })
+                .catch(err => {
+                  console.error('CNN-LSTM failed:', err);
+                  return null;
                 });
 
               const lstmPromise = generateMLForecast(stockData, forecastHorizon, mlSettings)
                 .then(forecast => {
                   setMlPredictions(prev => ({ ...prev, lstm: forecast }));
                   return forecast;
+                })
+                .catch(err => {
+                  console.error('LSTM failed:', err);
+                  return null;
                 });
 
-              const [gru, tft, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, tftPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+              const [gru, cnn, cnnLstm, lstm] = await Promise.all([gruPromise, cnnPromise, cnnLstmPromise, lstmPromise]);
+
+              // Generate ensemble from successful models
+              let ensemble = null;
+              try {
+                ensemble = await generateEnsembleForecast(stockData, forecastHorizon, mlSettings);
+                setMlPredictions(prev => ({ ...prev, ensemble }));
+              } catch (ensembleError) {
+                console.error('Ensemble model failed:', ensembleError);
+              }
 
               // Save all predictions to cache
               const allPredictions = {
-                linearRegression: linearReg,
-                polynomialRegression: polyReg,
-                movingAverage: maForecast,
-                ema: emaForecast,
-                arima: arimaForecast,
-                gru,
-                tft,
-                cnn,
-                cnnLstm,
-                lstm,
+                ...predictions,
+                ...(gru && { gru }),
+                ...(cnn && { cnn }),
+                ...(cnnLstm && { cnnLstm }),
+                ...(lstm && { lstm }),
+                ...(ensemble && { ensemble }),
               };
 
               savePredictionsToCache(symbol, allPredictions, forecastHorizon);

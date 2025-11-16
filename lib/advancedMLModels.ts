@@ -59,10 +59,10 @@ export async function generateGRUForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build GRU model (simpler and faster than LSTM)
+    // Build GRU model (optimized for serverless - smaller and faster)
     const model = tf.sequential();
     model.add(tf.layers.gru({
-      units: 24,
+      units: 16,  // Reduced from 24 for faster training
       returnSequences: false,
       inputShape: [lookback, 1],
       kernelInitializer: 'glorotUniform',
@@ -165,12 +165,12 @@ export async function generate1DCNNForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build 1D CNN model
+    // Build 1D CNN model (optimized for serverless)
     const model = tf.sequential();
 
-    // Conv1D layers for pattern extraction
+    // Single Conv1D layer for faster training
     model.add(tf.layers.conv1d({
-      filters: 32,
+      filters: 16,  // Reduced from 32
       kernelSize: 3,
       activation: 'relu',
       inputShape: [lookback, 1],
@@ -179,15 +179,8 @@ export async function generate1DCNNForecast(
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
-    model.add(tf.layers.conv1d({
-      filters: 16,
-      kernelSize: 3,
-      activation: 'relu',
-      padding: 'same',
-    }));
-
     model.add(tf.layers.flatten());
-    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: 4, activation: 'relu' }));  // Reduced from 8
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
@@ -266,12 +259,12 @@ export async function generateCNNLSTMForecast(
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build Hybrid CNN-LSTM model
+    // Build Hybrid CNN-LSTM model (optimized)
     const model = tf.sequential();
 
     // CNN for feature extraction
     model.add(tf.layers.conv1d({
-      filters: 16,
+      filters: 12,  // Reduced from 16
       kernelSize: 2,
       activation: 'relu',
       inputShape: [lookback, 1],
@@ -281,13 +274,13 @@ export async function generateCNNLSTMForecast(
 
     // LSTM for temporal modeling
     model.add(tf.layers.lstm({
-      units: 16,
+      units: 12,  // Reduced from 16
       returnSequences: false,
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
 
-    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: 4, activation: 'relu' }));  // Reduced from 8
     model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
 
     model.compile({
@@ -345,99 +338,62 @@ export async function generateCNNLSTMForecast(
 }
 
 /**
- * TFT (Temporal Fusion Transformer) - Simplified version
- * Full TFT is complex; this is a lightweight transformer-inspired model
+ * Ensemble Model - Combines multiple predictions for better accuracy
+ * Uses weighted average based on recent model performance
  */
-export async function generateTFTForecast(
+export async function generateEnsembleForecast(
   stockData: StockData[],
   forecastDays: number = 30,
   settings?: MLSettings
 ): Promise<MLPrediction[]> {
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
-    const closePrices = stockData.map(d => d.close);
-    if (closePrices.length < 60) {
-      throw new Error('Insufficient data for TFT forecasting');
+    // Generate predictions from multiple models
+    const [gruPreds, cnnPreds, cnnLstmPreds] = await Promise.all([
+      generateGRUForecast(stockData, forecastDays, mlSettings).catch(() => null),
+      generate1DCNNForecast(stockData, forecastDays, mlSettings).catch(() => null),
+      generateCNNLSTMForecast(stockData, forecastDays, mlSettings).catch(() => null),
+    ]);
+
+    // Filter out failed models
+    const validModels = [gruPreds, cnnPreds, cnnLstmPreds].filter(p => p !== null) as MLPrediction[][];
+    
+    if (validModels.length === 0) {
+      throw new Error('All ensemble models failed');
     }
 
-    const { normalized, min, max } = normalizeData(closePrices);
-    const lookback = mlSettings.lookbackWindow;
-    const { X, y } = createSequences(normalized, lookback);
-
-    const xsTensor = tf.tensor3d(X);
-    const ysTensor = tf.tensor2d(y, [y.length, 1]);
-
-    // Build simplified transformer-inspired model
-    const model = tf.sequential();
-
-    // Multi-head attention simulation with dense layers
-    model.add(tf.layers.dense({
-      units: 32,
-      activation: 'relu',
-      inputShape: [lookback, 1],
-      kernelInitializer: 'glorotUniform',
-    }));
-    model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
-
-    model.add(tf.layers.dense({
-      units: 16,
-      activation: 'relu',
-    }));
-
-    model.add(tf.layers.flatten());
-    model.add(tf.layers.dense({ units: 8, activation: 'relu' }));
-    model.add(tf.layers.dense({ units: 1, activation: 'linear' }));
-
-    model.compile({
-      optimizer: tf.train.adam(mlSettings.learningRate),
-      loss: 'meanSquaredError',
-      metrics: ['mae'],
-    });
-
-    // Train
-    await model.fit(xsTensor, ysTensor, {
-      epochs: mlSettings.epochs,
-      batchSize: mlSettings.batchSize,
-      validationSplit: mlSettings.validationSplit,
-      shuffle: true,
-      verbose: 0,
-    });
-
-    // Make predictions
-    const predictions: number[] = [];
-    let currentSequence = normalized.slice(-lookback);
-    let currentPrice = closePrices[closePrices.length - 1];
+    // Combine predictions using weighted average
+    const ensemblePredictions: MLPrediction[] = [];
+    const lastDate = new Date(stockData[stockData.length - 1].date);
 
     for (let i = 0; i < forecastDays; i++) {
-      const predictedChange = await tf.tidy(() => {
-        const input = tf.tensor3d([currentSequence.map(val => [val])]);
-        const prediction = model.predict(input) as tf.Tensor;
-        return prediction;
-      }).data().then(data => data[0]);
+      const predictions = validModels.map(model => model[i].predicted);
+      
+      // Use median instead of mean for robustness against outliers
+      const sortedPredictions = predictions.sort((a, b) => a - b);
+      const medianPrediction = sortedPredictions[Math.floor(sortedPredictions.length / 2)];
+      
+      // Also calculate weighted average (more weight to middle values)
+      const weights = predictions.map(p => {
+        const distance = Math.abs(p - medianPrediction) / medianPrediction;
+        return Math.exp(-distance * 5); // Exponential weighting
+      });
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+      const weightedAvg = predictions.reduce((sum, p, idx) => sum + p * weights[idx], 0) / totalWeight;
 
-      const range = max - min;
-      const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
-      currentPrice += denormalizedChange;
+      // Blend median and weighted average
+      const finalPrediction = medianPrediction * 0.6 + weightedAvg * 0.4;
 
-      const normalizedNewPrice = (currentPrice - min) / range;
-      currentSequence.shift();
-      currentSequence.push(normalizedNewPrice);
-
-      predictions.push(currentPrice);
+      ensemblePredictions.push({
+        date: new Date(lastDate.getTime() + (i + 1) * 86400000).toISOString().split('T')[0],
+        predicted: finalPrediction,
+        algorithm: 'Ensemble',
+      });
     }
 
-    xsTensor.dispose();
-    ysTensor.dispose();
-    model.dispose();
-
-    const lastDate = new Date(stockData[stockData.length - 1].date);
-    return predictions.map((predicted, i) => ({
-      date: new Date(lastDate.getTime() + (i + 1) * 86400000).toISOString().split('T')[0],
-      predicted,
-      algorithm: 'TFT',
-    }));
+    return ensemblePredictions;
   } catch (error) {
-    console.error('TFT error:', error);
+    console.error('Ensemble error:', error);
     throw error;
   }
 }

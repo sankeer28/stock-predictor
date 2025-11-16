@@ -271,6 +271,165 @@ export function generateEMAForecast(
 }
 
 /**
+ * Prophet-Lite - Inspired by Facebook Prophet
+ * Combines trend, seasonality, and changepoint detection
+ * Lightweight implementation suitable for browser/serverless
+ */
+export function generateProphetLiteForecast(
+  stockData: StockData[],
+  forecastDays: number = 30
+): MLPrediction[] {
+  const closePrices = stockData.map(d => d.close);
+
+  if (closePrices.length < 60) {
+    return generateLinearRegression(stockData, forecastDays);
+  }
+
+  const n = closePrices.length;
+
+  // 1. Detect trend using piecewise linear regression
+  const changepoints = detectChangepoints(closePrices);
+  const trend = fitPiecewiseTrend(closePrices, changepoints);
+
+  // 2. Extract seasonality (weekly pattern)
+  const detrended = closePrices.map((price, i) => price - trend[i]);
+  const weeklySeasonality = extractWeeklySeasonality(detrended, stockData);
+
+  // 3. Calculate residuals
+  const residuals = detrended.map((val, i) => val - weeklySeasonality[i]);
+  const residualStd = Math.sqrt(
+    residuals.reduce((sum, r) => sum + r * r, 0) / residuals.length
+  );
+
+  // 4. Forecast future values
+  const lastDate = new Date(stockData[stockData.length - 1].date);
+  const predictions: MLPrediction[] = [];
+
+  // Extrapolate trend
+  const lastTrendValue = trend[trend.length - 1];
+  const trendSlope = (trend[trend.length - 1] - trend[trend.length - 10]) / 10;
+
+  for (let i = 0; i < forecastDays; i++) {
+    const forecastDate = new Date(lastDate);
+    forecastDate.setDate(forecastDate.getDate() + i + 1);
+
+    // Trend component (with damping for long-term forecasts)
+    const dampingFactor = Math.exp(-i / (forecastDays * 2));
+    const trendComponent = lastTrendValue + trendSlope * (i + 1) * dampingFactor;
+
+    // Seasonality component (weekly cycle)
+    const dayOfWeek = forecastDate.getDay();
+    const seasonalityComponent = calculateSeasonalityForDay(weeklySeasonality, dayOfWeek);
+
+    // Combine components
+    let predicted = trendComponent + seasonalityComponent;
+
+    // Add mean reversion for very long forecasts
+    if (i > 15) {
+      const meanPrice = closePrices.slice(-60).reduce((sum, p) => sum + p, 0) / Math.min(60, closePrices.length);
+      const reversionFactor = (i - 15) / forecastDays;
+      predicted = predicted * (1 - reversionFactor * 0.2) + meanPrice * (reversionFactor * 0.2);
+    }
+
+    predictions.push({
+      date: forecastDate.toISOString().split('T')[0],
+      predicted: Math.max(0, predicted),
+      algorithm: 'Prophet-Lite',
+    });
+  }
+
+  return predictions;
+}
+
+// Helper: Detect trend changepoints
+function detectChangepoints(prices: number[]): number[] {
+  const changepoints: number[] = [];
+  const windowSize = Math.max(10, Math.floor(prices.length / 10));
+
+  for (let i = windowSize; i < prices.length - windowSize; i += windowSize) {
+    const before = prices.slice(i - windowSize, i);
+    const after = prices.slice(i, i + windowSize);
+
+    const slopeBefore = (before[before.length - 1] - before[0]) / windowSize;
+    const slopeAfter = (after[after.length - 1] - after[0]) / windowSize;
+
+    // Detect significant slope change
+    if (Math.abs(slopeAfter - slopeBefore) > Math.abs(slopeBefore) * 0.5) {
+      changepoints.push(i);
+    }
+  }
+
+  return changepoints;
+}
+
+// Helper: Fit piecewise linear trend
+function fitPiecewiseTrend(prices: number[], changepoints: number[]): number[] {
+  const trend: number[] = [];
+  const segments = [0, ...changepoints, prices.length];
+
+  for (let seg = 0; seg < segments.length - 1; seg++) {
+    const start = segments[seg];
+    const end = segments[seg + 1];
+    const segmentPrices = prices.slice(start, end);
+
+    const n = segmentPrices.length;
+    const x = Array.from({ length: n }, (_, i) => i);
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = segmentPrices.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * segmentPrices[i], 0);
+    const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    for (let i = 0; i < n; i++) {
+      trend.push(slope * i + intercept);
+    }
+  }
+
+  return trend;
+}
+
+// Helper: Extract weekly seasonality
+function extractWeeklySeasonality(detrended: number[], stockData: StockData[]): number[] {
+  const dayAverages: { [key: number]: number[] } = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+
+  detrended.forEach((val, i) => {
+    const dayOfWeek = new Date(stockData[i].date).getDay();
+    dayAverages[dayOfWeek].push(val);
+  });
+
+  const seasonalPattern: { [key: number]: number } = {};
+  for (let day = 0; day < 7; day++) {
+    const values = dayAverages[day];
+    seasonalPattern[day] = values.length > 0
+      ? values.reduce((sum, v) => sum + v, 0) / values.length
+      : 0;
+  }
+
+  // Normalize so seasonality averages to zero
+  const avgSeasonality = Object.values(seasonalPattern).reduce((sum, v) => sum + v, 0) / 7;
+  for (let day = 0; day < 7; day++) {
+    seasonalPattern[day] -= avgSeasonality;
+  }
+
+  return detrended.map((_, i) => {
+    const dayOfWeek = new Date(stockData[i].date).getDay();
+    return seasonalPattern[dayOfWeek];
+  });
+}
+
+// Helper: Calculate seasonality for a given day
+function calculateSeasonalityForDay(weeklySeasonality: number[], dayOfWeek: number): number {
+  // Average the seasonality values for this day of week
+  const values: number[] = [];
+  for (let i = 0; i < weeklySeasonality.length; i++) {
+    values.push(weeklySeasonality[i]);
+  }
+  return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) / values.length : 0;
+}
+
+/**
  * ARIMA (AutoRegressive Integrated Moving Average)
  * p=5 (AR order), d=1 (differencing), q=5 (MA order)
  * Advanced statistical forecasting for time series
