@@ -146,7 +146,188 @@ export function calculateBollingerBands(prices: number[], period = 20, stdDev = 
 }
 
 /**
- * Calculate all technical indicators
+ * Calculate ATR (Average True Range) - Volatility indicator
+ */
+export function calculateATR(stockData: StockData[], period: number = 14): number[] {
+  const result: number[] = [];
+  const trueRanges: number[] = [];
+
+  for (let i = 0; i < stockData.length; i++) {
+    if (i === 0) {
+      result.push(NaN);
+      continue;
+    }
+
+    const high = stockData[i].high;
+    const low = stockData[i].low;
+    const prevClose = stockData[i - 1].close;
+
+    const tr = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+    trueRanges.push(tr);
+
+    if (i < period) {
+      result.push(NaN);
+    } else {
+      const recentTR = trueRanges.slice(-period);
+      const atr = recentTR.reduce((sum, tr) => sum + tr, 0) / period;
+      result.push(atr);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Calculate Stochastic Oscillator - Momentum indicator
+ */
+export function calculateStochastic(
+  stockData: StockData[],
+  period: number = 14,
+  smoothK: number = 3,
+  smoothD: number = 3
+): { k: number[], d: number[] } {
+  const k: number[] = [];
+  const d: number[] = [];
+
+  for (let i = 0; i < stockData.length; i++) {
+    if (i < period - 1) {
+      k.push(NaN);
+      continue;
+    }
+
+    const slice = stockData.slice(i - period + 1, i + 1);
+    const high = Math.max(...slice.map(d => d.high));
+    const low = Math.min(...slice.map(d => d.low));
+    const close = stockData[i].close;
+
+    const stoch = ((close - low) / (high - low || 1)) * 100;
+    k.push(stoch);
+  }
+
+  // Smooth %K
+  const smoothedK: number[] = calculateSMA(k.filter(v => !isNaN(v)), smoothK);
+  
+  // Calculate %D (SMA of %K)
+  const smoothedD: number[] = calculateSMA(smoothedK, smoothD);
+
+  // Pad with NaN to match original length
+  const padK = new Array(stockData.length - smoothedK.length).fill(NaN);
+  const padD = new Array(stockData.length - smoothedD.length).fill(NaN);
+
+  return {
+    k: [...padK, ...smoothedK],
+    d: [...padD, ...smoothedD],
+  };
+}
+
+/**
+ * Calculate ADX (Average Directional Index) - Trend strength indicator
+ */
+export function calculateADX(stockData: StockData[], period: number = 14): {
+  adx: number[];
+  plusDI: number[];
+  minusDI: number[];
+} {
+  const adx: number[] = [];
+  const plusDI: number[] = [];
+  const minusDI: number[] = [];
+  const plusDM: number[] = [];
+  const minusDM: number[] = [];
+  const tr: number[] = [];
+
+  for (let i = 1; i < stockData.length; i++) {
+    const high = stockData[i].high;
+    const low = stockData[i].low;
+    const prevHigh = stockData[i - 1].high;
+    const prevLow = stockData[i - 1].low;
+    const prevClose = stockData[i - 1].close;
+
+    // Calculate directional movement
+    const upMove = high - prevHigh;
+    const downMove = prevLow - low;
+
+    plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
+
+    // Calculate true range
+    const trueRange = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+    tr.push(trueRange);
+  }
+
+  // Calculate smoothed averages
+  for (let i = 0; i < stockData.length; i++) {
+    if (i < period) {
+      plusDI.push(NaN);
+      minusDI.push(NaN);
+      adx.push(NaN);
+      continue;
+    }
+
+    const smoothPlusDM = plusDM.slice(i - period, i).reduce((a, b) => a + b, 0) / period;
+    const smoothMinusDM = minusDM.slice(i - period, i).reduce((a, b) => a + b, 0) / period;
+    const smoothTR = tr.slice(i - period, i).reduce((a, b) => a + b, 0) / period;
+
+    const plusDIVal = (smoothPlusDM / (smoothTR || 1)) * 100;
+    const minusDIVal = (smoothMinusDM / (smoothTR || 1)) * 100;
+
+    plusDI.push(plusDIVal);
+    minusDI.push(minusDIVal);
+
+    // Calculate DX and ADX
+    const dx = (Math.abs(plusDIVal - minusDIVal) / (plusDIVal + minusDIVal || 1)) * 100;
+    
+    if (i < period * 2) {
+      adx.push(NaN);
+    } else {
+      const recentDX = [];
+      for (let j = i - period; j < i; j++) {
+        if (!isNaN(plusDI[j]) && !isNaN(minusDI[j])) {
+          const dxVal = (Math.abs(plusDI[j] - minusDI[j]) / (plusDI[j] + minusDI[j] || 1)) * 100;
+          recentDX.push(dxVal);
+        }
+      }
+      const avgDX = recentDX.reduce((a, b) => a + b, 0) / recentDX.length;
+      adx.push(avgDX);
+    }
+  }
+
+  return { adx, plusDI, minusDI };
+}
+
+/**
+ * Calculate OBV (On-Balance Volume) - Volume-based momentum indicator
+ */
+export function calculateOBV(stockData: StockData[]): number[] {
+  const obv: number[] = [];
+  let runningOBV = 0;
+
+  for (let i = 0; i < stockData.length; i++) {
+    if (i === 0) {
+      obv.push(stockData[i].volume);
+      runningOBV = stockData[i].volume;
+    } else {
+      if (stockData[i].close > stockData[i - 1].close) {
+        runningOBV += stockData[i].volume;
+      } else if (stockData[i].close < stockData[i - 1].close) {
+        runningOBV -= stockData[i].volume;
+      }
+      obv.push(runningOBV);
+    }
+  }
+
+  return obv;
+}
+
+/**
+ * Calculate all technical indicators (enhanced with new indicators)
  */
 export function calculateAllIndicators(stockData: StockData[]): TechnicalIndicators {
   const closePrices = stockData.map(d => d.close);

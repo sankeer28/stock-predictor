@@ -7,18 +7,32 @@ export interface MLPrediction {
 }
 
 /**
- * Linear Regression - Weighted regression favoring recent data
+ * Linear Regression - Weighted regression favoring recent data with OHLCV analysis
  */
 export function generateLinearRegression(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
+  const highPrices = stockData.map(d => d.high);
+  const lowPrices = stockData.map(d => d.low);
+  const volumes = stockData.map(d => d.volume);
 
   // Use recent 120 days for better trend capture
   const recentWindow = Math.min(120, closePrices.length);
   const recentPrices = closePrices.slice(-recentWindow);
+  const recentHighs = highPrices.slice(-recentWindow);
+  const recentLows = lowPrices.slice(-recentWindow);
+  const recentVolumes = volumes.slice(-recentWindow);
   const n = recentPrices.length;
+
+  // Calculate average true range (volatility)
+  const atr = calculateATR(recentHighs, recentLows, recentPrices);
+  
+  // Calculate volume trend
+  const volumeAvg = recentVolumes.reduce((a, b) => a + b, 0) / n;
+  const recentVolumeAvg = recentVolumes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, recentVolumes.length);
+  const volumeTrend = recentVolumeAvg / volumeAvg;
 
   // Weighted linear regression: more recent data has higher weight
   let sumX = 0;
@@ -28,12 +42,18 @@ export function generateLinearRegression(
   let sumW = 0;
 
   for (let i = 0; i < n; i++) {
-    // Exponential weight: recent data weighted more heavily
-    const weight = Math.exp((i - n) / (n / 2)); // Exponential decay
+    // Enhanced weight considering volume and price action
+    const baseWeight = Math.exp((i - n) / (n / 2)); // Exponential decay
+    const volumeWeight = recentVolumes[i] / volumeAvg;
+    const priceRangeWeight = (recentHighs[i] - recentLows[i]) / recentPrices[i];
+    const weight = baseWeight * (1 + volumeWeight * 0.1) * (1 + priceRangeWeight * 0.05);
+
+    // Use typical price (HLC/3) for better representation
+    const typicalPrice = (recentHighs[i] + recentLows[i] + recentPrices[i]) / 3;
 
     sumX += i * weight;
-    sumY += recentPrices[i] * weight;
-    sumXY += i * recentPrices[i] * weight;
+    sumY += typicalPrice * weight;
+    sumXY += i * typicalPrice * weight;
     sumX2 += i * i * weight;
     sumW += weight;
   }
@@ -66,18 +86,30 @@ export function generateLinearRegression(
 }
 
 /**
- * Polynomial Regression (degree 2) - Captures curved trends with improved fitting
+ * Polynomial Regression (degree 2) - Captures curved trends with OHLCV data
  */
 export function generatePolynomialRegression(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
+  const highPrices = stockData.map(d => d.high);
+  const lowPrices = stockData.map(d => d.low);
+  const volumes = stockData.map(d => d.volume);
 
   // Use recent 90 days for better curve fitting
   const recentWindow = Math.min(90, closePrices.length);
   const recentPrices = closePrices.slice(-recentWindow);
+  const recentHighs = highPrices.slice(-recentWindow);
+  const recentLows = lowPrices.slice(-recentWindow);
+  const recentVolumes = volumes.slice(-recentWindow);
   const n = recentPrices.length;
+
+  // Use typical prices for better representation
+  const typicalPrices = [];
+  for (let i = 0; i < n; i++) {
+    typicalPrices.push(calculateTypicalPrice(recentHighs[i], recentLows[i], recentPrices[i]));
+  }
 
   // Normalize x values to 0-1 range to prevent overflow
   const xValues = Array.from({ length: n }, (_, i) => i / (n - 1));
@@ -88,7 +120,7 @@ export function generatePolynomialRegression(
 
   for (let i = 0; i < n; i++) {
     const x = xValues[i];
-    const y = recentPrices[i];
+    const y = typicalPrices[i];  // Use typical price instead of just close
     sumX += x;
     sumX2 += x * x;
     sumX3 += x * x * x;
@@ -154,29 +186,39 @@ export function generatePolynomialRegression(
 }
 
 /**
- * Moving Average Prediction - Adaptive window based on volatility
+ * Moving Average Prediction - Adaptive window based on volatility with OHLCV
  */
 export function generateMovingAverageForecast(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
+  const highPrices = stockData.map(d => d.high);
+  const lowPrices = stockData.map(d => d.low);
+  const volumes = stockData.map(d => d.volume);
 
-  // Calculate volatility to determine optimal window size
-  const returns: number[] = [];
-  for (let i = 1; i < closePrices.length; i++) {
-    returns.push(Math.abs((closePrices[i] - closePrices[i - 1]) / closePrices[i - 1]));
-  }
-  const avgVolatility = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+  // Calculate typical prices
+  const typicalPrices = stockData.map((d, i) => 
+    calculateTypicalPrice(highPrices[i], lowPrices[i], closePrices[i])
+  );
+
+  // Calculate ATR-based volatility (more accurate than simple returns)
+  const atr = calculateATR(highPrices, lowPrices, closePrices);
+  const avgPrice = closePrices.reduce((sum, p) => sum + p, 0) / closePrices.length;
+  const avgVolatility = atr / avgPrice;
 
   // Adaptive window: lower volatility = longer window (smoother)
   // Higher volatility = shorter window (more responsive)
-  const baseWindow = Math.min(30, Math.floor(closePrices.length / 2));
+  const baseWindow = Math.min(30, Math.floor(typicalPrices.length / 2));
   const windowSize = Math.max(10, Math.floor(baseWindow * (1 - avgVolatility * 20)));
 
-  // Calculate moving average
-  const recentPrices = closePrices.slice(-windowSize);
-  const avgPrice = recentPrices.reduce((sum, price) => sum + price, 0) / windowSize;
+  // Calculate moving average using typical prices
+  const recentPrices = typicalPrices.slice(-windowSize);
+  const avgTypicalPrice = recentPrices.reduce((sum, price) => sum + price, 0) / windowSize;
+
+  // Calculate volume-weighted trend
+  const recentVolumes = volumes.slice(-windowSize);
+  const volumeAvg = recentVolumes.reduce((sum, v) => sum + v, 0) / windowSize;
 
   // Calculate trend from recent prices with weighted approach
   const halfWindow = Math.floor(windowSize / 2);
@@ -186,9 +228,11 @@ export function generateMovingAverageForecast(
   const firstAvg = firstHalf.reduce((sum, p) => sum + p, 0) / halfWindow;
   const secondAvg = secondHalf.reduce((sum, p) => sum + p, 0) / halfWindow;
 
-  // Enhanced trend calculation with momentum
+  // Enhanced trend calculation with momentum and volume
   const trend = (secondAvg - firstAvg) / halfWindow;
   const momentum = (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices.length;
+  const obvTrend = calculateOBVTrend(closePrices.slice(-windowSize), recentVolumes);
+  const volumeImpact = obvTrend > 0 ? 1.05 : 0.95; // 5% boost/reduction based on volume
 
   // Generate predictions
   const lastDate = new Date(stockData[stockData.length - 1].date);
@@ -200,7 +244,11 @@ export function generateMovingAverageForecast(
 
     // Combine trend and momentum with decay over time
     const decayFactor = Math.exp(-i / forecastDays); // Momentum decays over time
-    const predicted = Math.max(0, avgPrice + trend * (i + 1) + momentum * (i + 1) * decayFactor);
+    let predicted = avgTypicalPrice + trend * (i + 1) + momentum * (i + 1) * decayFactor;
+    
+    // Apply volume impact
+    predicted *= volumeImpact;
+    predicted = Math.max(0, predicted);
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],
@@ -213,13 +261,21 @@ export function generateMovingAverageForecast(
 }
 
 /**
- * Exponential Moving Average - Enhanced with dual EMA and momentum
+ * Exponential Moving Average - Enhanced with dual EMA, momentum, and OHLCV
  */
 export function generateEMAForecast(
   stockData: StockData[],
   forecastDays: number = 30
 ): MLPrediction[] {
   const closePrices = stockData.map(d => d.close);
+  const highPrices = stockData.map(d => d.high);
+  const lowPrices = stockData.map(d => d.low);
+  const volumes = stockData.map(d => d.volume);
+
+  // Calculate typical prices for more accurate EMA
+  const typicalPrices = stockData.map((d, i) => 
+    calculateTypicalPrice(highPrices[i], lowPrices[i], closePrices[i])
+  );
 
   // Dual EMA approach: fast (12) and slow (26) for better trend detection
   const fastPeriod = 12;
@@ -227,25 +283,30 @@ export function generateEMAForecast(
   const fastMultiplier = 2 / (fastPeriod + 1);
   const slowMultiplier = 2 / (slowPeriod + 1);
 
-  // Calculate Fast EMA
-  let fastEMA = closePrices.slice(0, fastPeriod).reduce((sum, p) => sum + p, 0) / fastPeriod;
-  for (let i = fastPeriod; i < closePrices.length; i++) {
-    fastEMA = (closePrices[i] - fastEMA) * fastMultiplier + fastEMA;
+  // Calculate Fast EMA on typical prices
+  let fastEMA = typicalPrices.slice(0, fastPeriod).reduce((sum, p) => sum + p, 0) / fastPeriod;
+  for (let i = fastPeriod; i < typicalPrices.length; i++) {
+    fastEMA = (typicalPrices[i] - fastEMA) * fastMultiplier + fastEMA;
   }
 
-  // Calculate Slow EMA
-  let slowEMA = closePrices.slice(0, slowPeriod).reduce((sum, p) => sum + p, 0) / slowPeriod;
-  for (let i = slowPeriod; i < closePrices.length; i++) {
-    slowEMA = (closePrices[i] - slowEMA) * slowMultiplier + slowEMA;
+  // Calculate Slow EMA on typical prices
+  let slowEMA = typicalPrices.slice(0, slowPeriod).reduce((sum, p) => sum + p, 0) / slowPeriod;
+  for (let i = slowPeriod; i < typicalPrices.length; i++) {
+    slowEMA = (typicalPrices[i] - slowEMA) * slowMultiplier + slowEMA;
   }
 
   // MACD-like signal: difference between fast and slow EMA indicates momentum
   const macdSignal = fastEMA - slowEMA;
 
-  // Calculate trend from recent price action
-  const recentWindow = Math.min(20, closePrices.length);
-  const recentPrices = closePrices.slice(-recentWindow);
+  // Calculate trend from recent price action using typical prices
+  const recentWindow = Math.min(20, typicalPrices.length);
+  const recentPrices = typicalPrices.slice(-recentWindow);
   const trend = (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentWindow;
+
+  // Volume analysis
+  const recentVolumes = volumes.slice(-recentWindow);
+  const obvTrend = calculateOBVTrend(closePrices.slice(-recentWindow), recentVolumes);
+  const volumeMultiplier = obvTrend > 0 ? 1.03 : 0.97;
 
   // Generate predictions
   const lastDate = new Date(stockData[stockData.length - 1].date);
@@ -258,7 +319,11 @@ export function generateEMAForecast(
     // Use fast EMA as baseline and incorporate trend + MACD momentum
     // MACD signal decays over time as short-term momentum is less predictive long-term
     const decayFactor = Math.exp(-i / (forecastDays / 2));
-    const predicted = Math.max(0, fastEMA + trend * (i + 1) + macdSignal * decayFactor);
+    let predicted = fastEMA + trend * (i + 1) + macdSignal * decayFactor;
+    
+    // Apply volume-based adjustment
+    predicted *= volumeMultiplier;
+    predicted = Math.max(0, predicted);
 
     predictions.push({
       date: forecastDate.toISOString().split('T')[0],
@@ -545,4 +610,76 @@ export function generateARIMAForecast(
   }
 
   return predictions;
+}
+
+// ============================================================================
+// Helper Functions for Enhanced OHLCV Analysis
+// ============================================================================
+
+/**
+ * Calculate Average True Range (ATR) - measure of volatility
+ */
+function calculateATR(highs: number[], lows: number[], closes: number[], period: number = 14): number {
+  if (highs.length < 2) return 0;
+  
+  const trueRanges: number[] = [];
+  for (let i = 1; i < highs.length; i++) {
+    const high = highs[i];
+    const low = lows[i];
+    const prevClose = closes[i - 1];
+    
+    const tr = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+    trueRanges.push(tr);
+  }
+  
+  // Calculate average
+  const windowSize = Math.min(period, trueRanges.length);
+  const recentTR = trueRanges.slice(-windowSize);
+  return recentTR.reduce((sum, tr) => sum + tr, 0) / windowSize;
+}
+
+/**
+ * Calculate typical price (HLC/3) for better price representation
+ */
+function calculateTypicalPrice(high: number, low: number, close: number): number {
+  return (high + low + close) / 3;
+}
+
+/**
+ * Calculate weighted close (HLCC/4) - gives more weight to close
+ */
+function calculateWeightedClose(high: number, low: number, close: number): number {
+  return (high + low + close + close) / 4;
+}
+
+/**
+ * Calculate On-Balance Volume trend
+ */
+function calculateOBVTrend(closes: number[], volumes: number[]): number {
+  if (closes.length < 2) return 1;
+  
+  let obv = 0;
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i] > closes[i - 1]) {
+      obv += volumes[i];
+    } else if (closes[i] < closes[i - 1]) {
+      obv -= volumes[i];
+    }
+  }
+  
+  return obv;
+}
+
+/**
+ * Calculate price momentum
+ */
+function calculateMomentum(prices: number[], period: number = 10): number {
+  if (prices.length < period) return 0;
+  const current = prices[prices.length - 1];
+  const past = prices[prices.length - period];
+  return (current - past) / past;
 }

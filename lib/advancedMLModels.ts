@@ -22,7 +22,59 @@ function normalizeData(data: number[]): { normalized: number[], min: number, max
   return { normalized, min, max };
 }
 
-// Create sequences for training
+// Normalize multiple features
+function normalizeMultiFeatureData(features: number[][]): { 
+  normalized: number[][], 
+  mins: number[], 
+  maxs: number[] 
+} {
+  const numFeatures = features.length;
+  const normalized: number[][] = [];
+  const mins: number[] = [];
+  const maxs: number[] = [];
+
+  for (let f = 0; f < numFeatures; f++) {
+    const result = normalizeData(features[f]);
+    normalized.push(result.normalized);
+    mins.push(result.min);
+    maxs.push(result.max);
+  }
+
+  return { normalized, mins, maxs };
+}
+
+// Create multi-feature sequences for training (OHLCV + indicators)
+function createMultiFeatureSequences(
+  features: number[][], 
+  lookback: number
+): { X: number[][][], y: number[] } {
+  const X: number[][][] = [];
+  const y: number[] = [];
+  const numSamples = features[0].length;
+  const numFeatures = features.length;
+
+  for (let i = lookback; i < numSamples; i++) {
+    const sequence: number[][] = [];
+    
+    // Create lookback window for all features
+    for (let t = i - lookback; t < i; t++) {
+      const timeStep: number[] = [];
+      for (let f = 0; f < numFeatures; f++) {
+        timeStep.push(features[f][t]);
+      }
+      sequence.push(timeStep);
+    }
+    
+    X.push(sequence);
+    // Predict price change (using close price - first feature)
+    const priceChange = features[0][i] - features[0][i - 1];
+    y.push(priceChange);
+  }
+
+  return { X, y };
+}
+
+// Create sequences for training (single feature - backward compatibility)
 function createSequences(data: number[], lookback: number): { X: number[][][], y: number[] } {
   const X: number[][][] = [];
   const y: number[] = [];
@@ -37,8 +89,39 @@ function createSequences(data: number[], lookback: number): { X: number[][][], y
   return { X, y };
 }
 
+// Prepare multi-feature data from stock data (OHLCV + technical indicators)
+function prepareMultiFeatureData(stockData: StockData[]): number[][] {
+  const features: number[][] = [];
+  
+  // Price features
+  features.push(stockData.map(d => d.close));      // 0: Close
+  features.push(stockData.map(d => d.open));       // 1: Open
+  features.push(stockData.map(d => d.high));       // 2: High
+  features.push(stockData.map(d => d.low));        // 3: Low
+  
+  // Volume feature (normalized by itself)
+  features.push(stockData.map(d => d.volume));     // 4: Volume
+  
+  // Price-based features
+  const typicalPrices = stockData.map((d, i) => (d.high + d.low + d.close) / 3);
+  features.push(typicalPrices);                    // 5: Typical Price
+  
+  // Price range (volatility indicator)
+  const priceRanges = stockData.map(d => d.high - d.low);
+  features.push(priceRanges);                      // 6: Price Range
+  
+  // Returns (momentum indicator)
+  const returns = [0];  // First return is 0
+  for (let i = 1; i < stockData.length; i++) {
+    returns.push((stockData[i].close - stockData[i - 1].close) / stockData[i - 1].close);
+  }
+  features.push(returns);                          // 7: Returns
+  
+  return features;
+}
+
 /**
- * GRU (Gated Recurrent Unit) - Simpler than LSTM, often faster
+ * GRU (Gated Recurrent Unit) - Enhanced with multi-feature OHLCV input
  */
 export async function generateGRUForecast(
   stockData: StockData[],
@@ -47,24 +130,27 @@ export async function generateGRUForecast(
 ): Promise<MLPrediction[]> {
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
-    const closePrices = stockData.map(d => d.close);
-    if (closePrices.length < 60) {
+    if (stockData.length < 60) {
       throw new Error('Insufficient data for GRU forecasting');
     }
 
-    const { normalized, min, max } = normalizeData(closePrices);
+    // Prepare multi-feature data
+    const features = prepareMultiFeatureData(stockData);
+    const { normalized, mins, maxs } = normalizeMultiFeatureData(features);
+    const numFeatures = features.length;
+    
     const lookback = mlSettings.lookbackWindow;
-    const { X, y } = createSequences(normalized, lookback);
+    const { X, y } = createMultiFeatureSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build GRU model (optimized for serverless - smaller and faster)
+    // Build GRU model with multi-feature input
     const model = tf.sequential();
     model.add(tf.layers.gru({
-      units: 16,  // Reduced from 24 for faster training
+      units: 24,  // Increased for multi-feature processing
       returnSequences: false,
-      inputShape: [lookback, 1],
+      inputShape: [lookback, numFeatures],  // Multiple features per timestep
       kernelInitializer: 'glorotUniform',
       recurrentInitializer: 'glorotUniform',
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
@@ -104,25 +190,50 @@ export async function generateGRUForecast(
       }
     });
 
-    // Make predictions
+    // Make predictions with multi-features
     const predictions: number[] = [];
-    let currentSequence = normalized.slice(-lookback);
+    const closePrices = stockData.map(d => d.close);
     let currentPrice = closePrices[closePrices.length - 1];
+    
+    // Initialize sequence with last lookback window (all features)
+    let currentSequence: number[][] = [];
+    for (let t = normalized[0].length - lookback; t < normalized[0].length; t++) {
+      const timeStep: number[] = [];
+      for (let f = 0; f < numFeatures; f++) {
+        timeStep.push(normalized[f][t]);
+      }
+      currentSequence.push(timeStep);
+    }
 
     for (let i = 0; i < forecastDays; i++) {
       const predictedChange = await tf.tidy(() => {
-        const input = tf.tensor3d([currentSequence.map(val => [val])]);
+        const input = tf.tensor3d([currentSequence]);
         const prediction = model.predict(input) as tf.Tensor;
         return prediction;
       }).data().then(data => data[0]);
 
-      const range = max - min;
+      const range = maxs[0] - mins[0];  // Use close price range
       const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
-      const normalizedNewPrice = (currentPrice - min) / range;
+      // Update sequence with new prediction
+      const normalizedNewPrice = (currentPrice - mins[0]) / range;
+      const newTimeStep: number[] = [];
+      
+      // For features we can't predict (open, high, low), use close as estimate
+      newTimeStep.push(normalizedNewPrice);  // close
+      newTimeStep.push(normalizedNewPrice);  // open (approximate)
+      newTimeStep.push(normalizedNewPrice * 1.005);  // high (slightly higher)
+      newTimeStep.push(normalizedNewPrice * 0.995);  // low (slightly lower)
+      
+      // Volume and other features - use recent average
+      for (let f = 4; f < numFeatures; f++) {
+        const recentAvg = currentSequence.slice(-3).reduce((sum, ts) => sum + ts[f], 0) / 3;
+        newTimeStep.push(recentAvg);
+      }
+      
       currentSequence.shift();
-      currentSequence.push(normalizedNewPrice);
+      currentSequence.push(newTimeStep);
 
       predictions.push(currentPrice);
     }
@@ -144,7 +255,7 @@ export async function generateGRUForecast(
 }
 
 /**
- * 1D CNN (Convolutional Neural Network) - Good for pattern recognition
+ * 1D CNN (Convolutional Neural Network) - Enhanced with multi-feature OHLCV input
  */
 export async function generate1DCNNForecast(
   stockData: StockData[],
@@ -153,27 +264,30 @@ export async function generate1DCNNForecast(
 ): Promise<MLPrediction[]> {
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
-    const closePrices = stockData.map(d => d.close);
-    if (closePrices.length < 60) {
+    if (stockData.length < 60) {
       throw new Error('Insufficient data for CNN forecasting');
     }
 
-    const { normalized, min, max } = normalizeData(closePrices);
+    // Prepare multi-feature data
+    const features = prepareMultiFeatureData(stockData);
+    const { normalized, mins, maxs } = normalizeMultiFeatureData(features);
+    const numFeatures = features.length;
+    
     const lookback = mlSettings.lookbackWindow;
-    const { X, y } = createSequences(normalized, lookback);
+    const { X, y } = createMultiFeatureSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build 1D CNN model (optimized for serverless)
+    // Build 1D CNN model with multi-feature input
     const model = tf.sequential();
 
-    // Single Conv1D layer for faster training
+    // Conv1D layer for pattern recognition across features
     model.add(tf.layers.conv1d({
-      filters: 16,  // Reduced from 32
+      filters: 24,  // Increased for multi-feature processing
       kernelSize: 3,
       activation: 'relu',
-      inputShape: [lookback, 1],
+      inputShape: [lookback, numFeatures],  // Multiple features per timestep
       padding: 'same',
       kernelInitializer: 'glorotUniform',
     }));
@@ -198,25 +312,48 @@ export async function generate1DCNNForecast(
       verbose: 0,
     });
 
-    // Make predictions
+    // Make predictions with multi-features
     const predictions: number[] = [];
-    let currentSequence = normalized.slice(-lookback);
+    const closePrices = stockData.map(d => d.close);
     let currentPrice = closePrices[closePrices.length - 1];
+    
+    // Initialize sequence with last lookback window (all features)
+    let currentSequence: number[][] = [];
+    for (let t = normalized[0].length - lookback; t < normalized[0].length; t++) {
+      const timeStep: number[] = [];
+      for (let f = 0; f < numFeatures; f++) {
+        timeStep.push(normalized[f][t]);
+      }
+      currentSequence.push(timeStep);
+    }
 
     for (let i = 0; i < forecastDays; i++) {
       const predictedChange = await tf.tidy(() => {
-        const input = tf.tensor3d([currentSequence.map(val => [val])]);
+        const input = tf.tensor3d([currentSequence]);
         const prediction = model.predict(input) as tf.Tensor;
         return prediction;
       }).data().then(data => data[0]);
 
-      const range = max - min;
+      const range = maxs[0] - mins[0];
       const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
-      const normalizedNewPrice = (currentPrice - min) / range;
+      // Update sequence with new prediction
+      const normalizedNewPrice = (currentPrice - mins[0]) / range;
+      const newTimeStep: number[] = [];
+      
+      newTimeStep.push(normalizedNewPrice);
+      newTimeStep.push(normalizedNewPrice);
+      newTimeStep.push(normalizedNewPrice * 1.005);
+      newTimeStep.push(normalizedNewPrice * 0.995);
+      
+      for (let f = 4; f < numFeatures; f++) {
+        const recentAvg = currentSequence.slice(-3).reduce((sum, ts) => sum + ts[f], 0) / 3;
+        newTimeStep.push(recentAvg);
+      }
+      
       currentSequence.shift();
-      currentSequence.push(normalizedNewPrice);
+      currentSequence.push(newTimeStep);
 
       predictions.push(currentPrice);
     }
@@ -238,7 +375,7 @@ export async function generate1DCNNForecast(
 }
 
 /**
- * Hybrid CNN-LSTM - Combines pattern recognition (CNN) with temporal dependencies (LSTM)
+ * Hybrid CNN-LSTM - Enhanced with multi-feature OHLCV input
  */
 export async function generateCNNLSTMForecast(
   stockData: StockData[],
@@ -247,27 +384,30 @@ export async function generateCNNLSTMForecast(
 ): Promise<MLPrediction[]> {
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
   try {
-    const closePrices = stockData.map(d => d.close);
-    if (closePrices.length < 60) {
+    if (stockData.length < 60) {
       throw new Error('Insufficient data for CNN-LSTM forecasting');
     }
 
-    const { normalized, min, max } = normalizeData(closePrices);
+    // Prepare multi-feature data
+    const features = prepareMultiFeatureData(stockData);
+    const { normalized, mins, maxs } = normalizeMultiFeatureData(features);
+    const numFeatures = features.length;
+    
     const lookback = mlSettings.lookbackWindow;
-    const { X, y } = createSequences(normalized, lookback);
+    const { X, y } = createMultiFeatureSequences(normalized, lookback);
 
     const xsTensor = tf.tensor3d(X);
     const ysTensor = tf.tensor2d(y, [y.length, 1]);
 
-    // Build Hybrid CNN-LSTM model (optimized)
+    // Build Hybrid CNN-LSTM model with multi-feature input
     const model = tf.sequential();
 
-    // CNN for feature extraction
+    // CNN for feature extraction across multiple features
     model.add(tf.layers.conv1d({
-      filters: 12,  // Reduced from 16
+      filters: 16,  // Increased for multi-feature processing
       kernelSize: 2,
       activation: 'relu',
-      inputShape: [lookback, 1],
+      inputShape: [lookback, numFeatures],  // Multiple features per timestep
       padding: 'same',
     }));
     model.add(tf.layers.dropout({ rate: mlSettings.dropout }));
@@ -298,25 +438,48 @@ export async function generateCNNLSTMForecast(
       verbose: 0,
     });
 
-    // Make predictions
+    // Make predictions with multi-features
     const predictions: number[] = [];
-    let currentSequence = normalized.slice(-lookback);
+    const closePrices = stockData.map(d => d.close);
     let currentPrice = closePrices[closePrices.length - 1];
+    
+    // Initialize sequence with last lookback window (all features)
+    let currentSequence: number[][] = [];
+    for (let t = normalized[0].length - lookback; t < normalized[0].length; t++) {
+      const timeStep: number[] = [];
+      for (let f = 0; f < numFeatures; f++) {
+        timeStep.push(normalized[f][t]);
+      }
+      currentSequence.push(timeStep);
+    }
 
     for (let i = 0; i < forecastDays; i++) {
       const predictedChange = await tf.tidy(() => {
-        const input = tf.tensor3d([currentSequence.map(val => [val])]);
+        const input = tf.tensor3d([currentSequence]);
         const prediction = model.predict(input) as tf.Tensor;
         return prediction;
       }).data().then(data => data[0]);
 
-      const range = max - min;
+      const range = maxs[0] - mins[0];
       const denormalizedChange = predictedChange * range * mlSettings.dampingFactor;
       currentPrice += denormalizedChange;
 
-      const normalizedNewPrice = (currentPrice - min) / range;
+      // Update sequence with new prediction
+      const normalizedNewPrice = (currentPrice - mins[0]) / range;
+      const newTimeStep: number[] = [];
+      
+      newTimeStep.push(normalizedNewPrice);
+      newTimeStep.push(normalizedNewPrice);
+      newTimeStep.push(normalizedNewPrice * 1.005);
+      newTimeStep.push(normalizedNewPrice * 0.995);
+      
+      for (let f = 4; f < numFeatures; f++) {
+        const recentAvg = currentSequence.slice(-3).reduce((sum, ts) => sum + ts[f], 0) / 3;
+        newTimeStep.push(recentAvg);
+      }
+      
       currentSequence.shift();
-      currentSequence.push(normalizedNewPrice);
+      currentSequence.push(newTimeStep);
 
       predictions.push(currentPrice);
     }

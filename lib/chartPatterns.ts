@@ -45,19 +45,21 @@ const PATTERN_DIRECTION: Record<ChartPatternType, ChartPattern['direction']> = {
   head_and_shoulders: 'bearish',
 };
 
-const DETECTION_WINDOWS = [60, 120, 200];
-const MIN_WINDOW = 45;
-const MAX_PATTERNS = 12;
-const MAX_PATTERNS_PER_TYPE = 2;
+// Enhanced detection windows for more frequent pattern detection
+const DETECTION_WINDOWS = [30, 45, 60, 90, 120, 150, 200];
+const MIN_WINDOW = 25;  // Reduced from 45 for earlier pattern detection
+const MAX_PATTERNS = 20;  // Increased from 12 to detect more patterns
+const MAX_PATTERNS_PER_TYPE = 3;  // Increased from 2 for more pattern variety
 const VOLATILITY_FLOOR = 0.002;
 const VOLATILITY_CAP = 0.2;
-const MAX_PATTERN_OVERLAP = 0.65;
+const MAX_PATTERN_OVERLAP = 0.7;  // Slightly increased to allow more overlapping patterns
+// Reduced confidence thresholds for more sensitive detection
 const MIN_CONFIDENCE_PER_TYPE: Partial<Record<ChartPatternType, number>> = {
-  double_top: 0.6,
-  double_bottom: 0.6,
-  head_and_shoulders: 0.65,
-  wedge_up: 0.55,
-  wedge_down: 0.55,
+  double_top: 0.5,  // Reduced from 0.6
+  double_bottom: 0.5,  // Reduced from 0.6
+  head_and_shoulders: 0.55,  // Reduced from 0.65
+  wedge_up: 0.45,  // Reduced from 0.55
+  wedge_down: 0.45,  // Reduced from 0.55
 };
 
 interface LineStats {
@@ -129,24 +131,24 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number): ChartPatt
   const lowStats = linearRegression(lows);
   const highStats = linearRegression(highs);
   const volatilityPct = getWindowVolatilityPct(data, startIndex, data.length - 1);
-  const supportTolerance = getAdaptiveTolerance(0.004, volatilityPct, 1.1);
-  const resistanceTolerance = getAdaptiveTolerance(0.004, volatilityPct, 1.1);
+  const supportTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.2);  // More tolerant
+  const resistanceTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.2);
 
   const patterns: ChartPattern[] = [];
 
   if (lowStats) {
     const touches = countLineTouches(lows, lowStats.slope, lowStats.intercept, supportTolerance);
-    const minTouches = Math.max(3, Math.round(slice.length * 0.2));
+    const minTouches = Math.max(2, Math.round(slice.length * 0.15));  // Reduced minimum touches
     if (
-      lowStats.slopePct >= -0.0008 &&
+      lowStats.slopePct >= -0.001 &&  // More tolerant slope
       touches.touches >= minTouches &&
-      lowStats.r2 >= 0.35 &&
-      touches.avgDeviation <= supportTolerance * 1.1
+      lowStats.r2 >= 0.3 &&  // Reduced R² threshold
+      touches.avgDeviation <= supportTolerance * 1.2
     ) {
       const confidence = clamp(
-        0.35 +
+        0.3 +  // Lower base confidence
           Math.min(0.35, touches.touches / slice.length) +
-          Math.min(0.3, lowStats.r2),
+          Math.min(0.35, lowStats.r2),
         0,
         0.95
       );
@@ -169,17 +171,17 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number): ChartPatt
       highStats.intercept,
       resistanceTolerance
     );
-    const minTouches = Math.max(3, Math.round(slice.length * 0.2));
+    const minTouches = Math.max(2, Math.round(slice.length * 0.15));  // Reduced minimum touches
     if (
-      highStats.slopePct <= 0.0008 &&
+      highStats.slopePct <= 0.001 &&  // More tolerant slope
       touches.touches >= minTouches &&
-      highStats.r2 >= 0.35 &&
-      touches.avgDeviation <= resistanceTolerance * 1.1
+      highStats.r2 >= 0.3 &&  // Reduced R² threshold
+      touches.avgDeviation <= resistanceTolerance * 1.2
     ) {
       const confidence = clamp(
-        0.35 +
+        0.3 +  // Lower base confidence
           Math.min(0.35, touches.touches / slice.length) +
-          Math.min(0.3, highStats.r2),
+          Math.min(0.35, highStats.r2),
         0,
         0.95
       );
@@ -206,16 +208,16 @@ function detectHorizontalSR(data: ChartDataPoint[], windowSize: number): ChartPa
   const highs = slice.map(point => getHigh(point));
   const lows = slice.map(point => getLow(point));
   const volatilityPct = getWindowVolatilityPct(data, startIndex, startIndex + slice.length - 1);
-  const clusterTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.3);
+  const clusterTolerance = getAdaptiveTolerance(0.008, volatilityPct, 1.5);  // More tolerant clustering
 
-  const highPeaks = findLocalExtrema(highs, 3, 'max');
-  const lowTroughs = findLocalExtrema(lows, 3, 'min');
+  const highPeaks = findLocalExtrema(highs, 2, 'max');  // Reduced distance for more peaks
+  const lowTroughs = findLocalExtrema(lows, 2, 'min');  // Reduced distance for more troughs
 
   const highClusters = clusterLevels(highs, highPeaks, clusterTolerance);
   const lowClusters = clusterLevels(lows, lowTroughs, clusterTolerance);
 
-  const topCluster = highClusters.find(cluster => cluster.indexes.length >= 3);
-  const bottomCluster = lowClusters.find(cluster => cluster.indexes.length >= 3);
+  const topCluster = highClusters.find(cluster => cluster.indexes.length >= 2);  // Reduced from 3
+  const bottomCluster = lowClusters.find(cluster => cluster.indexes.length >= 2);  // Reduced from 3
 
   if (!topCluster || !bottomCluster) {
     return [];
@@ -510,11 +512,11 @@ function detectChannels(data: ChartDataPoint[], windowSize: number): ChartPatter
 
 function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
-  const peaks = findLocalExtrema(closes, 3, 'max');
+  const peaks = findLocalExtrema(closes, 2, 'max');  // Reduced from 3 for more peaks
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const baseTolerance = 0.012;
-  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.04);
-  const minSeparation = 5;
+  const baseTolerance = 0.015;  // Increased tolerance
+  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.05);  // More tolerant
+  const minSeparation = 3;  // Reduced from 5 for earlier detection
   const results: ChartPattern[] = [];
 
   for (let i = peaks.length - 1; i >= 1; i--) {
@@ -522,7 +524,7 @@ function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
     for (let j = i - 1; j >= 0; j--) {
       const first = peaks[j];
       const separation = second - first;
-      if (separation < minSeparation || separation > 160) continue;
+      if (separation < minSeparation || separation > 180) continue;  // Extended range
 
       const firstVal = closes[first];
       const secondVal = closes[second];
@@ -560,11 +562,11 @@ function detectDoubleTops(data: ChartDataPoint[]): ChartPattern[] {
 
 function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
-  const troughs = findLocalExtrema(closes, 3, 'min');
+  const troughs = findLocalExtrema(closes, 2, 'min');  // Reduced from 3 for more troughs
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const baseTolerance = 0.012;
-  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.04);
-  const minSeparation = 5;
+  const baseTolerance = 0.015;  // Increased tolerance
+  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.05);  // More tolerant
+  const minSeparation = 3;  // Reduced from 5 for earlier detection
   const results: ChartPattern[] = [];
 
   for (let i = troughs.length - 1; i >= 1; i--) {
@@ -572,7 +574,7 @@ function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
     for (let j = i - 1; j >= 0; j--) {
       const first = troughs[j];
       const separation = second - first;
-      if (separation < minSeparation || separation > 160) continue;
+      if (separation < minSeparation || separation > 180) continue;  // Extended range
 
       const firstVal = closes[first];
       const secondVal = closes[second];
@@ -610,11 +612,11 @@ function detectDoubleBottoms(data: ChartDataPoint[]): ChartPattern[] {
 
 function detectMultipleTops(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
-  const peaks = findLocalExtrema(closes, 3, 'max').filter(index => index >= closes.length - 220);
+  const peaks = findLocalExtrema(closes, 2, 'max').filter(index => index >= closes.length - 250);  // More history, smaller distance
   if (peaks.length < 3) return [];
 
-  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, closes.length - 220), closes.length - 1);
-  const clusterTolerance = getAdaptiveTolerance(0.012, volatilityPct, 1.4);
+  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, closes.length - 250), closes.length - 1);
+  const clusterTolerance = getAdaptiveTolerance(0.015, volatilityPct, 1.6);  // More tolerant
   const clusters = clusterLevels(closes, peaks, clusterTolerance);
   const cluster = clusters.find(c => c.indexes.length >= 3);
   if (!cluster) return [];
@@ -642,11 +644,11 @@ function detectMultipleTops(data: ChartDataPoint[]): ChartPattern[] {
 
 function detectMultipleBottoms(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
-  const troughs = findLocalExtrema(closes, 3, 'min').filter(index => index >= closes.length - 220);
+  const troughs = findLocalExtrema(closes, 2, 'min').filter(index => index >= closes.length - 250);  // More history, smaller distance
   if (troughs.length < 3) return [];
 
-  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, closes.length - 220), closes.length - 1);
-  const clusterTolerance = getAdaptiveTolerance(0.012, volatilityPct, 1.4);
+  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, closes.length - 250), closes.length - 1);
+  const clusterTolerance = getAdaptiveTolerance(0.015, volatilityPct, 1.6);  // More tolerant
   const clusters = clusterLevels(closes, troughs, clusterTolerance);
   const cluster = clusters.find(c => c.indexes.length >= 3);
   if (!cluster) return [];
@@ -674,10 +676,10 @@ function detectMultipleBottoms(data: ChartDataPoint[]): ChartPattern[] {
 
 function detectHeadAndShoulders(data: ChartDataPoint[]): ChartPattern[] {
   const closes = data.map(point => getClose(point));
-  const peaks = findLocalExtrema(closes, 4, 'max');
+  const peaks = findLocalExtrema(closes, 3, 'max');  // Reduced from 4 for more peaks
   if (peaks.length < 3) return [];
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const patternTolerance = getAdaptiveTolerance(0.02, volatilityPct, 4);
+  const patternTolerance = getAdaptiveTolerance(0.025, volatilityPct, 4.5);  // More tolerant
   const results: ChartPattern[] = [];
 
   for (let i = peaks.length - 3; i >= 0; i--) {
@@ -685,8 +687,8 @@ function detectHeadAndShoulders(data: ChartDataPoint[]): ChartPattern[] {
     const head = peaks[i + 1];
     const right = peaks[i + 2];
 
-    if (head - left < 5 || right - head < 5) continue;
-    if (right - left > 200) continue;
+    if (head - left < 3 || right - head < 3) continue;  // Reduced from 5
+    if (right - left > 250) continue;  // Extended range
 
     const leftVal = closes[left];
     const headVal = closes[head];
