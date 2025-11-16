@@ -3,12 +3,33 @@
 import React from 'react';
 import { Building2, TrendingUp, DollarSign, BarChart3, Percent, Award, ExternalLink, ArrowUp, ArrowDown } from 'lucide-react';
 
+interface FundamentalsData {
+  fundamentals: {
+    peRatio: number | null;
+    eps: number | null;
+    profitMargin: number | null;
+    operatingMargin: number | null;
+    roe: number | null;
+    roa: number | null;
+    debtToEquity: number | null;
+    currentRatio: number | null;
+    revenueGrowth: number | null;
+    earningsGrowth: number | null;
+    dividendYield: number | null;
+    analystTargetPrice: number | null;
+    pegRatio: number | null;
+    priceToBook: number | null;
+  };
+}
+
 interface CompanyInfoProps {
   symbol: string;
   companyName: string;
   currentPrice: number;
   currentChange?: number | null;
   currentChangePercent?: number | null;
+  fundamentalsData?: FundamentalsData | null;
+  fundamentalsLoading?: boolean;
   companyInfo: {
     sector?: string;
     industry?: string;
@@ -55,8 +76,9 @@ interface CompanyInfoProps {
   };
 }
 
-export default function CompanyInfo({ symbol, companyName, currentPrice, currentChange, currentChangePercent, companyInfo }: CompanyInfoProps) {
+export default function CompanyInfo({ symbol, companyName, currentPrice, currentChange, currentChangePercent, companyInfo, fundamentalsData, fundamentalsLoading }: CompanyInfoProps) {
   const [imageError, setImageError] = React.useState(false);
+  const [showFundamentals, setShowFundamentals] = React.useState(true);
 
   // Reset image error when symbol changes
   React.useEffect(() => {
@@ -327,6 +349,200 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
           </div>
         )}
       </div>
+
+      {/* Fundamentals Section */}
+      {fundamentalsData && (
+        <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--bg-1)' }}>
+          <button
+            onClick={() => setShowFundamentals(!showFundamentals)}
+            className="flex items-center justify-between w-full mb-4 text-lg font-semibold"
+            style={{ color: 'var(--text-2)' }}
+          >
+            <span>📊 Fundamentals Analysis</span>
+            <span style={{ color: 'var(--accent)' }}>{showFundamentals ? '▼' : '▶'}</span>
+          </button>
+
+          {showFundamentals && (
+            <>
+              {/* Key Metrics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {fundamentalsData.fundamentals.peRatio && (
+                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--info)', borderLeftWidth: '3px' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>P/E Ratio</div>
+                    <div className="text-lg font-bold" style={{ color: 'var(--info)' }}>
+                      {fundamentalsData.fundamentals.peRatio.toFixed(2)}
+                    </div>
+                  </div>
+                )}
+
+                {fundamentalsData.fundamentals.eps && (
+                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--success)', borderLeftWidth: '3px' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>EPS</div>
+                    <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
+                      ${fundamentalsData.fundamentals.eps.toFixed(2)}
+                    </div>
+                  </div>
+                )}
+
+                {fundamentalsData.fundamentals.profitMargin && (
+                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--accent)', borderLeftWidth: '3px' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Profit Margin</div>
+                    <div className="text-lg font-bold" style={{ color: 'var(--accent)' }}>
+                      {(fundamentalsData.fundamentals.profitMargin * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                )}
+
+                {fundamentalsData.fundamentals.roe && (
+                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--warning)', borderLeftWidth: '3px' }}>
+                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>ROE</div>
+                    <div className="text-lg font-bold" style={{ color: 'var(--warning)' }}>
+                      {(fundamentalsData.fundamentals.roe * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                {/* Valuation */}
+                <div>
+                  <div className="font-semibold mb-2" style={{ color: 'var(--text-3)' }}>Valuation</div>
+                  <div className="space-y-1 text-xs">
+                    {fundamentalsData.fundamentals.peRatio && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>P/E Ratio:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.peRatio.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.pegRatio && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>PEG Ratio:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.pegRatio.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.priceToBook && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Price/Book:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.priceToBook.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Profitability */}
+                <div>
+                  <div className="font-semibold mb-2" style={{ color: 'var(--text-3)' }}>Profitability</div>
+                  <div className="space-y-1 text-xs">
+                    {fundamentalsData.fundamentals.profitMargin && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Profit Margin:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.profitMargin * 100).toFixed(2)}%</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.operatingMargin && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Operating Margin:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.operatingMargin * 100).toFixed(2)}%</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.roe && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>ROE:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.roe * 100).toFixed(2)}%</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.roa && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>ROA:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.roa * 100).toFixed(2)}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Financial Health & Growth */}
+                <div>
+                  <div className="font-semibold mb-2" style={{ color: 'var(--text-3)' }}>Health & Growth</div>
+                  <div className="space-y-1 text-xs">
+                    {fundamentalsData.fundamentals.debtToEquity && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Debt/Equity:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.debtToEquity.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.currentRatio && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Current Ratio:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.currentRatio.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.revenueGrowth && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Revenue Growth:</span>
+                        <span style={{ color: fundamentalsData.fundamentals.revenueGrowth > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                          {(fundamentalsData.fundamentals.revenueGrowth * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.earningsGrowth && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Earnings Growth:</span>
+                        <span style={{ color: fundamentalsData.fundamentals.earningsGrowth > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                          {(fundamentalsData.fundamentals.earningsGrowth * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Analyst Target Price */}
+              {fundamentalsData.fundamentals.analystTargetPrice && (
+                <div className="mt-4 p-3 border-2" style={{ 
+                  background: 'var(--bg-2)', 
+                  borderColor: 'var(--accent)',
+                  borderLeftWidth: '3px'
+                }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Analyst Target Price</div>
+                      <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>
+                        ${fundamentalsData.fundamentals.analystTargetPrice.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold" style={{ 
+                        color: fundamentalsData.fundamentals.analystTargetPrice > currentPrice ? 'var(--success)' : 'var(--danger)' 
+                      }}>
+                        {fundamentalsData.fundamentals.analystTargetPrice > currentPrice ? '↑' : '↓'} 
+                        {Math.abs(((fundamentalsData.fundamentals.analystTargetPrice - currentPrice) / currentPrice) * 100).toFixed(1)}%
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--text-4)' }}>
+                        {fundamentalsData.fundamentals.analystTargetPrice > currentPrice ? 'Upside Potential' : 'Downside Risk'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Data Source */}
+              <div className="mt-3 text-xs text-center" style={{ color: 'var(--text-5)' }}>
+                Fundamentals data provided by Alpha Vantage
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {fundamentalsLoading && (
+        <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--bg-1)' }}>
+          <div className="flex items-center justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: 'var(--accent)' }} />
+            <span className="ml-2 text-sm" style={{ color: 'var(--text-4)' }}>Loading fundamentals...</span>
+          </div>
+        </div>
+      )}
 
       {/* Footer with CIK and identifiers */}
       {(companyInfo.cik || companyInfo.sicCode) && (

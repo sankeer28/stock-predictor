@@ -46,6 +46,8 @@ export default function Home() {
   const [companyName, setCompanyName] = useState<string>('');
   const [marketState, setMarketState] = useState<string>('');
   const [companyInfo, setCompanyInfo] = useState<any>(null);
+  const [fundamentalsData, setFundamentalsData] = useState<any>(null);
+  const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [forecastData, setForecastData] = useState<any[]>([]);
   const [prophetForecastData, setProphetForecastData] = useState<ProphetForecast[]>([]);
@@ -281,6 +283,24 @@ export default function Home() {
         change: typeof stockResult.change !== 'undefined' ? stockResult.change : null,
         changePercent: typeof stockResult.changePercent !== 'undefined' ? stockResult.changePercent : null,
       });
+
+      // Fetch fundamentals data from Alpha Vantage (cached for 24 hours)
+      const cachedFundamentals = localStorage.getItem(`fundamentals_${stockSymbol}`);
+      const cachedTime = localStorage.getItem(`fundamentals_time_${stockSymbol}`);
+      
+      if (cachedFundamentals && cachedTime) {
+        const age = Date.now() - parseInt(cachedTime);
+        if (age < 24 * 60 * 60 * 1000) { // 24 hours
+          console.log(`Using cached fundamentals for ${stockSymbol}`);
+          setFundamentalsData(JSON.parse(cachedFundamentals));
+        } else {
+          // Cache expired, fetch new data
+          fetchFundamentals(stockSymbol);
+        }
+      } else {
+        // No cache, fetch new data
+        fetchFundamentals(stockSymbol);
+      }
 
       // Add to search history
       addToHistory(stockSymbol, price);
@@ -655,6 +675,31 @@ export default function Home() {
     }
   }, [forecastHorizon, mlSettings]);
 
+  // Fetch fundamentals data
+  const fetchFundamentals = async (stockSymbol: string) => {
+    setFundamentalsLoading(true);
+    try {
+      const response = await fetch(`/api/fundamentals?symbol=${stockSymbol}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFundamentalsData(data);
+        
+        // Cache for 24 hours
+        localStorage.setItem(`fundamentals_${stockSymbol}`, JSON.stringify(data));
+        localStorage.setItem(`fundamentals_time_${stockSymbol}`, Date.now().toString());
+      } else {
+        const error = await response.json();
+        console.error('Fundamentals fetch error:', error);
+        setFundamentalsData(null);
+      }
+    } catch (error) {
+      console.error('Error fetching fundamentals:', error);
+      setFundamentalsData(null);
+    } finally {
+      setFundamentalsLoading(false);
+    }
+  };
+
   const handleSearch = () => {
     if (inputSymbol.trim()) {
       fetchData(inputSymbol.trim().toUpperCase());
@@ -923,6 +968,8 @@ export default function Home() {
                   currentChange={companyInfo?.change ?? (stockData.length > 1 ? undefined : undefined)}
                   currentChangePercent={companyInfo?.changePercent ?? undefined}
                   companyInfo={companyInfo}
+                  fundamentalsData={fundamentalsData}
+                  fundamentalsLoading={fundamentalsLoading}
                 />
               </div>
             )}
