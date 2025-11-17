@@ -147,12 +147,12 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-2 md:gap-3">
               {/* Today's change with arrow to the left of the price */}
               {typeof change === 'number' && typeof changePercent === 'number' ? (
-                <div className="flex items-center text-sm font-mono" style={{ color: change > 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {change > 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                <div className="flex items-center text-xs md:text-sm font-mono" style={{ color: change > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {change > 0 ? <ArrowUp className="w-3 h-3 md:w-4 md:h-4" /> : <ArrowDown className="w-3 h-3 md:w-4 md:h-4" />}
                   <span className="ml-1">
                     {change > 0 ? '+' : ''}{change.toFixed(2)} ({changePercent.toFixed(2)}%)
                   </span>
@@ -160,7 +160,7 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
               ) : null}
 
               <div className="text-right">
-                <div className="text-4xl font-bold font-mono" style={{ color: 'var(--accent)' }}>
+                <div className="text-2xl md:text-4xl font-bold font-mono" style={{ color: 'var(--accent)' }}>
                   ${currentPrice.toFixed(2)}
                 </div>
               </div>
@@ -170,7 +170,7 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
                 href={companyInfo.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 border transition-colors"
+                className="hidden md:flex items-center gap-2 px-3 py-2 border transition-colors"
                 style={{
                   color: 'var(--accent)',
                   borderColor: 'var(--accent)',

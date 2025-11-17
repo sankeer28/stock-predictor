@@ -271,9 +271,9 @@ export default function TechnicalIndicatorsChart({
 
     return (
       <div className="w-full">
-        <div className="h-[200px]">
+        <div className="h-[150px] sm:h-[180px] md:h-[200px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 15, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
               <XAxis
                 dataKey="date"
@@ -378,9 +378,9 @@ export default function TechnicalIndicatorsChart({
 
   return (
     <div className="w-full">
-      <div className="h-[200px]">
+      <div className="h-[150px] sm:h-[180px] md:h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <LineChart data={data} margin={{ top: 5, right: 15, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
             <XAxis
               dataKey="date"

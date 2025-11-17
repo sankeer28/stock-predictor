@@ -1250,11 +1250,11 @@ export default function StockChart({
         </div>
       )}
 
-      <div ref={chartRef} className="w-full h-[550px]">
+      <div ref={chartRef} className="w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[550px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartType === 'candlestick' ? candlestickData : combinedData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 50 }}
+            margin={{ top: 5, right: 10, left: 0, bottom: 30 }}
             barCategoryGap="10%"
           >
           <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
