@@ -3,11 +3,5 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "functions": {
-    "app/api/sentiment/route.ts": {
-      "maxDuration": 60,
-      "memory": 3008
-    }
-  }
+  "regions": ["iad1"]
 }

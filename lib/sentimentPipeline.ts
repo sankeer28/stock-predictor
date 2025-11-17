@@ -1,48 +1,7 @@
-import { pipeline, env } from '@xenova/transformers';
-
-// Configure cache directory for Vercel (use /tmp which is writable)
-if (process.env.VERCEL) {
-  env.cacheDir = '/tmp/.transformers_cache';
-}
-
-// Singleton pattern for sentiment analysis pipeline
-let sentimentPipeline: any = null;
-let pipelinePromise: Promise<any> | null = null;
-
 /**
- * Get or initialize the sentiment analysis pipeline
- * Uses DistilBERT with keyword-enhanced logic for better financial sentiment
+ * Lightweight sentiment analysis using rule-based NLP
+ * No ML dependencies - perfect for serverless with memory constraints
  */
-export async function getSentimentPipeline(): Promise<any> {
-  if (sentimentPipeline !== null) {
-    return sentimentPipeline;
-  }
-
-  // If already loading, return the existing promise
-  if (pipelinePromise !== null) {
-    return pipelinePromise;
-  }
-
-  // Start loading the pipeline
-  pipelinePromise = (async () => {
-    try {
-      // Use DistilBERT fine-tuned on SST-2
-      sentimentPipeline = await pipeline(
-        'sentiment-analysis',
-        'Xenova/distilbert-base-uncased-finetuned-sst-2-english'
-      );
-      console.log('Loaded sentiment model: DistilBERT SST-2 with keyword enhancement');
-      pipelinePromise = null; // Clear the promise once loaded
-      return sentimentPipeline;
-    } catch (error) {
-      console.error('Failed to load sentiment model:', error);
-      pipelinePromise = null;
-      throw error;
-    }
-  })();
-
-  return pipelinePromise;
-}
 
 /**
  * NLP-enhanced sentiment adjustment for financial news
@@ -230,11 +189,10 @@ function getKeywordAdjustment(text: string): { adjustment: number; override?: 'p
 }
 
 /**
- * Analyze sentiment using transformers.js (DistilBERT) + NLP enhancements
+ * Analyze sentiment using lightweight rule-based NLP
  * Returns label (positive/negative/neutral) and score
  *
  * Features:
- * - ML Model: DistilBERT for base sentiment
  * - Negation Detection: "not good", "no growth" → flips sentiment
  * - Intensity Modifiers: "very", "extremely" → boosts strength
  * - Comparative Language: "better than expected" → strong signal
@@ -250,48 +208,37 @@ export async function analyzeSentimentWithTransformers(text: string): Promise<{
   }
 
   try {
-    const pipe = await getSentimentPipeline();
-    const truncatedText = text.slice(0, 512); // Limit to 512 tokens
-
-    // Get ML model prediction
-    const result = await pipe(truncatedText);
-    const sentiment = Array.isArray(result) ? result[0] : result;
-    const mlLabel = sentiment.label.toLowerCase();
-    const mlScore = sentiment.score;
-
-    // Get keyword-based adjustment
+    // Get keyword-based sentiment analysis
     const { adjustment, override } = getKeywordAdjustment(text);
 
-    // Determine final sentiment
+    // Determine sentiment based on keyword analysis
     let finalLabel: string;
     let finalScore: number;
 
-    // If keywords strongly suggest an override, use it
-    if (override && Math.abs(adjustment) >= 2) {
+    // Strong signals from keywords
+    if (override) {
       finalLabel = override;
-      finalScore = override === 'positive' ? 0.85 : 0.85;
+      finalScore = 0.85;
+    } else if (adjustment > 1.5) {
+      // Strong positive
+      finalLabel = 'positive';
+      finalScore = Math.min(0.95, 0.7 + adjustment * 0.1);
+    } else if (adjustment < -1.5) {
+      // Strong negative
+      finalLabel = 'negative';
+      finalScore = Math.min(0.95, 0.7 + Math.abs(adjustment) * 0.1);
+    } else if (adjustment > 0.3) {
+      // Moderate positive
+      finalLabel = 'positive';
+      finalScore = 0.6 + adjustment * 0.1;
+    } else if (adjustment < -0.3) {
+      // Moderate negative
+      finalLabel = 'negative';
+      finalScore = 0.6 + Math.abs(adjustment) * 0.1;
     } else {
-      // Otherwise, use ML prediction with keyword-based confidence adjustment
-      finalLabel = mlLabel;
-      finalScore = mlScore;
-
-      // Adjust confidence based on keyword match
-      if ((mlLabel === 'positive' && adjustment > 0) || (mlLabel === 'negative' && adjustment < 0)) {
-        // Keywords agree with ML - boost confidence
-        finalScore = Math.min(0.99, mlScore + Math.abs(adjustment) * 0.05);
-      } else if ((mlLabel === 'positive' && adjustment < -1) || (mlLabel === 'negative' && adjustment > 1)) {
-        // Strong keyword disagreement - maybe flip or make neutral
-        if (mlScore < 0.7) {
-          finalLabel = 'neutral';
-          finalScore = 0.5;
-        }
-      }
-
-      // Map to our format (positive/negative/neutral)
-      if (finalScore < 0.6) {
-        finalLabel = 'neutral';
-        finalScore = 0.5;
-      }
+      // Neutral
+      finalLabel = 'neutral';
+      finalScore = 0.5;
     }
 
     return {
