@@ -1142,7 +1142,7 @@ export default function Home() {
 
               {/* Market Status */}
               {!loading && stockData.length > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 border-2" style={{
+                <div className="hidden md:flex items-center gap-2 px-3 py-2 border-2" style={{
                   borderColor: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)',
                   background: 'var(--bg-3)',
                 }}>
