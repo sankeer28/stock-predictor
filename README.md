@@ -27,20 +27,6 @@ Stock analysis with ML forecasting, technical analysis, and sentiment analysis.
 - **Volume Analysis**: Identifies unusual trading activity
 - **Momentum**: Price action and trend strength indicators
 
-## Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Charts**: Recharts
-- **ML & AI**:
-  - TensorFlow.js (LSTM, GRU, CNN neural networks)
-  - Custom NLP (rule-based sentiment with financial domain knowledge)
-- **APIs**:
-  - Yahoo Finance (stock data)
-  - NewsAPI (news articles)
-
-## Getting Started
 
 ### Prerequisites
 
@@ -80,12 +66,9 @@ npm run dev
 6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 
-
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
 
 ## Disclaimer
 
