@@ -1,5 +1,6 @@
 # Stock Predictor
 Stock analysis with ML forecasting, technical analysis, and sentiment analysis.
+![demo](https://github.com/user-attachments/assets/7d1f79fb-8e0d-46c0-9b37-bc4879e283d7)
 
 ## AI Models & Algorithms
 
