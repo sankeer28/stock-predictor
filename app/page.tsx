@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, TrendingUp, Loader2, AlertCircle, Github } from 'lucide-react';
+import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock } from 'lucide-react';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateTradingSignal } from '@/lib/tradingSignals';
@@ -36,6 +36,7 @@ const PatternAnalysis = dynamic(() => import('@/components/PatternAnalysis'), { 
 const MLSettingsPanel = dynamic(() => import('@/components/MLSettingsPanel'), { ssr: false });
 const PatternSettingsPanel = dynamic(() => import('@/components/PatternSettingsPanel'), { ssr: false });
 const CorrelationHeatmap = dynamic(() => import('@/components/CorrelationHeatmap'), { ssr: false });
+const PredictionsCache = dynamic(() => import('@/components/PredictionsCache'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -1032,21 +1033,7 @@ export default function Home() {
   return (
     <main className="min-h-screen p-4" style={{ background: 'var(--bg-4)' }}>
       <div className="flex gap-4 items-start">
-        {/* Left Sidebar - Search History */}
-        <div className="hidden xl:block flex-shrink-0">
-          <Sidebar
-            searchHistory={searchHistory}
-            onSelectSymbol={(sym) => {
-              setInputSymbol(sym);
-              fetchData(sym);
-            }}
-            onClearHistory={clearHistory}
-            currentSymbol={symbol}
-            onLoadCachedPrediction={handleLoadCachedPrediction}
-          />
-        </div>
-
-        {/* Main Content Area */}
+        {/* Main Content Area - Now Full Width */}
         <div className="flex-1 min-w-0">
           {/* Header with Search */}
           <div className="card mb-4">
@@ -1152,6 +1139,72 @@ export default function Home() {
                     </>
                   )}
                 </button>
+
+                {/* Search History Dropdown */}
+                {searchHistory.length > 0 && (
+                  <details className="relative">
+                    <summary className="px-4 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border list-none"
+                      style={{
+                        background: 'var(--bg-3)',
+                        borderColor: 'var(--bg-1)',
+                        color: 'var(--text-3)'
+                      }}>
+                      <Clock className="w-5 h-5" />
+                      <span className="hidden sm:inline">History ({searchHistory.length})</span>
+                      <span className="sm:hidden">{searchHistory.length}</span>
+                    </summary>
+                    <div className="absolute right-0 mt-2 w-64 border-2 shadow-lg z-50 max-h-96 overflow-y-auto"
+                      style={{
+                        background: 'var(--bg-2)',
+                        borderColor: 'var(--bg-1)'
+                      }}>
+                      <div className="p-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--bg-1)' }}>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-4)' }}>Recent Searches</span>
+                        <button
+                          onClick={clearHistory}
+                          className="text-xs px-2 py-1 border transition-all"
+                          style={{
+                            background: 'var(--bg-3)',
+                            borderColor: 'var(--bg-1)',
+                            color: 'var(--danger)'
+                          }}
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      {searchHistory.map((item, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setInputSymbol(item.symbol);
+                            fetchData(item.symbol);
+                          }}
+                          className="w-full text-left px-3 py-2 transition-all border-b hover:opacity-80"
+                          style={{
+                            borderColor: 'var(--bg-1)',
+                            background: item.symbol === symbol ? 'var(--bg-3)' : 'transparent'
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-2)' }}>
+                                {item.symbol}
+                              </div>
+                              {item.companyName && (
+                                <div className="text-xs truncate" style={{ color: 'var(--text-4)' }}>
+                                  {item.companyName}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs" style={{ color: 'var(--text-5)' }}>
+                              {new Date(item.timestamp).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
 
               {/* Market Status */}
@@ -1597,29 +1650,8 @@ export default function Home() {
               />
             </div>
 
-            {/* Mobile: stack Search History, Cache and ML panels below News */}
+            {/* Mobile: stack ML panels below News */}
             <div className="block xl:hidden mt-6 space-y-4">
-              <Sidebar
-                searchHistory={searchHistory}
-                onSelectSymbol={(sym) => {
-                  setInputSymbol(sym);
-                  fetchData(sym);
-                }}
-                onClearHistory={clearHistory}
-                currentSymbol={symbol}
-                onLoadCachedPrediction={handleLoadCachedPrediction}
-                inlineMobile={true}
-              />
-
-              {/* ML Settings Panel */}
-              <MLSettingsPanel
-                settings={mlSettings}
-                onSettingsChange={handleMlSettingsChange}
-                onPresetChange={handleMlPresetChange}
-                currentPreset={mlPreset}
-                inlineMobile={true}
-              />
-
               <MLPredictions
                 currentPrice={currentPrice}
                 predictions={mlPredictions}
@@ -1629,7 +1661,19 @@ export default function Home() {
                 inlineMobile={true}
               />
 
-              {/* Pattern Settings Panel - Mobile (Below ML Predictions) */}
+              {/* ML Cache - Mobile */}
+              <PredictionsCache onLoadPrediction={handleLoadCachedPrediction} />
+
+              {/* ML Settings Panel - Mobile */}
+              <MLSettingsPanel
+                settings={mlSettings}
+                onSettingsChange={handleMlSettingsChange}
+                onPresetChange={handleMlPresetChange}
+                currentPreset={mlPreset}
+                inlineMobile={true}
+              />
+
+              {/* Pattern Settings Panel - Mobile */}
               {showPatterns && (
                 <PatternSettingsPanel
                   settings={patternSettings}
@@ -1664,28 +1708,35 @@ export default function Home() {
         )}
         </div>
 
-        {/* ML Predictions Sidebar - Right Side */}
+        {/* ML Predictions Sidebar - Right Side (Desktop) */}
         {!loading && stockData.length > 0 && (
           <div className="hidden xl:block flex-shrink-0">
-            {/* ML Settings Panel */}
-            <MLSettingsPanel
-              settings={mlSettings}
-              onSettingsChange={handleMlSettingsChange}
-              onPresetChange={handleMlPresetChange}
-              currentPreset={mlPreset}
-            />
-
             <MLPredictions
               currentPrice={currentPrice}
               predictions={mlPredictions}
               isTraining={mlTraining}
               fromCache={mlFromCache}
               onRecalculate={() => {
-                fetchData(symbol, { forceRecalc: true }); // Force recalculation
+                fetchData(symbol, { forceRecalc: true });
               }}
             />
 
-            {/* Pattern Settings Panel - Below ML Predictions */}
+            {/* ML Cache - Below ML Predictions */}
+            <div className="mt-4">
+              <PredictionsCache onLoadPrediction={handleLoadCachedPrediction} />
+            </div>
+
+            {/* ML Settings Panel - Below ML Cache */}
+            <div className="mt-4">
+              <MLSettingsPanel
+                settings={mlSettings}
+                onSettingsChange={handleMlSettingsChange}
+                onPresetChange={handleMlPresetChange}
+                currentPreset={mlPreset}
+              />
+            </div>
+
+            {/* Pattern Settings Panel - Below ML Settings */}
             {showPatterns && (
               <div className="mt-4">
                 <PatternSettingsPanel

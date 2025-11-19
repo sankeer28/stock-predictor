@@ -281,7 +281,7 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
         )}
 
         {/* Algorithm Info */}
-        <div className="mt-6 space-y-3"> 
+        <div className="mt-6 space-y-3">
           <div className="p-3 border-2" style={{
             background: 'var(--bg-2)',
             borderColor: 'var(--info)',
