@@ -657,6 +657,15 @@ export default function StockChart({
     enablePatterns ? patterns : []
   );
 
+  // Update viewPatterns when patterns prop changes
+  React.useEffect(() => {
+    if (enablePatterns) {
+      setViewPatterns(patterns || []);
+    } else {
+      setViewPatterns([]);
+    }
+  }, [patterns, enablePatterns]);
+
   const clampIndex = React.useCallback(
     (value: number, min: number, max: number) => {
       return Math.min(Math.max(value, min), max);

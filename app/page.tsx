@@ -225,10 +225,12 @@ export default function Home() {
 
   // Memoize Pattern settings callbacks to prevent unnecessary re-renders
   const handlePatternSettingsChange = React.useCallback((newSettings: PatternSettings) => {
+    console.log('🔄 Pattern settings updated:', newSettings);
     setPatternSettings(newSettings);
   }, []);
 
   const handlePatternPresetChange = React.useCallback((newPreset: PatternPreset) => {
+    console.log('🔄 Pattern preset updated:', newPreset);
     setPatternPreset(newPreset);
   }, []);
 
@@ -291,7 +293,7 @@ export default function Home() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [chartData, showPatterns, detectPatterns]);
+  }, [chartData, showPatterns, patternSettings, detectPatterns]);
 
   // Load search history and ML settings from localStorage on mount
   useEffect(() => {
