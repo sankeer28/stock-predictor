@@ -161,7 +161,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
             </li>
           </ul>
           <p className="pt-1 italic">
-            <strong>Tip:</strong> High correlation (0.7+) means stocks tend to move together, useful for portfolio diversification.
+            <strong>Tip:</strong> High correlation (0.7+) means stocks tend to move together - important to consider when building a diversified investment strategy.
           </p>
         </div>
       </div>
@@ -318,6 +318,252 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Conclusion */}
+          {(() => {
+            // Calculate statistics from the correlation matrix
+            const correlations: number[] = [];
+            for (let i = 0; i < correlationMatrix.length; i++) {
+              for (let j = i + 1; j < correlationMatrix[i].length; j++) {
+                correlations.push(correlationMatrix[i][j]);
+              }
+            }
+
+            if (correlations.length === 0) return null;
+
+            const avgCorrelation = correlations.reduce((a, b) => a + b, 0) / correlations.length;
+            const maxCorrelation = Math.max(...correlations);
+            const minCorrelation = Math.min(...correlations);
+            const maxIdx = correlations.indexOf(maxCorrelation);
+            const minIdx = correlations.indexOf(minCorrelation);
+
+            // Calculate standard deviation
+            const variance = correlations.reduce((sum, val) => sum + Math.pow(val - avgCorrelation, 2), 0) / correlations.length;
+            const stdDev = Math.sqrt(variance);
+
+            // Find the stock pairs for max and min correlation
+            let maxPair: [string, string] = ['', ''];
+            let minPair: [string, string] = ['', ''];
+            let currentIdx = 0;
+
+            for (let i = 0; i < correlationMatrix.length; i++) {
+              for (let j = i + 1; j < correlationMatrix[i].length; j++) {
+                if (currentIdx === maxIdx) {
+                  maxPair = [symbols[i], symbols[j]];
+                }
+                if (currentIdx === minIdx) {
+                  minPair = [symbols[i], symbols[j]];
+                }
+                currentIdx++;
+              }
+            }
+
+            // Correlation categories
+            const highCorrelationCount = correlations.filter(c => c >= 0.7).length;
+            const moderateCorrelationCount = correlations.filter(c => c >= 0.4 && c < 0.7).length;
+            const lowCorrelationCount = correlations.filter(c => c >= 0 && c < 0.4).length;
+            const negativeCorrelationCount = correlations.filter(c => c < 0).length;
+
+            const highCorrelationPct = (highCorrelationCount / correlations.length) * 100;
+            const moderateCorrelationPct = (moderateCorrelationCount / correlations.length) * 100;
+            const lowCorrelationPct = (lowCorrelationCount / correlations.length) * 100;
+            const negativeCorrelationPct = (negativeCorrelationCount / correlations.length) * 100;
+
+            // Individual stock analysis - calculate average correlation for each stock
+            const stockAvgCorrelations = symbols.map((stock, i) => {
+              const stockCorrelations = correlationMatrix[i].filter((_, j) => i !== j);
+              const avg = stockCorrelations.reduce((a, b) => a + b, 0) / stockCorrelations.length;
+              return { stock, avgCorrelation: avg };
+            });
+
+            stockAvgCorrelations.sort((a, b) => b.avgCorrelation - a.avgCorrelation);
+            const mostCorrelatedStock = stockAvgCorrelations[0];
+            const leastCorrelatedStock = stockAvgCorrelations[stockAvgCorrelations.length - 1];
+
+            // Find highly correlated clusters (stocks with avg correlation > 0.7)
+            const highlyCorrelatedStocks = stockAvgCorrelations.filter(s => s.avgCorrelation >= 0.7);
+
+            return (
+              <div className="mt-4 p-4 border-2" style={{
+                background: 'var(--bg-2)',
+                borderColor: 'var(--accent)',
+                borderLeftWidth: '4px'
+              }}>
+                <div className="text-sm font-bold mb-3" style={{ color: 'var(--text-2)' }}>
+                  Analysis
+                </div>
+
+                <div className="text-xs space-y-3" style={{ color: 'var(--text-3)' }}>
+                  {/* Overall Statistics */}
+                  <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+                    <div className="font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Stock Group Statistics</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>Average Correlation:</span>
+                        <div className="font-mono font-bold" style={{ color: avgCorrelation >= 0.7 ? 'var(--warning)' : avgCorrelation >= 0.4 ? 'var(--warning)' : 'var(--success)' }}>
+                          {avgCorrelation.toFixed(3)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>Std. Deviation:</span>
+                        <div className="font-mono font-bold" style={{ color: 'var(--text-2)' }}>
+                          {stdDev.toFixed(3)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>Range:</span>
+                        <div className="font-mono text-[11px]" style={{ color: 'var(--text-3)' }}>
+                          {minCorrelation.toFixed(2)} to {maxCorrelation.toFixed(2)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>Total Pairs:</span>
+                        <div className="font-mono font-bold" style={{ color: 'var(--text-2)' }}>
+                          {correlations.length}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distribution */}
+                  <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+                    <div className="font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Correlation Distribution</div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px]">🟢 High (≥0.7):</span>
+                        <span className="font-mono font-bold" style={{ color: highCorrelationPct > 50 ? 'var(--danger)' : 'var(--text-3)' }}>
+                          {highCorrelationCount} pairs ({highCorrelationPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px]">🟡 Moderate (0.4-0.7):</span>
+                        <span className="font-mono" style={{ color: 'var(--text-3)' }}>
+                          {moderateCorrelationCount} pairs ({moderateCorrelationPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px]">⚪ Low (0-0.4):</span>
+                        <span className="font-mono" style={{ color: 'var(--text-3)' }}>
+                          {lowCorrelationCount} pairs ({lowCorrelationPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                      {negativeCorrelationCount > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]">🔴 Negative (&lt;0):</span>
+                          <span className="font-mono" style={{ color: 'var(--success)' }}>
+                            {negativeCorrelationCount} pairs ({negativeCorrelationPct.toFixed(0)}%)
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Individual Stock Analysis */}
+                  <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+                    <div className="font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Individual Stock Analysis</div>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-[11px] mb-1" style={{ color: 'var(--text-5)' }}>Most Correlated (moves with others):</div>
+                        <div className="font-mono font-bold" style={{ color: 'var(--warning)' }}>
+                          {mostCorrelatedStock.stock}: {mostCorrelatedStock.avgCorrelation.toFixed(3)}
+                        </div>
+                        <div className="text-[10px] mt-0.5 italic" style={{ color: 'var(--text-5)' }}>
+                          Tends to follow the group closely
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] mb-1" style={{ color: 'var(--text-5)' }}>Least Correlated (independent):</div>
+                        <div className="font-mono font-bold" style={{ color: 'var(--success)' }}>
+                          {leastCorrelatedStock.stock}: {leastCorrelatedStock.avgCorrelation.toFixed(3)}
+                        </div>
+                        <div className="text-[10px] mt-0.5 italic" style={{ color: 'var(--text-5)' }}>
+                          Most independent movement, best for diversification
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Key Relationships */}
+                  <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+                    <div className="font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Key Relationships</div>
+                    <div className="space-y-1.5">
+                      <div>
+                        <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>Strongest Link:</span>
+                        <div className="font-mono font-bold" style={{ color: 'var(--danger)' }}>
+                          {maxPair[0]} ↔ {maxPair[1]}: {maxCorrelation.toFixed(3)}
+                        </div>
+                        <div className="text-[10px] italic" style={{ color: 'var(--text-5)' }}>
+                          These stocks move almost identically - very low diversification benefit
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>Weakest Link:</span>
+                        <div className="font-mono font-bold" style={{ color: minCorrelation < 0 ? 'var(--success)' : 'var(--text-3)' }}>
+                          {minPair[0]} ↔ {minPair[1]}: {minCorrelation.toFixed(3)}
+                        </div>
+                        <div className="text-[10px] italic" style={{ color: 'var(--text-5)' }}>
+                          {minCorrelation < 0
+                            ? "Negative correlation - excellent hedge pair!"
+                            : "Low correlation - good diversification potential"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recommendations */}
+                  <div className="p-3 border-2" style={{
+                    background: 'var(--bg-4)',
+                    borderColor: highCorrelationPct > 50 ? 'var(--warning)' : 'var(--success)',
+                    borderLeftWidth: '3px'
+                  }}>
+                    <div className="font-semibold mb-2" style={{ color: 'var(--text-2)' }}>
+                      {highCorrelationPct > 50 ? '⚠️ Investment Insights' : '✓ Investment Insights'}
+                    </div>
+                    <div className="space-y-2">
+                      {highCorrelationPct > 50 ? (
+                        <>
+                          <p className="text-[11px]" style={{ color: 'var(--warning)' }}>
+                            <strong>High Correlation Risk:</strong> {highCorrelationPct.toFixed(0)}% of these stock pairs are highly correlated.
+                            If you're investing in multiple stocks from this group, they may decline together during market downturns.
+                          </p>
+                          <p className="text-[11px]" style={{ color: 'var(--text-4)' }}>
+                            <strong>Diversification Tips:</strong>
+                          </p>
+                          <ul className="text-[10px] ml-4 space-y-0.5" style={{ color: 'var(--text-4)' }}>
+                            <li>• {mostCorrelatedStock.stock} moves most closely with the group (avg: {mostCorrelatedStock.avgCorrelation.toFixed(2)})</li>
+                            <li>• For diversification, look for stocks with &lt;0.4 correlation to {symbol}</li>
+                            <li>• {leastCorrelatedStock.stock} has the most independent movement in this group</li>
+                            {negativeCorrelationCount > 0 && <li>• Some pairs have negative correlation - good for hedging</li>}
+                          </ul>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[11px]" style={{ color: 'var(--success)' }}>
+                            <strong>Well-Diversified Group:</strong> These stocks show varied movement patterns. If investing in multiple from this group, you'd have natural diversification.
+                          </p>
+                          <p className="text-[11px]" style={{ color: 'var(--text-4)' }}>
+                            <strong>Key Observations:</strong>
+                          </p>
+                          <ul className="text-[10px] ml-4 space-y-0.5" style={{ color: 'var(--text-4)' }}>
+                            <li>• {leastCorrelatedStock.stock} has the most independent performance (avg: {leastCorrelatedStock.avgCorrelation.toFixed(2)})</li>
+                            <li>• {maxPair[0]} and {maxPair[1]} move together most closely ({maxCorrelation.toFixed(2)})</li>
+                            <li>• Average correlation of {avgCorrelation.toFixed(2)} suggests moderate independence</li>
+                            {stdDev > 0.2 && <li>• High variation ({stdDev.toFixed(2)}) shows diverse relationships between stocks</li>}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Market Context */}
+                  <div className="pt-2 text-[10px] italic border-t" style={{ borderColor: 'var(--bg-1)', color: 'var(--text-5)' }}>
+                    <strong>Note:</strong> Correlations are calculated for {selectedYear} and may change over time.
+                    Low correlation between stocks can help reduce overall volatility if you invest in multiple assets.
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
