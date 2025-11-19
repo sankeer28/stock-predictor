@@ -26,9 +26,16 @@ const nextConfig = {
           cacheGroups: {
             // Split TensorFlow.js into its own chunk
             tensorflow: {
-              test: /[\\/]node_modules[\\/]@tensorflow[\\/]/,
+              test: /[\\/]node_modules[\\/]@tensorflow[\\/]tfjs[\\/]/,
               name: 'tensorflow',
               priority: 30,
+              reuseExistingChunk: true,
+            },
+            // Split WebGPU backend separately for better caching
+            tensorflowWebgpu: {
+              test: /[\\/]node_modules[\\/]@tensorflow[\\/]tfjs-backend-webgpu[\\/]/,
+              name: 'tensorflow-webgpu',
+              priority: 31,
               reuseExistingChunk: true,
             },
             // Split transformers into its own chunk

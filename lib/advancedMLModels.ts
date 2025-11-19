@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs';
 import { StockData } from '@/types';
 import { MLSettings, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
+import { getTensorFlowInfo } from './tfConfig';
 
 export interface MLPrediction {
   date: string;
@@ -204,7 +205,16 @@ export async function generateGRUForecast(
   settings?: MLSettings
 ): Promise<MLPrediction[]> {
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
+
+  // Track performance
+  const startTime = performance.now();
+  const memoryBefore = tf.memory();
+
   try {
+    // Log TensorFlow backend info
+    const tfInfo = getTensorFlowInfo();
+    console.log(`📊 GRU Training started on ${tfInfo.backend.toUpperCase()} backend`);
+
     if (stockData.length < 60) {
       throw new Error('Insufficient data for GRU forecasting');
     }
@@ -323,6 +333,16 @@ export async function generateGRUForecast(
     xsTensor.dispose();
     ysTensor.dispose();
     model.dispose();
+
+    // Performance metrics
+    const endTime = performance.now();
+    const memoryAfter = tf.memory();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    const memoryUsed = ((memoryAfter.numBytes - memoryBefore.numBytes) / 1024 / 1024).toFixed(2);
+
+    console.log(`✅ GRU Training completed in ${duration}s`);
+    console.log(`   Memory: ${memoryUsed} MB used, ${memoryAfter.numTensors} tensors`);
+    console.log(`   Backend: ${getTensorFlowInfo().backend.toUpperCase()}`);
 
     const lastDate = new Date(stockData[stockData.length - 1].date);
     return predictions.map((predicted, i) => ({
@@ -474,7 +494,16 @@ export async function generateCNNLSTMForecast(
   settings?: MLSettings
 ): Promise<MLPrediction[]> {
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
+
+  // Track performance
+  const startTime = performance.now();
+  const memoryBefore = tf.memory();
+
   try {
+    // Log TensorFlow backend info
+    const tfInfo = getTensorFlowInfo();
+    console.log(`📊 CNN-LSTM Training started on ${tfInfo.backend.toUpperCase()} backend`);
+
     if (stockData.length < 60) {
       throw new Error('Insufficient data for CNN-LSTM forecasting');
     }
@@ -603,6 +632,16 @@ export async function generateCNNLSTMForecast(
     xsTensor.dispose();
     ysTensor.dispose();
     model.dispose();
+
+    // Performance metrics
+    const endTime = performance.now();
+    const memoryAfter = tf.memory();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    const memoryUsed = ((memoryAfter.numBytes - memoryBefore.numBytes) / 1024 / 1024).toFixed(2);
+
+    console.log(`✅ CNN-LSTM Training completed in ${duration}s`);
+    console.log(`   Memory: ${memoryUsed} MB used, ${memoryAfter.numTensors} tensors`);
+    console.log(`   Backend: ${getTensorFlowInfo().backend.toUpperCase()}`);
 
     const lastDate = new Date(stockData[stockData.length - 1].date);
     return predictions.map((predicted, i) => ({

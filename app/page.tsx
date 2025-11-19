@@ -35,6 +35,7 @@ const MLPredictions = dynamic(() => import('@/components/MLPredictions'), { ssr:
 const PatternAnalysis = dynamic(() => import('@/components/PatternAnalysis'), { ssr: false });
 const MLSettingsPanel = dynamic(() => import('@/components/MLSettingsPanel'), { ssr: false });
 const PatternSettingsPanel = dynamic(() => import('@/components/PatternSettingsPanel'), { ssr: false });
+const CorrelationHeatmap = dynamic(() => import('@/components/CorrelationHeatmap'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -138,6 +139,7 @@ export default function Home() {
   const [inputSymbol, setInputSymbol] = useState('AAPL');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [tfReady, setTfReady] = useState(false);
 
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
@@ -292,6 +294,18 @@ export default function Home() {
 
   // Load search history and ML settings from localStorage on mount
   useEffect(() => {
+    // Initialize TensorFlow.js with WebGPU for better performance
+    const initTF = async () => {
+      try {
+        const { initializeTensorFlow, warmupGPU } = await import('@/lib/tfConfig');
+        await initializeTensorFlow();
+        await warmupGPU();
+      } catch (error) {
+        console.error('Failed to initialize TensorFlow.js:', error);
+      }
+    };
+    initTF();
+
     try {
       const savedHistory = localStorage.getItem('stockSearchHistory');
       if (savedHistory) {
@@ -1576,6 +1590,13 @@ export default function Home() {
               />
             </div>
 
+            {/* Correlation Heatmap */}
+            <div className="mt-6">
+              <CorrelationHeatmap
+                symbol={symbol}
+              />
+            </div>
+
             {/* Mobile: stack Search History, Cache and ML panels below News */}
             <div className="block xl:hidden mt-6 space-y-4">
               <Sidebar
@@ -1632,6 +1653,12 @@ export default function Home() {
                   isDetecting={patternDetecting}
                 />
               )}
+
+              {/* Correlation Heatmap - Mobile */}
+              <CorrelationHeatmap
+                symbol={symbol}
+                inlineMobile={true}
+              />
             </div>
           </>
         )}

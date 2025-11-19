@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs';
 import { StockData } from '@/types';
 import { MLSettings, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
+import { getTensorFlowInfo } from './tfConfig';
 
 // Normalize data to 0-1 range for better training
 function normalizeData(data: number[]): { normalized: number[], min: number, max: number } {
@@ -88,7 +89,16 @@ export async function generateMLForecast(
 ): Promise<MLForecast[]> {
   // Use default settings if not provided
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
+
+  // Track performance
+  const startTime = performance.now();
+  const memoryBefore = tf.memory();
+
   try {
+    // Log TensorFlow backend info
+    const tfInfo = getTensorFlowInfo();
+    console.log(`📊 LSTM Training started on ${tfInfo.backend.toUpperCase()} backend`);
+
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
 
@@ -233,6 +243,16 @@ export async function generateMLForecast(
     xsTensor.dispose();
     ysTensor.dispose();
     model.dispose();
+
+    // Performance metrics
+    const endTime = performance.now();
+    const memoryAfter = tf.memory();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    const memoryUsed = ((memoryAfter.numBytes - memoryBefore.numBytes) / 1024 / 1024).toFixed(2);
+
+    console.log(`✅ LSTM Training completed in ${duration}s`);
+    console.log(`   Memory: ${memoryUsed} MB used, ${memoryAfter.numTensors} tensors`);
+    console.log(`   Backend: ${getTensorFlowInfo().backend.toUpperCase()}`);
 
     return forecasts;
 
