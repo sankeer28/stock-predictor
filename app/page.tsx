@@ -500,7 +500,7 @@ export default function Home() {
       setDataInterval(stockResult.interval || intervalParam);
 
       // Fetch detailed company info from Massive API
-      let massiveCompanyInfo = {};
+      let massiveCompanyInfo: any = {};
       try {
         const companyResponse = await fetch(`/api/company?symbol=${stockSymbol}`);
         if (companyResponse.ok) {
