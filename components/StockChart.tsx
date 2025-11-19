@@ -21,7 +21,6 @@ import {
   Customized,
 } from 'recharts';
 import { ChartDataPoint, ChartPattern } from '@/types';
-import { detectChartPatterns } from '@/lib/chartPatterns';
 
 const PATTERN_DIRECTION_STYLES: Record<
   ChartPattern['direction'],
@@ -59,10 +58,16 @@ const PatternRenderer = ({ xAxisMap, yAxisMap, patterns, data }: any) => {
         if (!patternData.length) return null;
 
         const labelValue = `${pattern.label} ${(pattern.confidence * 100).toFixed(0)}%`;
-        
+
         // Get coordinates - simpler approach
         const x1 = xScale(pattern.startDate);
         const x2 = xScale(pattern.endDate);
+
+        // Skip if coordinates are invalid
+        if (typeof x1 !== 'number' || typeof x2 !== 'number' || isNaN(x1) || isNaN(x2)) {
+          return null;
+        }
+
         const midX = (x1 + x2) / 2;
 
         // Calculate price range for the pattern
@@ -395,8 +400,8 @@ const PatternRenderer = ({ xAxisMap, yAxisMap, patterns, data }: any) => {
                 {/* Pattern area - subtle */}
                 <rect
                   x={x1}
-                  y={yHead}
-                  width={x2 - x1}
+                  y={Math.min(yHead, yNeckline)}
+                  width={Math.max(0, x2 - x1)}
                   height={Math.abs(yNeckline - yHead)}
                   fill={style.fill}
                   fillOpacity={0.05}
@@ -452,9 +457,9 @@ const PatternRenderer = ({ xAxisMap, yAxisMap, patterns, data }: any) => {
                 {/* Zone fill */}
                 <rect
                   x={x1}
-                  y={yResistance}
-                  width={x2 - x1}
-                  height={ySupport - yResistance}
+                  y={Math.min(yResistance, ySupport)}
+                  width={Math.max(0, x2 - x1)}
+                  height={Math.abs(ySupport - yResistance)}
                   fill={style.fill}
                   fillOpacity={0.08}
                   stroke="none"
@@ -653,17 +658,9 @@ export default function StockChart({
   const [zoomLevel, setZoomLevel] = useState(1);
   const chartRef = React.useRef<HTMLDivElement>(null);
 
-  const [viewPatterns, setViewPatterns] = useState<ChartPattern[]>(
-    enablePatterns ? patterns : []
-  );
-
-  // Update viewPatterns when patterns prop changes
-  React.useEffect(() => {
-    if (enablePatterns) {
-      setViewPatterns(patterns || []);
-    } else {
-      setViewPatterns([]);
-    }
+  // Use patterns prop directly instead of state to avoid infinite loops
+  const viewPatterns = React.useMemo(() => {
+    return enablePatterns ? (patterns || []) : [];
   }, [patterns, enablePatterns]);
 
   const clampIndex = React.useCallback(
@@ -771,12 +768,16 @@ export default function StockChart({
   useEffect(() => {
     const startIndex = getStartIndexForDays(30);
     const endIndex = combinedData.length - 1; // Include forecast
-    setBrushRange({
-      startIndex,
-      endIndex,
+
+    // Only update if values actually changed
+    setBrushRange(prev => {
+      if (prev.startIndex === startIndex && prev.endIndex === endIndex) {
+        return prev;
+      }
+      setBrushKey(k => k + 1); // Force brush remount only when range changes
+      setActiveRange('default'); // Set default as active
+      return { startIndex, endIndex };
     });
-    setBrushKey(prev => prev + 1); // Force brush remount
-    setActiveRange('default'); // Set default as active
   }, [historicalDataLength, combinedData.length, getStartIndexForDays]);
 
   const visibleStartIndex = React.useMemo(() => {
@@ -795,45 +796,6 @@ export default function StockChart({
     if (!data.length) return [];
     return data.slice(visibleStartIndex, visibleEndIndex + 1);
   }, [data, visibleStartIndex, visibleEndIndex]);
-
-  useEffect(() => {
-    if (!enablePatterns) {
-      setViewPatterns([]);
-      return;
-    }
-
-    // Debounce pattern detection to avoid blocking UI during zoom/pan
-    const timer = setTimeout(() => {
-      const MIN_VISIBLE_POINTS = 25;
-      if (visibleData.length >= MIN_VISIBLE_POINTS) {
-        // Run pattern detection asynchronously to not block UI
-        requestIdleCallback(() => {
-          const recalculated = detectChartPatterns(visibleData);
-          if (recalculated.length) {
-            const shifted = recalculated.map(pattern => {
-              const globalStartIndex = pattern.startIndex + visibleStartIndex;
-              const globalEndIndex = pattern.endIndex + visibleStartIndex;
-              return {
-                ...pattern,
-                startIndex: globalStartIndex,
-                endIndex: globalEndIndex,
-                startDate: data[globalStartIndex]?.date ?? pattern.startDate,
-                endDate: data[globalEndIndex]?.date ?? pattern.endDate,
-              };
-            });
-            setViewPatterns(shifted);
-          } else {
-            setViewPatterns(patterns);
-          }
-        }, { timeout: 1000 });
-      } else {
-        setViewPatterns(patterns);
-      }
-    }, 500); // Wait 500ms after zoom/pan stops
-
-    return () => clearTimeout(timer);
-  }, [enablePatterns, visibleData, visibleStartIndex, data, patterns]);
-
   // Notify parent of visible range changes
   useEffect(() => {
     if (onVisibleRangeChange && data.length > 0) {
@@ -850,9 +812,11 @@ export default function StockChart({
     const start = brushRange.startIndex ?? 0;
     const end = brushRange.endIndex ?? combinedData.length - 1;
     const cappedEnd = Math.min(end, data.length - 1);
-    return viewPatterns.filter(
+    const filtered = viewPatterns.filter(
       pattern => pattern.endIndex >= start && pattern.startIndex <= cappedEnd
     );
+    console.log(`🎯 Pattern filtering: Total=${viewPatterns.length}, Visible=${filtered.length}, Range=[${start}, ${cappedEnd}] (${cappedEnd - start + 1} points)`);
+    return filtered;
   }, [enablePatterns, viewPatterns, brushRange, combinedData.length, data.length]);
 
   const patternBadges = React.useMemo(
