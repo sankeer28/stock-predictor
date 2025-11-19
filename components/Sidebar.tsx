@@ -9,6 +9,7 @@ export interface SearchHistoryItem {
   symbol: string;
   timestamp: number;
   price?: number;
+  companyName?: string;
 }
 
 interface SidebarProps {

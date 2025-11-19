@@ -368,11 +368,12 @@ export default function Home() {
   };
 
   // Add to search history
-  const addToHistory = (stockSymbol: string, price?: number) => {
+  const addToHistory = (stockSymbol: string, price?: number, companyName?: string) => {
     const newItem: SearchHistoryItem = {
       symbol: stockSymbol,
       timestamp: Date.now(),
-      price
+      price,
+      companyName
     };
 
     // Use functional update to ensure we have the latest state
@@ -544,7 +545,8 @@ export default function Home() {
       }
 
       // Add to search history
-      addToHistory(stockSymbol, price);
+      const nameForHistory = massiveCompanyInfo?.name || stockResult.companyInfo?.name || stockResult.symbol;
+      addToHistory(stockSymbol, price, nameForHistory);
 
       // Calculate technical indicators
       const indicators = calculateAllIndicators(stockResult.data);
