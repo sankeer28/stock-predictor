@@ -42,10 +42,7 @@ const ApeWisdomMentions = dynamic(() => import('@/components/ApeWisdomMentions')
 const InsiderTransactions = dynamic(() => import('@/components/InsiderTransactions'), { ssr: false });
 const EarningsCalendar = dynamic(() => import('@/components/EarningsCalendar'), { ssr: false });
 const AnalystRecommendations = dynamic(() => import('@/components/AnalystRecommendations'), { ssr: false });
-const PriceTargets = dynamic(() => import('@/components/PriceTargets'), { ssr: false });
 const PeerStocks = dynamic(() => import('@/components/PeerStocks'), { ssr: false });
-const CongressionalTrading = dynamic(() => import('@/components/CongressionalTrading'), { ssr: false });
-const EconomicCalendar = dynamic(() => import('@/components/EconomicCalendar'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -1734,8 +1731,6 @@ export default function Home() {
 
               <AnalystRecommendations symbol={symbol} inlineMobile={true} />
 
-              <PriceTargets symbol={symbol} currentPrice={currentPrice} inlineMobile={true} />
-
               <PeerStocks
                 symbol={symbol}
                 onPeerClick={(peer) => {
@@ -1744,10 +1739,6 @@ export default function Home() {
                 }}
                 inlineMobile={true}
               />
-
-              <CongressionalTrading symbol={symbol} inlineMobile={true} />
-
-              <EconomicCalendar inlineMobile={true} />
 
               {/* Correlation Heatmap - Mobile */}
               <CorrelationHeatmap
@@ -1848,10 +1839,6 @@ export default function Home() {
             </div>
 
             <div className="mt-4">
-              <PriceTargets symbol={symbol} currentPrice={currentPrice} />
-            </div>
-
-            <div className="mt-4">
               <PeerStocks
                 symbol={symbol}
                 onPeerClick={(peer) => {
@@ -1859,14 +1846,6 @@ export default function Home() {
                   fetchData(peer);
                 }}
               />
-            </div>
-
-            <div className="mt-4">
-              <CongressionalTrading symbol={symbol} />
-            </div>
-
-            <div className="mt-4">
-              <EconomicCalendar />
             </div>
           </div>
         )}

@@ -16,7 +16,6 @@ interface FundamentalsData {
     revenueGrowth: number | null;
     earningsGrowth: number | null;
     dividendYield: number | null;
-    analystTargetPrice: number | null;
     pegRatio: number | null;
     priceToBook: number | null;
   };
@@ -114,10 +113,12 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
     return num.toLocaleString();
   };
 
-  // Determine P/E to display: prefer fundamentals P/E, otherwise fallback to trailingPE
+  // Determine P/E to display: use trailingP/E from company info (trailingPE) only
   const fundamentalsPe = fundamentalsData?.fundamentals?.peRatio ?? null;
+
   const trailingPe = companyInfo?.trailingPE ?? null;
   const displayedPe = fundamentalsPe ?? trailingPe;
+  const peSource = trailingPe != null ? 'Trailing' : null;
 
   return (
     <div className="card">
@@ -238,6 +239,20 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
               : companyInfo.description}
           </p>
         )}
+
+        {/* P/E Ratio (large card, prefer trailingPE) */}
+        {companyInfo.trailingPE && (
+          <div className="mt-3 p-3 border-2" style={{
+            background: 'var(--bg-2)',
+            borderColor: '#8b5cf6',
+            borderLeftWidth: '3px'
+          }}>
+            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>P/E Ratio</div>
+            <div className="text-sm font-semibold font-mono" style={{ color: '#8b5cf6' }}>
+              {formatNumber(companyInfo.trailingPE)}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fundamentals Section */}
@@ -256,8 +271,7 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
                 <div>
                   <div className="font-semibold mb-2" style={{ color: 'var(--text-3)' }}>Valuation</div>
                   <div className="space-y-1 text-xs">
-                    {/* P/E is shown in the compact metrics header; no duplicate here */}
-                      {/* P/E is displayed in the compact metrics header (no duplicate in valuation) */}
+                    {/* P/E displayed as a large card above; omit here to avoid duplication */}
                     {fundamentalsData.fundamentals.pegRatio && (
                       <div className="flex justify-between">
                         <span style={{ color: 'var(--text-4)' }}>PEG Ratio:</span>
@@ -399,35 +413,6 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
                   </div>
                 </div>
               </div>
-
-              {/* Analyst Target Price */}
-              {fundamentalsData.fundamentals.analystTargetPrice && (
-                <div className="mt-4 p-3 border-2" style={{ 
-                  background: 'var(--bg-2)', 
-                  borderColor: 'var(--accent)',
-                  borderLeftWidth: '3px'
-                }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Analyst Target Price</div>
-                      <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>
-                        ${fundamentalsData.fundamentals.analystTargetPrice.toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold" style={{ 
-                        color: fundamentalsData.fundamentals.analystTargetPrice > currentPrice ? 'var(--success)' : 'var(--danger)' 
-                      }}>
-                        {fundamentalsData.fundamentals.analystTargetPrice > currentPrice ? '↑' : '↓'} 
-                        {Math.abs(((fundamentalsData.fundamentals.analystTargetPrice - currentPrice) / currentPrice) * 100).toFixed(1)}%
-                      </div>
-                      <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-                        {fundamentalsData.fundamentals.analystTargetPrice > currentPrice ? 'Upside Potential' : 'Downside Risk'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
