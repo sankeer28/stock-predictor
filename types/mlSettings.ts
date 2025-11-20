@@ -21,16 +21,16 @@ export interface MLSettings {
 // Balanced settings - Optimized for SPEED (most users will use this)
 // Fast training while maintaining good accuracy
 export const DEFAULT_ML_SETTINGS: MLSettings = {
-  epochs: 30,                    // Reduced from 50 for much faster training
-  learningRate: 0.0015,         // Slightly higher for faster convergence
-  batchSize: 128,               // Doubled from 64 (much faster per epoch)
-  lookbackWindow: 15,           // Reduced from 20 (faster processing)
-  dropout: 0.15,                // Reduced for speed
-  l2Regularization: 0.0005,     // Lighter regularization for speed
+  epochs: 15,                    // Reduced from 30 for MUCH faster browser training
+  learningRate: 0.002,          // Higher for faster convergence
+  batchSize: 256,               // Doubled from 128 (faster per epoch)
+  lookbackWindow: 10,           // Reduced from 15 (faster processing)
+  dropout: 0.1,                 // Reduced for speed
+  l2Regularization: 0.0001,     // Lighter regularization for speed
   dampingFactor: 0.7,           // Reduced from 0.5 (less aggressive dampening)
   confidenceInterval: 1.96,     // 95% confidence (statistical standard)
-  earlyStoppingPatience: 4,     // Reduced from 6 (stop much earlier)
-  validationSplit: 0.1,         // Reduced from 0.15 (more training data, faster)
+  earlyStoppingPatience: 3,     // Reduced from 4 (stop even earlier)
+  validationSplit: 0.08,        // Reduced from 0.1 (more training data, faster)
 };
 
 // Conservative: More accurate, slower training (for users who want best accuracy)

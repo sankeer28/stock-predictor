@@ -651,42 +651,39 @@ export default function Home() {
 
             setMlPredictions(predictions);
 
-            // Neural network models (optimized for serverless - only best performing models)
-            console.log('Starting optimized neural network models...');
+            // Neural network models - TRAIN SEQUENTIALLY to prevent browser freeze
+            console.log('Starting neural network models (sequential training)...');
 
-            // Start all models at once (parallel training)
-            const gruPromise = mlLibs.generateGRUForecast(stockResult.data, forecastHorizon, mlSettings)
-              .then(forecast => {
-                setMlPredictions(prev => ({ ...prev, gru: forecast }));
-                return forecast;
-              })
-              .catch(err => {
-                console.error('GRU failed:', err);
-                return null;
-              });
+            // Train models ONE AT A TIME to avoid freezing the browser
+            let lstm = null;
+            try {
+              console.log('Training LSTM...');
+              lstm = await mlLibs.generateMLForecast(stockResult.data, forecastHorizon, mlSettings);
+              setMlPredictions(prev => ({ ...prev, lstm }));
+              console.log('✅ LSTM complete');
+            } catch (err) {
+              console.error('LSTM failed:', err);
+            }
 
-            const cnnLstmPromise = mlLibs.generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings)
-              .then(forecast => {
-                setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
-                return forecast;
-              })
-              .catch(err => {
-                console.error('CNN-LSTM failed:', err);
-                return null;
-              });
+            let gru = null;
+            try {
+              console.log('Training GRU...');
+              gru = await mlLibs.generateGRUForecast(stockResult.data, forecastHorizon, mlSettings);
+              setMlPredictions(prev => ({ ...prev, gru }));
+              console.log('✅ GRU complete');
+            } catch (err) {
+              console.error('GRU failed:', err);
+            }
 
-            const lstmPromise = mlLibs.generateMLForecast(stockResult.data, forecastHorizon, mlSettings)
-              .then(forecast => {
-                setMlPredictions(prev => ({ ...prev, lstm: forecast }));
-                return forecast;
-              })
-              .catch(err => {
-                console.error('LSTM failed:', err);
-                return null;
-              });
-
-            // Wait for neural networks to complete
-            const [gru, cnnLstm, lstm] = await Promise.all([gruPromise, cnnLstmPromise, lstmPromise]);
+            let cnnLstm = null;
+            try {
+              console.log('Training CNN-LSTM...');
+              cnnLstm = await mlLibs.generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings);
+              setMlPredictions(prev => ({ ...prev, cnnLstm }));
+              console.log('✅ CNN-LSTM complete');
+            } catch (err) {
+              console.error('CNN-LSTM failed:', err);
+            }
 
             // Generate ensemble INSTANTLY from already-trained models (no retraining!)
             const ensemble = mlLibs.generateEnsembleFromPredictions(
@@ -835,38 +832,39 @@ export default function Home() {
 
               setMlPredictions(predictions);
 
-              // Neural network models (optimized for serverless)
-              const gruPromise = mlLibs.generateGRUForecast(stockData, forecastHorizon, mlSettings)
-                .then(forecast => {
-                  setMlPredictions(prev => ({ ...prev, gru: forecast }));
-                  return forecast;
-                })
-                .catch(err => {
-                  console.error('GRU failed:', err);
-                  return null;
-                });
+              // Neural network models - TRAIN SEQUENTIALLY to prevent browser freeze
+              console.log('Starting neural network models (sequential training)...');
 
-              const cnnLstmPromise = mlLibs.generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings)
-                .then(forecast => {
-                  setMlPredictions(prev => ({ ...prev, cnnLstm: forecast }));
-                  return forecast;
-                })
-                .catch(err => {
-                  console.error('CNN-LSTM failed:', err);
-                  return null;
-                });
+              // Train models ONE AT A TIME to avoid freezing the browser
+              let lstm = null;
+              try {
+                console.log('Training LSTM...');
+                lstm = await mlLibs.generateMLForecast(stockData, forecastHorizon, mlSettings);
+                setMlPredictions(prev => ({ ...prev, lstm }));
+                console.log('✅ LSTM complete');
+              } catch (err) {
+                console.error('LSTM failed:', err);
+              }
 
-              const lstmPromise = mlLibs.generateMLForecast(stockData, forecastHorizon, mlSettings)
-                .then(forecast => {
-                  setMlPredictions(prev => ({ ...prev, lstm: forecast }));
-                  return forecast;
-                })
-                .catch(err => {
-                  console.error('LSTM failed:', err);
-                  return null;
-                });
+              let gru = null;
+              try {
+                console.log('Training GRU...');
+                gru = await mlLibs.generateGRUForecast(stockData, forecastHorizon, mlSettings);
+                setMlPredictions(prev => ({ ...prev, gru }));
+                console.log('✅ GRU complete');
+              } catch (err) {
+                console.error('GRU failed:', err);
+              }
 
-              const [gru, cnnLstm, lstm] = await Promise.all([gruPromise, cnnLstmPromise, lstmPromise]);
+              let cnnLstm = null;
+              try {
+                console.log('Training CNN-LSTM...');
+                cnnLstm = await mlLibs.generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings);
+                setMlPredictions(prev => ({ ...prev, cnnLstm }));
+                console.log('✅ CNN-LSTM complete');
+              } catch (err) {
+                console.error('CNN-LSTM failed:', err);
+              }
 
               // Generate ensemble INSTANTLY from already-trained models (no retraining!)
               const ensemble = mlLibs.generateEnsembleFromPredictions(

@@ -47,7 +47,7 @@ function buildLSTMModel(lookback: number, settings: MLSettings): tf.Sequential {
 
   // LSTM layer highly optimized for speed
   model.add(tf.layers.lstm({
-    units: 16,  // Reduced from 20 for much faster training
+    units: 8,  // Reduced from 16 for MUCH faster browser training
     returnSequences: false,
     inputShape: [lookback, 1],
     kernelInitializer: 'glorotUniform',  // More stable than glorotNormal

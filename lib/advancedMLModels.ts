@@ -233,7 +233,7 @@ export async function generateGRUForecast(
     // Build GRU model with multi-feature input (15 features) - highly optimized for speed
     const model = tf.sequential();
     model.add(tf.layers.gru({
-      units: 16,  // Reduced from 24 for much faster training
+      units: 8,  // Reduced from 16 for MUCH faster browser training
       returnSequences: false,
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
       kernelInitializer: 'glorotUniform',
@@ -524,7 +524,7 @@ export async function generateCNNLSTMForecast(
 
     // CNN for feature extraction across multiple features
     model.add(tf.layers.conv1d({
-      filters: 12,  // Reduced from 16 for much faster training
+      filters: 8,  // Reduced from 12 for MUCH faster browser training
       kernelSize: 2,
       activation: 'relu',
       inputShape: [lookback, numFeatures],  // Multiple features per timestep
@@ -534,7 +534,7 @@ export async function generateCNNLSTMForecast(
 
     // LSTM for temporal modeling
     model.add(tf.layers.lstm({
-      units: 8,  // Reduced from 12 for much faster training
+      units: 4,  // Reduced from 8 for MUCH faster browser training
       returnSequences: false,
       recurrentInitializer: 'orthogonal',  // Faster initialization
       kernelRegularizer: tf.regularizers.l2({ l2: mlSettings.l2Regularization }),
