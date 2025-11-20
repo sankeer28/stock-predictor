@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, MessageSquare, ThumbsUp, Loader2, RefreshCw, ExternalLink, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, MessageSquare, ThumbsUp, Loader2, RefreshCw, ExternalLink, Minus, ChevronDown } from 'lucide-react';
 
 interface ApeWisdomStock {
   rank: number;
@@ -20,12 +20,34 @@ interface ApeWisdomMentionsProps {
   inlineMobile?: boolean;
 }
 
+const FILTER_OPTIONS = [
+  { value: 'all', label: 'All Subreddits', category: 'Combined' },
+  { value: 'all-stocks', label: 'All Stock Subreddits', category: 'Combined' },
+  { value: 'all-crypto', label: 'All Crypto Subreddits', category: 'Combined' },
+  { value: '4chan', label: '4chan /biz/', category: 'Other' },
+  { value: 'wallstreetbets', label: 'r/WallStreetBets', category: 'Stock' },
+  { value: 'stocks', label: 'r/stocks', category: 'Stock' },
+  { value: 'investing', label: 'r/investing', category: 'Stock' },
+  { value: 'options', label: 'r/options', category: 'Stock' },
+  { value: 'Daytrading', label: 'r/Daytrading', category: 'Stock' },
+  { value: 'SPACs', label: 'r/SPACs', category: 'Stock' },
+  { value: 'WallStreetbetsELITE', label: 'r/WallStreetbetsELITE', category: 'Stock' },
+  { value: 'Wallstreetbetsnew', label: 'r/Wallstreetbetsnew', category: 'Stock' },
+  { value: 'CryptoCurrency', label: 'r/CryptoCurrency', category: 'Crypto' },
+  { value: 'Bitcoin', label: 'r/Bitcoin', category: 'Crypto' },
+  { value: 'SatoshiStreetBets', label: 'r/SatoshiStreetBets', category: 'Crypto' },
+  { value: 'CryptoMoonShots', label: 'r/CryptoMoonShots', category: 'Crypto' },
+  { value: 'CryptoCurrencies', label: 'r/CryptoCurrencies', category: 'Crypto' },
+  { value: 'CryptoMarkets', label: 'r/CryptoMarkets', category: 'Crypto' },
+];
+
 export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWisdomMentionsProps) {
   const [stocks, setStocks] = useState<ApeWisdomStock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [filter, setFilter] = useState<'all-stocks' | 'all-crypto'>('all-stocks');
+  const [filter, setFilter] = useState('all-stocks');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   const fetchApeWisdomData = async () => {
     try {
@@ -50,6 +72,21 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
   useEffect(() => {
     fetchApeWisdomData();
   }, [filter]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showDropdown && !target.closest('.relative')) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showDropdown]);
 
   const getRankChangeIcon = (change: number) => {
     if (change > 0) return <TrendingUp className="w-3 h-3" style={{ color: 'var(--success)' }} />;
@@ -117,30 +154,122 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 mb-4">
+      {/* Subreddit Filter Dropdown */}
+      <div className="mb-4 relative">
         <button
-          onClick={() => setFilter('all-stocks')}
-          className="flex-1 px-3 py-2 text-xs font-semibold border transition-all"
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="w-full px-3 py-2 text-left text-sm font-medium border transition-all flex items-center justify-between"
           style={{
-            background: filter === 'all-stocks' ? 'var(--accent)' : 'var(--bg-3)',
-            borderColor: filter === 'all-stocks' ? 'var(--accent)' : 'var(--bg-1)',
-            color: filter === 'all-stocks' ? 'var(--text-0)' : 'var(--text-3)',
+            background: 'var(--bg-3)',
+            borderColor: 'var(--bg-1)',
+            color: 'var(--text-2)',
           }}
         >
-          Stocks
+          <span>{FILTER_OPTIONS.find(f => f.value === filter)?.label || 'Select Subreddit'}</span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
         </button>
-        <button
-          onClick={() => setFilter('all-crypto')}
-          className="flex-1 px-3 py-2 text-xs font-semibold border transition-all"
-          style={{
-            background: filter === 'all-crypto' ? 'var(--accent)' : 'var(--bg-3)',
-            borderColor: filter === 'all-crypto' ? 'var(--accent)' : 'var(--bg-1)',
-            color: filter === 'all-crypto' ? 'var(--text-0)' : 'var(--text-3)',
-          }}
-        >
-          Crypto
-        </button>
+
+        {showDropdown && (
+          <div
+            className="absolute top-full left-0 right-0 mt-1 border-2 shadow-lg z-50 max-h-80 overflow-y-auto"
+            style={{
+              background: 'var(--bg-2)',
+              borderColor: 'var(--bg-1)',
+            }}
+          >
+            {/* Combined Filters */}
+            <div className="p-2 border-b" style={{ borderColor: 'var(--bg-1)' }}>
+              <div className="text-xs font-semibold mb-1 px-2" style={{ color: 'var(--text-4)' }}>
+                COMBINED
+              </div>
+              {FILTER_OPTIONS.filter(f => f.category === 'Combined').map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setFilter(option.value);
+                    setShowDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm transition-all hover:opacity-80"
+                  style={{
+                    background: filter === option.value ? 'var(--bg-3)' : 'transparent',
+                    color: filter === option.value ? 'var(--accent)' : 'var(--text-3)',
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Stock Subreddits */}
+            <div className="p-2 border-b" style={{ borderColor: 'var(--bg-1)' }}>
+              <div className="text-xs font-semibold mb-1 px-2" style={{ color: 'var(--text-4)' }}>
+                STOCK SUBREDDITS
+              </div>
+              {FILTER_OPTIONS.filter(f => f.category === 'Stock').map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setFilter(option.value);
+                    setShowDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm transition-all hover:opacity-80"
+                  style={{
+                    background: filter === option.value ? 'var(--bg-3)' : 'transparent',
+                    color: filter === option.value ? 'var(--accent)' : 'var(--text-3)',
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Crypto Subreddits */}
+            <div className="p-2 border-b" style={{ borderColor: 'var(--bg-1)' }}>
+              <div className="text-xs font-semibold mb-1 px-2" style={{ color: 'var(--text-4)' }}>
+                CRYPTO SUBREDDITS
+              </div>
+              {FILTER_OPTIONS.filter(f => f.category === 'Crypto').map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setFilter(option.value);
+                    setShowDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm transition-all hover:opacity-80"
+                  style={{
+                    background: filter === option.value ? 'var(--bg-3)' : 'transparent',
+                    color: filter === option.value ? 'var(--accent)' : 'var(--text-3)',
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Other Sources */}
+            <div className="p-2">
+              <div className="text-xs font-semibold mb-1 px-2" style={{ color: 'var(--text-4)' }}>
+                OTHER
+              </div>
+              {FILTER_OPTIONS.filter(f => f.category === 'Other').map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setFilter(option.value);
+                    setShowDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm transition-all hover:opacity-80"
+                  style={{
+                    background: filter === option.value ? 'var(--bg-3)' : 'transparent',
+                    color: filter === option.value ? 'var(--accent)' : 'var(--text-3)',
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -252,10 +381,7 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
             </div>
           )}
 
-          {/* Footer Info */}
-          <div className="mt-4 pt-3 border-t text-xs" style={{ borderColor: 'var(--bg-1)', color: 'var(--text-5)' }}>
-            <p>Aggregated from multiple subreddits • Powered by ApeWisdom</p>
-          </div>
+
         </>
       )}
     </div>

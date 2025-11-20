@@ -215,70 +215,7 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
           })}
         </div>
 
-        {/* ML Models Comparison Table */}
-        {algorithms.some(a => a.data && a.data.length > 0) && (
-          <div className="mt-6">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-2)' }}>
-              Model Comparison ({selectedDays} days)
-            </h3>
-            <div className="border-2" style={{ borderColor: 'var(--bg-1)' }}>
-              <table className="w-full text-xs">
-                <thead style={{ background: 'var(--bg-2)' }}>
-                  <tr>
-                    <th className="p-2 text-left" style={{ color: 'var(--text-4)' }}>Model</th>
-                    <th className="p-2 text-right" style={{ color: 'var(--text-4)' }}>Price</th>
-                    <th className="p-2 text-right" style={{ color: 'var(--text-4)' }}>Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {algorithms.map((algo, index) => {
-                    const stats = calculateStats(algo.data);
-                    const isReady = algo.data && algo.data.length > 0;
 
-                    return (
-                      <tr
-                        key={algo.key}
-                        className="border-t"
-                        style={{
-                          borderColor: 'var(--bg-1)',
-                          background: index % 2 === 0 ? 'var(--bg-3)' : 'var(--bg-2)',
-                          opacity: isReady ? 1 : 0.4,
-                        }}
-                      >
-                        <td className="p-2" style={{ color: 'var(--text-3)' }}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{ background: algo.color }}
-                            />
-                            {algo.name}
-                          </div>
-                        </td>
-                        <td className="p-2 text-right font-mono" style={{ color: 'var(--text-2)' }}>
-                          {isReady && stats ? `$${stats.price.toFixed(2)}` : '—'}
-                        </td>
-                        <td
-                          className="p-2 text-right font-semibold"
-                          style={{
-                            color: stats && stats.change > 0 ? 'var(--success)' : 'var(--danger)',
-                          }}
-                        >
-                          {isReady && stats ? (
-                            <>
-                              {stats.change > 0 ? '+' : ''}{stats.change.toFixed(2)}%
-                            </>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Algorithm Info */}
         <div className="mt-6 space-y-3">
