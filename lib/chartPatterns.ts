@@ -153,12 +153,14 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
   const resistanceTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.2);
 
   const patterns: ChartPattern[] = [];
+  let supportCandidate: ChartPattern | null = null;
+  let resistanceCandidate: ChartPattern | null = null;
 
   if (lowStats) {
     const touches = countLineTouches(lows, lowStats.slope, lowStats.intercept, supportTolerance);
     const minTouches = Math.max(2, Math.round(slice.length * 0.15));  // Reduced minimum touches
     if (
-      lowStats.slopePct >= -0.001 &&  // More tolerant slope
+      lowStats.slopePct >= -0.0005 &&  // Stricter: only upward or flat trends
       touches.touches >= minTouches &&
       lowStats.r2 >= 0.3 &&  // Reduced R² threshold
       touches.avgDeviation <= supportTolerance * 1.2
@@ -170,15 +172,13 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
         0,
         0.95
       );
-      patterns.push(
-        buildPattern(data, 'trendline_support', startIndex, data.length - 1, confidence, {
-          slopePct: lowStats.slopePct * 100,
-          touches: touches.touches,
-          r2: lowStats.r2,
-          priceMin: Math.min(...lows),
-          priceMax: Math.max(...lows),
-        })
-      );
+      supportCandidate = buildPattern(data, 'trendline_support', startIndex, data.length - 1, confidence, {
+        slopePct: lowStats.slopePct * 100,
+        touches: touches.touches,
+        r2: lowStats.r2,
+        priceMin: Math.min(...lows),
+        priceMax: Math.max(...lows),
+      });
     }
   }
 
@@ -191,7 +191,7 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
     );
     const minTouches = Math.max(2, Math.round(slice.length * 0.15));  // Reduced minimum touches
     if (
-      highStats.slopePct <= 0.001 &&  // More tolerant slope
+      highStats.slopePct <= 0.0005 &&  // Stricter: only downward or flat trends
       touches.touches >= minTouches &&
       highStats.r2 >= 0.3 &&  // Reduced R² threshold
       touches.avgDeviation <= resistanceTolerance * 1.2
@@ -203,16 +203,23 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
         0,
         0.95
       );
-      patterns.push(
-        buildPattern(data, 'trendline_resistance', startIndex, data.length - 1, confidence, {
-          slopePct: highStats.slopePct * 100,
-          touches: touches.touches,
-          r2: highStats.r2,
-          priceMin: Math.min(...highs),
-          priceMax: Math.max(...highs),
-        })
-      );
+      resistanceCandidate = buildPattern(data, 'trendline_resistance', startIndex, data.length - 1, confidence, {
+        slopePct: highStats.slopePct * 100,
+        touches: touches.touches,
+        r2: highStats.r2,
+        priceMin: Math.min(...highs),
+        priceMax: Math.max(...highs),
+      });
     }
+  }
+
+  // Only add the strongest pattern if both exist (prevent duplicate trendlines)
+  if (supportCandidate && resistanceCandidate) {
+    // Choose the one with higher confidence
+    patterns.push(supportCandidate.confidence >= resistanceCandidate.confidence ? supportCandidate : resistanceCandidate);
+  } else {
+    if (supportCandidate) patterns.push(supportCandidate);
+    if (resistanceCandidate) patterns.push(resistanceCandidate);
   }
 
   return patterns;
