@@ -38,6 +38,7 @@ const PatternSettingsPanel = dynamic(() => import('@/components/PatternSettingsP
 const CorrelationHeatmap = dynamic(() => import('@/components/CorrelationHeatmap'), { ssr: false });
 const PredictionsCache = dynamic(() => import('@/components/PredictionsCache'), { ssr: false });
 const RedditSentiment = dynamic(() => import('@/components/RedditSentiment'), { ssr: false });
+const ApeWisdomMentions = dynamic(() => import('@/components/ApeWisdomMentions'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -1710,6 +1711,15 @@ export default function Home() {
                 inlineMobile={true}
               />
 
+              {/* ApeWisdom Mentions - Mobile */}
+              <ApeWisdomMentions
+                onTickerClick={(ticker) => {
+                  setInputSymbol(ticker);
+                  fetchData(ticker);
+                }}
+                inlineMobile={true}
+              />
+
               {/* Correlation Heatmap - Mobile */}
               <CorrelationHeatmap
                 symbol={symbol}
@@ -1778,6 +1788,16 @@ export default function Home() {
             {/* Reddit Sentiment - Desktop Sidebar */}
             <div className="mt-4">
               <RedditSentiment
+                onTickerClick={(ticker) => {
+                  setInputSymbol(ticker);
+                  fetchData(ticker);
+                }}
+              />
+            </div>
+
+            {/* ApeWisdom Mentions - Desktop Sidebar */}
+            <div className="mt-4">
+              <ApeWisdomMentions
                 onTickerClick={(ticker) => {
                   setInputSymbol(ticker);
                   fetchData(ticker);
