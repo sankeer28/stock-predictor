@@ -114,6 +114,11 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
     return num.toLocaleString();
   };
 
+  // Determine P/E to display: prefer fundamentals P/E, otherwise fallback to trailingPE
+  const fundamentalsPe = fundamentalsData?.fundamentals?.peRatio ?? null;
+  const trailingPe = companyInfo?.trailingPE ?? null;
+  const displayedPe = fundamentalsPe ?? trailingPe;
+
   return (
     <div className="card">
       <span className="card-label">Company Overview</span>
@@ -235,190 +240,34 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
         )}
       </div>
 
-      {/* Market Data - Only show available fields */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {/* Market Cap */}
-        {companyInfo.marketCap && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: 'var(--accent)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Market Cap</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--accent)' }}>
-              {formatMarketCap(companyInfo.marketCap)}
-            </div>
-          </div>
-        )}
-
-        {/* Shares Outstanding */}
-        {companyInfo.sharesOutstanding && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: 'var(--success)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Shares Out.</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--success)' }}>
-              {formatVolume(companyInfo.sharesOutstanding)}
-            </div>
-          </div>
-        )}
-
-        {/* 52 Week High */}
-        {companyInfo.fiftyTwoWeekHigh && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: 'var(--info)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>52-Week High</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--info)' }}>
-              ${formatNumber(companyInfo.fiftyTwoWeekHigh)}
-            </div>
-          </div>
-        )}
-
-        {/* 52 Week Low */}
-        {companyInfo.fiftyTwoWeekLow && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: 'var(--info)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>52-Week Low</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--info)' }}>
-              ${formatNumber(companyInfo.fiftyTwoWeekLow)}
-            </div>
-          </div>
-        )}
-
-        {/* Average Volume */}
-        {companyInfo.averageVolume && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: 'var(--warning)',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Avg Volume</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: 'var(--warning)' }}>
-              {formatVolume(companyInfo.averageVolume)}
-            </div>
-          </div>
-        )}
-
-        {/* P/E Ratio */}
-        {companyInfo.trailingPE && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: '#8b5cf6',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>P/E Ratio</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: '#8b5cf6' }}>
-              {formatNumber(companyInfo.trailingPE)}
-            </div>
-          </div>
-        )}
-
-        {/* Beta */}
-        {companyInfo.beta && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: '#ec4899',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Beta</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: '#ec4899' }}>
-              {formatNumber(companyInfo.beta)}
-            </div>
-          </div>
-        )}
-
-        {/* Dividend Yield */}
-        {companyInfo.dividendYield && (
-          <div className="p-3 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: '#10b981',
-            borderLeftWidth: '3px'
-          }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Div Yield</div>
-            <div className="text-sm font-semibold font-mono" style={{ color: '#10b981' }}>
-              {formatPercent(companyInfo.dividendYield)}
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Fundamentals Section */}
       {fundamentalsData && (
         <div className="mt-6 pt-6 border-t" style={{ borderColor: 'var(--bg-1)' }}>
-          <button
-            onClick={() => setShowFundamentals(!showFundamentals)}
-            className="flex items-center justify-between w-full mb-4 text-lg font-semibold"
-            style={{ color: 'var(--text-2)' }}
-          >
-            <span>📊 Fundamentals Analysis</span>
-            <span style={{ color: 'var(--accent)' }}>{showFundamentals ? '▼' : '▶'}</span>
-          </button>
-
           {showFundamentals && (
             <>
-              {/* Key Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                {fundamentalsData.fundamentals.peRatio && (
-                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--info)', borderLeftWidth: '3px' }}>
-                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>P/E Ratio</div>
-                    <div className="text-lg font-bold" style={{ color: 'var(--info)' }}>
-                      {fundamentalsData.fundamentals.peRatio.toFixed(2)}
-                    </div>
-                  </div>
-                )}
+              {/* Key Metrics Grid (compact) */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 text-xs" style={{ color: 'var(--text-4)' }}>
 
-                {fundamentalsData.fundamentals.eps && (
-                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--success)', borderLeftWidth: '3px' }}>
-                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>EPS</div>
-                    <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
-                      ${fundamentalsData.fundamentals.eps.toFixed(2)}
-                    </div>
-                  </div>
-                )}
-
-                {fundamentalsData.fundamentals.profitMargin && (
-                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--accent)', borderLeftWidth: '3px' }}>
-                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Profit Margin</div>
-                    <div className="text-lg font-bold" style={{ color: 'var(--accent)' }}>
-                      {(fundamentalsData.fundamentals.profitMargin * 100).toFixed(1)}%
-                    </div>
-                  </div>
-                )}
-
-                {fundamentalsData.fundamentals.roe && (
-                  <div className="p-3 border-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--warning)', borderLeftWidth: '3px' }}>
-                    <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>ROE</div>
-                    <div className="text-lg font-bold" style={{ color: 'var(--warning)' }}>
-                      {(fundamentalsData.fundamentals.roe * 100).toFixed(1)}%
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Detailed Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 {/* Valuation */}
                 <div>
                   <div className="font-semibold mb-2" style={{ color: 'var(--text-3)' }}>Valuation</div>
                   <div className="space-y-1 text-xs">
-                    {fundamentalsData.fundamentals.peRatio && (
-                      <div className="flex justify-between">
-                        <span style={{ color: 'var(--text-4)' }}>P/E Ratio:</span>
-                        <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.peRatio.toFixed(2)}</span>
-                      </div>
-                    )}
+                    {/* P/E is shown in the compact metrics header; no duplicate here */}
+                      {/* P/E is displayed in the compact metrics header (no duplicate in valuation) */}
                     {fundamentalsData.fundamentals.pegRatio && (
                       <div className="flex justify-between">
                         <span style={{ color: 'var(--text-4)' }}>PEG Ratio:</span>
                         <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.pegRatio.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {fundamentalsData.fundamentals.eps != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>EPS:</span>
+                        <span style={{ color: 'var(--text-2)' }}>${formatNumber(fundamentalsData.fundamentals.eps)}</span>
                       </div>
                     )}
                     {fundamentalsData.fundamentals.priceToBook && (
@@ -491,6 +340,60 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
                         <span style={{ color: fundamentalsData.fundamentals.earningsGrowth > 0 ? 'var(--success)' : 'var(--danger)' }}>
                           {(fundamentalsData.fundamentals.earningsGrowth * 100).toFixed(2)}%
                         </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* Market */}
+                <div>
+                  <div className="font-semibold mb-2" style={{ color: 'var(--text-3)' }}>Market</div>
+                  <div className="space-y-1 text-xs">
+                    {companyInfo.marketCap != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Market Cap:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{formatMarketCap(companyInfo.marketCap)}</span>
+                      </div>
+                    )}
+
+                    {companyInfo.sharesOutstanding != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Shares Out.:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{formatVolume(companyInfo.sharesOutstanding)}</span>
+                      </div>
+                    )}
+
+                    {companyInfo.averageVolume != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Avg Volume:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{formatVolume(companyInfo.averageVolume)}</span>
+                      </div>
+                    )}
+
+                    {companyInfo.fiftyTwoWeekHigh != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>52-Week High:</span>
+                        <span style={{ color: 'var(--text-2)' }}>${formatNumber(companyInfo.fiftyTwoWeekHigh)}</span>
+                      </div>
+                    )}
+
+                    {companyInfo.fiftyTwoWeekLow != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>52-Week Low:</span>
+                        <span style={{ color: 'var(--text-2)' }}>${formatNumber(companyInfo.fiftyTwoWeekLow)}</span>
+                      </div>
+                    )}
+
+                    {companyInfo.beta != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Beta:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{formatNumber(companyInfo.beta)}</span>
+                      </div>
+                    )}
+
+                    {companyInfo.dividendYield != null && (
+                      <div className="flex justify-between">
+                        <span style={{ color: 'var(--text-4)' }}>Div Yield:</span>
+                        <span style={{ color: 'var(--text-2)' }}>{formatPercent(companyInfo.dividendYield)}</span>
                       </div>
                     )}
                   </div>
