@@ -139,7 +139,7 @@ export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment =
       </div>
 
       {/* News Articles */}
-      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+      <div className="space-y-3 max-h-[600px] overflow-y-auto">
         {articles.map((article, index) => {
           const sentiment = sentiments[index];
           return (
