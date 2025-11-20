@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Database, Trash2, RefreshCw } from 'lucide-react';
+import { Database, Trash2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   getAllCachedPredictions,
   clearCachedPredictionByTimestamp,
@@ -15,7 +15,8 @@ interface PredictionsCacheProps {
 
 export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheProps) {
   const [cachedPredictions, setCachedPredictions] = useState<CachedPrediction[]>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   const loadCache = () => {
     const predictions = getAllCachedPredictions();
@@ -57,27 +58,48 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-3">
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
         <div className="flex items-center gap-2">
-          <Database className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+          <Database className="w-5 h-5" style={{ color: 'var(--accent)' }} />
           <span className="card-label">ML Cache</span>
-          <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg-1)', color: 'var(--text-4)' }}>
+          <span className="text-xs px-2 py-0.5 rounded" style={{
+            background: 'var(--bg-2)',
+            color: 'var(--text-4)',
+            border: '1px solid var(--bg-1)'
+          }}>
             {cachedPredictions.length}
           </span>
         </div>
-        {cachedPredictions.length > 0 && (
-          <button
-            onClick={handleClearAll}
-            className="text-xs p-1 hover:bg-opacity-80 transition-all"
-            style={{ color: 'var(--error)' }}
-            title="Clear all cache"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+        {isCollapsed ? (
+          <ChevronDown className="w-5 h-5" style={{ color: 'var(--text-4)' }} />
+        ) : (
+          <ChevronUp className="w-5 h-5" style={{ color: 'var(--text-4)' }} />
         )}
       </div>
 
-      {cachedPredictions.length === 0 ? (
+      {!isCollapsed && (
+        <>
+          {cachedPredictions.length > 0 && (
+            <div className="flex justify-end mb-2 mt-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClearAll();
+                }}
+                className="text-xs px-2 py-1 hover:bg-opacity-80 transition-all flex items-center gap-1"
+                style={{ color: 'var(--error)' }}
+                title="Clear all cache"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Clear All</span>
+              </button>
+            </div>
+          )}
+
+          {cachedPredictions.length === 0 ? (
         <div className="text-center py-8" style={{ color: 'var(--text-4)' }}>
           <Database className="w-12 h-12 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No cached predictions yet</p>
@@ -96,7 +118,7 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
                 </tr>
               </thead>
               <tbody>
-                {cachedPredictions.slice(0, isExpanded ? undefined : 5).map((pred, index) => (
+                {cachedPredictions.slice(0, showAll ? undefined : 5).map((pred, index) => (
                   <tr
                     key={`${pred.symbol}-${pred.timestamp}`}
                     onClick={() => onLoadPrediction?.(pred)}
@@ -139,7 +161,7 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
           {/* Show More/Less Button */}
           {cachedPredictions.length > 5 && (
             <button
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={() => setShowAll(!showAll)}
               className="w-full mt-3 py-2 text-xs border transition-all"
               style={{
                 background: 'var(--bg-3)',
@@ -147,9 +169,11 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
                 color: 'var(--text-3)',
               }}
             >
-              {isExpanded ? 'Show Less' : `Show All (${cachedPredictions.length})`}
+              {showAll ? 'Show Less' : `Show All (${cachedPredictions.length})`}
             </button>
           )}
+        </>
+      )}
         </>
       )}
     </div>

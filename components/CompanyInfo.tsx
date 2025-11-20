@@ -525,11 +525,6 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
                   </div>
                 </div>
               )}
-
-              {/* Data Source */}
-              <div className="mt-3 text-xs text-center" style={{ color: 'var(--text-5)' }}>
-                Fundamentals data provided by Alpha Vantage
-              </div>
             </>
           )}
         </div>
@@ -544,26 +539,6 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
         </div>
       )}
 
-      {/* Footer with CIK and identifiers */}
-      {(companyInfo.cik || companyInfo.sicCode) && (
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--bg-1)' }}>
-          <div className="flex flex-wrap gap-4 text-xs" style={{ color: 'var(--text-5)' }}>
-            {companyInfo.cik && (
-              <div>
-                <span>CIK: </span>
-                <span className="font-mono">{companyInfo.cik}</span>
-              </div>
-            )}
-            {companyInfo.sicCode && companyInfo.sicDescription && (
-              <div>
-                <span>SIC: </span>
-                <span className="font-mono">{companyInfo.sicCode}</span>
-                <span className="ml-1">({companyInfo.sicDescription})</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

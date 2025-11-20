@@ -1279,8 +1279,8 @@ export default function Home() {
                 <span className="text-xs" style={{ color: 'var(--text-5)' }}>Toggle overlays on chart</span>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-1">
+                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
                   background: showMA20 ? 'var(--bg-3)' : 'var(--bg-4)',
                   borderColor: showMA20 ? 'var(--accent)' : 'var(--bg-1)',
                   borderLeftWidth: showMA20 ? '3px' : '1px'
@@ -1289,19 +1289,19 @@ export default function Home() {
                     type="checkbox"
                     checked={showMA20}
                     onChange={(e) => setShowMA20(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
                       background: showMA20 ? 'var(--accent)' : 'var(--bg-4)',
                     }}
                   />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>20-Day MA</div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Short-term</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>20-Day MA</div>
+                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Short-term</div>
                   </div>
                 </label>
                 
-                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
                   background: showMA50 ? 'var(--bg-3)' : 'var(--bg-4)',
                   borderColor: showMA50 ? 'var(--accent)' : 'var(--bg-1)',
                   borderLeftWidth: showMA50 ? '3px' : '1px'
@@ -1310,19 +1310,19 @@ export default function Home() {
                     type="checkbox"
                     checked={showMA50}
                     onChange={(e) => setShowMA50(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
                       background: showMA50 ? 'var(--accent)' : 'var(--bg-4)',
                     }}
                   />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>50-Day MA</div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Mid-term</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>50-Day MA</div>
+                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Mid-term</div>
                   </div>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+
+                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
                   background: showBB ? 'var(--bg-3)' : 'var(--bg-4)',
                   borderColor: showBB ? 'var(--accent)' : 'var(--bg-1)',
                   borderLeftWidth: showBB ? '3px' : '1px'
@@ -1331,19 +1331,19 @@ export default function Home() {
                     type="checkbox"
                     checked={showBB}
                     onChange={(e) => setShowBB(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
                       background: showBB ? 'var(--accent)' : 'var(--bg-4)',
                     }}
                   />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Bollinger</div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Volatility</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>Bollinger</div>
+                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Volatility</div>
                   </div>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+
+                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
                   background: showVolume ? 'var(--bg-3)' : 'var(--bg-4)',
                   borderColor: showVolume ? 'var(--accent)' : 'var(--bg-1)',
                   borderLeftWidth: showVolume ? '3px' : '1px'
@@ -1352,19 +1352,19 @@ export default function Home() {
                     type="checkbox"
                     checked={showVolume}
                     onChange={(e) => setShowVolume(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
                       background: showVolume ? 'var(--accent)' : 'var(--bg-4)',
                     }}
                   />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Volume</div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Strength</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>Volume</div>
+                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Strength</div>
                   </div>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+
+                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
                   background: showIndicators ? 'var(--bg-3)' : 'var(--bg-4)',
                   borderColor: showIndicators ? 'var(--accent)' : 'var(--bg-1)',
                   borderLeftWidth: showIndicators ? '3px' : '1px'
@@ -1373,19 +1373,19 @@ export default function Home() {
                     type="checkbox"
                     checked={showIndicators}
                     onChange={(e) => setShowIndicators(e.target.checked)}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
                       background: showIndicators ? 'var(--accent)' : 'var(--bg-4)',
                     }}
                   />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>RSI/MACD</div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>Momentum</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>RSI/MACD</div>
+                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Momentum</div>
                   </div>
                 </label>
-              
-              <label className="flex items-center gap-2 cursor-pointer group p-2 border transition-all" style={{ 
+
+              <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
                 background: showPatterns ? 'var(--bg-3)' : 'var(--bg-4)',
                 borderColor: showPatterns ? 'var(--accent)' : 'var(--bg-1)',
                 borderLeftWidth: showPatterns ? '3px' : '1px'
@@ -1394,15 +1394,15 @@ export default function Home() {
                   type="checkbox"
                   checked={showPatterns}
                   onChange={(e) => setShowPatterns(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all"
+                  className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                   style={{
                     borderColor: 'var(--bg-1)',
                     background: showPatterns ? 'var(--accent)' : 'var(--bg-4)',
                   }}
                 />
-                <div className="flex-1">
-                  <div className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>Chart Patterns</div>
-                  <div className="text-xs" style={{ color: 'var(--text-5)' }}>(beta)</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>Chart Patterns</div>
+                  <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>(beta)</div>
                 </div>
               </label>
               </div>
