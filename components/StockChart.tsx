@@ -1250,38 +1250,60 @@ export default function StockChart({
             />
           )}
           <Tooltip
-            formatter={(value: any, name: any, props: any) => {
-              if (chartType === 'candlestick' && props?.payload) {
-                const { open, high, low, close } = props.payload;
-                // Check if OHLC data exists
-                if (open !== undefined && high !== undefined && low !== undefined && close !== undefined) {
-                  return [
-                    <div key="ohlc" style={{ fontSize: '11px' }}>
-                      <div>O: {formatPrice(open)}</div>
-                      <div>H: {formatPrice(high)}</div>
-                      <div>L: {formatPrice(low)}</div>
-                      <div>C: {formatPrice(close)}</div>
-                    </div>,
-                    'OHLC'
-                  ];
+            content={(props: any) => {
+              const { active, payload, label } = props;
+              if (!active || !payload || !payload.length) return null;
+
+              // Filter out the duplicate "lower" entry (from Area component)
+              const filteredPayload = payload.filter((entry: any) => {
+                // Keep all entries except the one with dataKey "lower" and no name
+                if (entry.dataKey === 'lower' && (!entry.name || entry.name === 'lower' || entry.name === '')) {
+                  return false;
                 }
-              }
-              // Safe formatting with null check
-              if (value === undefined || value === null) return 'N/A';
-              return formatPrice(Number(value));
-            }}
-            labelFormatter={formatTooltipLabel}
-            contentStyle={{
-              backgroundColor: 'oklch(23% 0 0)',
-              border: '2px solid oklch(70% 0.12 170)',
-              borderRadius: '0',
-              color: 'oklch(85% 0 0)',
-              fontFamily: 'DM Mono, monospace',
-              fontSize: '12px',
-            }}
-            labelStyle={{
-              color: 'oklch(70% 0.12 170)',
-              fontWeight: 'bold',
+                return true;
+              });
+
+              return (
+                <div style={{
+                  backgroundColor: 'oklch(23% 0 0)',
+                  border: '2px solid oklch(70% 0.12 170)',
+                  borderRadius: '0',
+                  color: 'oklch(85% 0 0)',
+                  fontFamily: 'DM Mono, monospace',
+                  fontSize: '12px',
+                  padding: '8px'
+                }}>
+                  <p style={{
+                    margin: '0 0 4px 0',
+                    color: 'oklch(70% 0.12 170)',
+                    fontWeight: 'bold'
+                  }}>
+                    {formatTooltipLabel(label)}
+                  </p>
+                  {chartType === 'candlestick' && payload[0]?.payload && (
+                    (() => {
+                      const { open, high, low, close } = payload[0].payload;
+                      if (open !== undefined && high !== undefined && low !== undefined && close !== undefined) {
+                        return (
+                          <div style={{ fontSize: '11px', marginBottom: '4px' }}>
+                            <div>O: {formatPrice(open)}</div>
+                            <div>H: {formatPrice(high)}</div>
+                            <div>L: {formatPrice(low)}</div>
+                            <div>C: {formatPrice(close)}</div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()
+                  )}
+                  {filteredPayload.map((entry: any, index: number) => (
+                    <div key={`item-${index}`} style={{ margin: '2px 0' }}>
+                      <span style={{ color: entry.color }}>{entry.name}: </span>
+                      <span>{entry.value !== undefined && entry.value !== null ? formatPrice(Number(entry.value)) : 'N/A'}</span>
+                    </div>
+                  ))}
+                </div>
+              );
             }}
           />
           <Legend
