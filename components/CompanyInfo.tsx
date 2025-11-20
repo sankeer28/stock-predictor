@@ -234,7 +234,7 @@ export default function CompanyInfo({ symbol, companyName, currentPrice, current
         {companyInfo.description && (
           <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--text-3)' }}>
             {companyInfo.description.length > 400
-              ? `${companyInfo.description.substring(0, 400)}...`
+              ? `${companyInfo.description.substring(0, 1000)}`
               : companyInfo.description}
           </p>
         )}
