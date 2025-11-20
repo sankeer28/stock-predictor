@@ -325,7 +325,7 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
               <button
                 key={stock.ticker}
                 onClick={() => onTickerClick?.(stock.ticker)}
-                className="w-full text-left p-3 border transition-all hover:opacity-80"
+                className="w-full text-left p-3 border transition-all hover:opacity-80 overflow-hidden"
                 style={{
                   background: 'var(--bg-2)',
                   borderColor: 'var(--bg-1)',
@@ -333,19 +333,19 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
                   borderLeftColor: stock.rankChange > 0 ? 'var(--success)' : stock.rankChange < 0 ? 'var(--danger)' : 'var(--text-5)',
                 }}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {/* Rank with change */}
-                    <div className="flex items-center gap-1 w-12">
+                    <div className="flex items-center gap-1 flex-shrink-0" style={{ width: '50px' }}>
                       <span className="font-mono text-sm font-bold" style={{ color: 'var(--text-3)' }}>
                         #{stock.rank}
                       </span>
                       {getRankChangeIcon(stock.rankChange)}
                     </div>
 
-                    {/* Ticker */}
-                    <div className="flex flex-col flex-1">
-                      <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-2)' }}>
+                    {/* Ticker - constrained to prevent overflow */}
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <div className="font-mono font-bold text-sm truncate" style={{ color: 'var(--text-2)' }}>
                         ${stock.ticker}
                       </div>
                       <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>
@@ -354,10 +354,10 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-3)' }}>
-                      <MessageSquare className="w-3 h-3" />
+                  {/* Stats - flex-shrink-0 to prevent squishing */}
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1 text-xs whitespace-nowrap" style={{ color: 'var(--text-3)' }}>
+                      <MessageSquare className="w-3 h-3 flex-shrink-0" />
                       <span className="font-mono">{formatNumber(stock.mentions)}</span>
                       {stock.mentionsChange !== 0 && (
                         <span className="text-xs" style={{ color: getRankChangeColor(stock.mentionsChange) }}>
@@ -365,8 +365,8 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-4)' }}>
-                      <ThumbsUp className="w-3 h-3" />
+                    <div className="flex items-center gap-1 text-xs whitespace-nowrap" style={{ color: 'var(--text-4)' }}>
+                      <ThumbsUp className="w-3 h-3 flex-shrink-0" />
                       <span className="font-mono">{formatNumber(stock.upvotes)}</span>
                     </div>
                   </div>

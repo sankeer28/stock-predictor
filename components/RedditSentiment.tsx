@@ -181,7 +181,7 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
               <button
                 key={stock.ticker}
                 onClick={() => onTickerClick?.(stock.ticker)}
-                className="w-full text-left p-3 border transition-all hover:opacity-80"
+                className="w-full text-left p-3 border transition-all hover:opacity-80 overflow-hidden"
                 style={{
                   background: 'var(--bg-2)',
                   borderColor: 'var(--bg-1)',
@@ -189,21 +189,21 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
                   borderLeftColor: getSentimentColor(stock.sentiment),
                 }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {/* Rank */}
                     <div className="flex-shrink-0 w-6 text-center font-mono text-sm" style={{ color: 'var(--text-4)' }}>
                       {index + 1}
                     </div>
 
                     {/* Ticker */}
-                    <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-2)' }}>
+                    <div className="font-mono font-bold text-sm flex-shrink-0" style={{ color: 'var(--text-2)' }}>
                       ${stock.ticker}
                     </div>
 
                     {/* Sentiment Badge */}
                     <div
-                      className="px-2 py-0.5 text-xs font-semibold"
+                      className="px-2 py-0.5 text-xs font-semibold whitespace-nowrap flex-shrink-0"
                       style={{
                         background: getSentimentBg(stock.sentiment),
                         color: getSentimentColor(stock.sentiment),
@@ -213,14 +213,14 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
                     </div>
 
                     {/* Score */}
-                    <div className="text-xs font-mono" style={{ color: 'var(--text-3)' }}>
+                    <div className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-3)' }}>
                       {formatScore(stock.sentiment_score)}
                     </div>
                   </div>
 
                   {/* Comments */}
-                  <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-4)' }}>
-                    <MessageCircle className="w-3 h-3" />
+                  <div className="flex items-center gap-1 text-xs whitespace-nowrap flex-shrink-0" style={{ color: 'var(--text-4)' }}>
+                    <MessageCircle className="w-3 h-3 flex-shrink-0" />
                     <span>{stock.no_of_comments}</span>
                   </div>
                 </div>
@@ -233,11 +233,6 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
               <p className="text-sm">No Reddit data available</p>
             </div>
           )}
-
-          {/* Footer Info */}
-          <div className="mt-4 pt-3 border-t text-xs" style={{ borderColor: 'var(--bg-1)', color: 'var(--text-5)' }}>
-            <p>Data updates every 15 minutes from r/WallStreetBets</p>
-          </div>
         </>
       )}
     </div>
