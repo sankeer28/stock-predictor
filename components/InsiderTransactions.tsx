@@ -130,7 +130,7 @@ export default function InsiderTransactions({ symbol, inlineMobile }: InsiderTra
               <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
                 {buyCount}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>transactions</div>
+              <div className="text-[9px]" style={{ color: 'var(--text-5)' }}>transactions</div>
             </div>
 
             <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
@@ -138,7 +138,7 @@ export default function InsiderTransactions({ symbol, inlineMobile }: InsiderTra
               <div className="text-lg font-bold" style={{ color: 'var(--danger)' }}>
                 {sellCount}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>transactions</div>
+              <div className="text-[9px]" style={{ color: 'var(--text-5)' }}>transactions</div>
             </div>
 
             <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
