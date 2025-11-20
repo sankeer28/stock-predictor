@@ -1049,11 +1049,9 @@ export default function Home() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent)' }} />
-              <div>
-                <h1 className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
-                  Stock Predictor
-                </h1>
-              </div>
+              <h1 className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
+                Stock Predictor
+              </h1>
             </div>
             <a
               href="https://github.com/sankeer28/stock-predictor"
@@ -1415,119 +1413,101 @@ export default function Home() {
             {/* Main Chart with Integrated Controls */}
             <div className="card mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <span className="card-label">
-                  Price Chart with Forecast
-                  <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-5)' }}>
-                    ({useProphetForecast ? 'Prophet' : 'Custom ML'})
-                  </span>
-                </span>
-                
-                {/* Chart Type Toggle */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleChartTypeChange('line')}
-                    className="px-3 py-1.5 text-xs font-medium border transition-all"
-                    style={{
-                      background: chartType === 'line' ? 'var(--accent)' : 'var(--bg-3)',
-                      borderColor: chartType === 'line' ? 'var(--accent)' : 'var(--bg-1)',
-                      color: chartType === 'line' ? 'var(--text-0)' : 'var(--text-3)',
-                    }}
-                  >
-                    📈 LINE
-                  </button>
-                  <button
-                    onClick={() => handleChartTypeChange('candlestick')}
-                    className="px-3 py-1.5 text-xs font-medium border transition-all"
-                    style={{
-                      background: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-3)',
-                      borderColor: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-1)',
-                      color: chartType === 'candlestick' ? 'var(--text-0)' : 'var(--text-3)',
-                    }}
-                  >
-                    📊 CANDLESTICK
-                  </button>
-                </div>
-              </div>
+                <span className="card-label">Price Chart with Forecast</span>
 
-              {/* Forecast Controls - Inline */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4 p-3 border" style={{
-                background: 'var(--bg-3)',
-                borderColor: 'var(--bg-1)',
-                borderLeftWidth: '3px',
-                borderLeftColor: 'var(--accent)'
-              }}>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setUseProphetForecast(false)}
-                    className="flex-1 px-3 py-1.5 text-xs font-medium border transition-all"
-                    style={{
-                      background: !useProphetForecast ? 'var(--success)' : 'var(--bg-4)',
-                      borderColor: !useProphetForecast ? 'var(--success)' : 'var(--bg-1)',
-                      color: !useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
-                    }}
-                  >
-                    🤖 CUSTOM ML
-                  </button>
-                  <button
-                    onClick={() => setUseProphetForecast(true)}
-                    className="flex-1 px-3 py-1.5 text-xs font-medium border transition-all"
-                    style={{
-                      background: useProphetForecast ? 'var(--info)' : 'var(--bg-4)',
-                      borderColor: useProphetForecast ? 'var(--info)' : 'var(--bg-1)',
-                      color: useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
-                    }}
-                  >
-                    🔮 PROPHET
-                  </button>
-                </div>
+                {/* Compact Controls */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Chart Type */}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleChartTypeChange('line')}
+                      className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                      style={{
+                        background: chartType === 'line' ? 'var(--accent)' : 'var(--bg-4)',
+                        borderColor: chartType === 'line' ? 'var(--accent)' : 'var(--bg-1)',
+                        color: chartType === 'line' ? 'var(--text-0)' : 'var(--text-3)',
+                      }}
+                    >
+                      📈 LINE
+                    </button>
+                    <button
+                      onClick={() => handleChartTypeChange('candlestick')}
+                      className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                      style={{
+                        background: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-4)',
+                        borderColor: chartType === 'candlestick' ? 'var(--accent)' : 'var(--bg-1)',
+                        color: chartType === 'candlestick' ? 'var(--text-0)' : 'var(--text-3)',
+                      }}
+                    >
+                      📊 CANDLE
+                    </button>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <label htmlFor="forecast-horizon" className="text-xs font-medium whitespace-nowrap" style={{ color: 'var(--text-4)' }}>
-                    Days:
-                  </label>
-                  <input
-                    id="forecast-horizon"
-                    type="number"
-                    min="7"
-                    max="90"
-                    value={forecastHorizon}
-                    onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
-                    className="w-full px-2 py-1.5 border font-mono text-xs"
-                    style={{
-                      background: 'var(--bg-4)',
-                      borderColor: 'var(--bg-1)',
-                      color: 'var(--text-2)',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
+                  <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
 
-                <div className="flex items-center text-xs italic" style={{ color: 'var(--text-5)' }}>
-                  {useProphetForecast
-                    ? '✨ Seasonality + Trends'
-                    : '⚡ ML Regression'}
-                </div>
-              </div>
+                  {/* Forecast Type */}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setUseProphetForecast(false)}
+                      className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                      style={{
+                        background: !useProphetForecast ? 'var(--success)' : 'var(--bg-4)',
+                        borderColor: !useProphetForecast ? 'var(--success)' : 'var(--bg-1)',
+                        color: !useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
+                      }}
+                    >
+                      🤖 ML
+                    </button>
+                    <button
+                      onClick={() => setUseProphetForecast(true)}
+                      className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                      style={{
+                        background: useProphetForecast ? 'var(--info)' : 'var(--bg-4)',
+                        borderColor: useProphetForecast ? 'var(--info)' : 'var(--bg-1)',
+                        color: useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
+                      }}
+                    >
+                      🔮 PROPHET
+                    </button>
+                  </div>
 
-              <div className="mb-4 border p-3" style={{ background: 'var(--bg-4)', borderColor: 'var(--bg-1)' }}>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-4)' }}>
-                    Frequency
-                  </span>
-                  <span className="text-[11px]" style={{ color: 'var(--text-5)' }}>
-                    {currentFrequency.description}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
+                  <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
+
+                  {/* Forecast Days */}
+                  <div className="flex items-center gap-1">
+                    <label htmlFor="forecast-horizon" className="text-[10px] font-semibold" style={{ color: 'var(--text-4)' }}>
+                      DAYS:
+                    </label>
+                    <input
+                      id="forecast-horizon"
+                      type="number"
+                      min="7"
+                      max="90"
+                      value={forecastHorizon}
+                      onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
+                      className="w-20 px-2 py-1 border font-mono text-[10px]"
+                      style={{
+                        background: 'var(--bg-4)',
+                        borderColor: 'var(--bg-1)',
+                        color: 'var(--text-2)',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
+
+                  {/* Frequency */}
+                  <span className="text-[10px] font-semibold" style={{ color: 'var(--text-4)' }}>FREQ:</span>
                   {DATA_FREQUENCY_OPTIONS.map(option => {
                     const isActive = option.id === dataFrequencyId;
                     return (
                       <button
                         key={option.id}
                         onClick={() => handleFrequencyChange(option.id)}
-                        className="px-3 py-1.5 text-xs font-semibold border transition-all"
+                        className="px-2 py-1 text-[10px] font-semibold border transition-all"
                         style={{
-                          background: isActive ? 'var(--accent)' : 'var(--bg-3)',
+                          background: isActive ? 'var(--accent)' : 'var(--bg-4)',
                           borderColor: isActive ? 'var(--accent)' : 'var(--bg-1)',
                           color: isActive ? 'var(--text-0)' : 'var(--text-3)',
                           opacity: loading && isActive ? 0.7 : 1,
@@ -1539,11 +1519,6 @@ export default function Home() {
                       </button>
                     );
                   })}
-                </div>
-                <div className="text-[11px] mt-2" style={{ color: 'var(--text-5)' }}>
-                  {currentFrequency.category === 'intraday'
-                    ? 'Intraday data auto-limits the lookback based on Yahoo Finance constraints.'
-                    : 'Session data includes full historical coverage.'}
                 </div>
               </div>
 

@@ -1156,15 +1156,6 @@ export default function StockChart({
         </div>
       </div>
 
-      {/* Interactive Controls Help */}
-      <div className="text-xs mb-2 p-2 border" style={{ 
-        background: 'var(--bg-2)', 
-        borderColor: 'var(--bg-1)',
-        color: 'var(--text-4)'
-      }}>
-        <strong style={{ color: 'var(--text-3)' }}>💡 Interactive Controls:</strong> Drag the slider at bottom to pan • Ctrl+Scroll to zoom • Keyboard: +/- zoom, R reset • Click buttons above
-      </div>
-
       {enablePatterns && data.length > 0 && (
         visiblePatterns.length > 0 ? (
           <div
@@ -1298,6 +1289,54 @@ export default function StockChart({
               paddingTop: '10px',
               fontFamily: 'DM Mono, monospace',
               fontSize: '11px'
+            }}
+            formatter={(value, entry: any) => {
+              return <span style={{ color: 'var(--text-3)' }}>{value}</span>;
+            }}
+            payload={undefined}
+            content={(props: any) => {
+              const { payload } = props;
+              if (!payload) return null;
+
+              // Filter out the duplicate "lower" entry
+              const filteredPayload = payload.filter((entry: any) =>
+                entry.dataKey !== 'lower' || entry.value !== 'lower'
+              );
+
+              return (
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  justifyContent: 'center'
+                }}>
+                  {filteredPayload.map((entry: any, index: number) => (
+                    <li key={`item-${index}`} style={{
+                      display: 'inline-block',
+                      marginRight: '10px',
+                      color: 'var(--text-3)',
+                      fontFamily: 'DM Mono, monospace',
+                      fontSize: '11px'
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 32 32" style={{
+                        display: 'inline-block',
+                        verticalAlign: 'middle',
+                        marginRight: '4px'
+                      }}>
+                        <path
+                          strokeWidth="4"
+                          fill="none"
+                          stroke={entry.color}
+                          d="M0,16h10.666666666666666 A5.333333333333333,5.333333333333333,0,1,1,21.333333333333332,16 H32M21.333333333333332,16 A5.333333333333333,5.333333333333333,0,1,1,10.666666666666666,16"
+                        />
+                      </svg>
+                      <span style={{ color: 'var(--text-3)' }}>{entry.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              );
             }}
           />
 
@@ -1547,7 +1586,6 @@ export default function StockChart({
                 stroke="none"
                 fill="var(--bg-4)"
                 fillOpacity={1}
-                name=""
               />
 
               {/* Upper and Lower Bounds - dotted lines */}
@@ -1555,10 +1593,10 @@ export default function StockChart({
                 yAxisId="price"
                 type="monotone"
                 dataKey="upper"
-                stroke="oklch(70% 0.13 0)"
+                stroke="oklch(60% 0.15 30)"
                 strokeWidth={1}
                 strokeDasharray="3 3"
-                strokeOpacity={0.5}
+                strokeOpacity={0.7}
                 dot={false}
                 name="Upper Bound"
               />
@@ -1566,10 +1604,10 @@ export default function StockChart({
                 yAxisId="price"
                 type="monotone"
                 dataKey="lower"
-                stroke="oklch(70% 0.13 0)"
+                stroke="oklch(60% 0.15 0)"
                 strokeWidth={1}
                 strokeDasharray="3 3"
-                strokeOpacity={0.5}
+                strokeOpacity={0.7}
                 dot={false}
                 name="Lower Bound"
               />
@@ -1579,7 +1617,7 @@ export default function StockChart({
                 yAxisId="price"
                 type="monotone"
                 dataKey="predicted"
-                stroke="oklch(70% 0.13 0)"
+                stroke="oklch(70% 0.15 260)"
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={false}
