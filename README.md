@@ -28,7 +28,6 @@ Stock analysis with ML forecasting, technical analysis, and sentiment analysis.
 - **Volume Analysis**: Identifies unusual trading activity
 - **Momentum**: Price action and trend strength indicators
 
-<img width="1865" height="4010" alt="image" src="https://github.com/user-attachments/assets/e1ade5ee-05e3-4c8f-a5b1-9b702e736d1b" />
 
 ### Prerequisites
 
