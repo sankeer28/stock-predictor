@@ -1044,7 +1044,7 @@ export default function Home() {
         {/* Main Content Area - Now Full Width */}
         <div className="flex-1 min-w-0">
           {/* Header with Search */}
-          <div className="card mb-4">
+          <div className="card mb-4" style={{ position: 'relative', zIndex: 20 }}>
             <span className="card-label">Stock Predictor</span>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
