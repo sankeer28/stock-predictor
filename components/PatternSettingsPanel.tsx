@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, ChevronDown, ChevronUp, BarChart2, Scale, Search, SlidersHorizontal } from 'lucide-react';
 import { PatternSettings, PatternPreset, getPatternPresetSettings } from '@/types/patternSettings';
 
 interface PatternSettingsPanelProps {
@@ -26,16 +26,16 @@ export default function PatternSettingsPanel({
   const [expanded, setExpanded] = useState(false);
 
   const handlePresetChange = (preset: PatternPreset) => {
-    console.log(`🎯 Pattern preset changed to: ${preset}`);
+    console.log(`[Preset Change] Pattern preset changed to: ${preset}`);
     onPresetChange(preset);
     const presetSettings = getPatternPresetSettings(preset);
-    console.log('📋 New settings:', presetSettings);
+    console.log('[Settings Profile] New settings:', presetSettings);
     onSettingsChange(presetSettings);
   };
 
   const handleSettingChange = (key: keyof PatternSettings, value: any) => {
     const newSettings = { ...settings, [key]: value };
-    console.log(`⚙️ Pattern setting changed: ${key} =`, value);
+    console.log(`[Setting Change] Pattern setting changed: ${key} =`, value);
     onSettingsChange(newSettings);
     // Switch to custom preset when manually adjusting
     if (currentPreset !== 'custom') {
@@ -144,10 +144,10 @@ export default function PatternSettingsPanel({
 
       {/* Preset Descriptions */}
       <div className="mb-4 p-2 border text-xs" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
-        {currentPreset === 'conservative' && '📊 Fewer, high-confidence patterns'}
-        {currentPreset === 'balanced' && '⚖️ Optimal balance of patterns'}
-        {currentPreset === 'aggressive' && '🔍 More patterns, lower confidence'}
-        {currentPreset === 'custom' && '⚙️ Custom configuration'}
+        {currentPreset === 'conservative' && <><BarChart2 className="w-3 h-3 inline mr-1" /> Fewer, high-confidence patterns</>}
+        {currentPreset === 'balanced' && <><Scale className="w-3 h-3 inline mr-1" /> Optimal balance of patterns</>}
+        {currentPreset === 'aggressive' && <><Search className="w-3 h-3 inline mr-1" /> More patterns, lower confidence</>}
+        {currentPreset === 'custom' && <><SlidersHorizontal className="w-3 h-3 inline mr-1" /> Custom configuration</>}
       </div>
 
       {expanded && (

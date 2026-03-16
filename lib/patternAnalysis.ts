@@ -237,8 +237,8 @@ function generateReasoning(
   // Mention key patterns
   const topPattern = scoredPatterns[0];
   if (topPattern) {
-    const direction = topPattern.pattern.direction === 'bullish' ? '↗️ bullish' : 
-                     topPattern.pattern.direction === 'bearish' ? '↘️ bearish' : 'neutral';
+    const direction = topPattern.pattern.direction === 'bullish' ? 'bullish' : 
+                     topPattern.pattern.direction === 'bearish' ? 'bearish' : 'neutral';
     reasoning.push(
       `Dominant pattern: ${topPattern.pattern.label} (${(topPattern.pattern.confidence * 100).toFixed(0)}% confidence, ${direction})`
     );
@@ -277,11 +277,11 @@ function generateSummary(
   const confidencePercent = (confidence * 100).toFixed(0);
   
   const signalText = {
-    strong_bullish: '🚀 STRONG BULLISH',
-    bullish: '📈 BULLISH',
-    neutral: '⚖️ NEUTRAL',
-    bearish: '📉 BEARISH',
-    strong_bearish: '🔻 STRONG BEARISH',
+    strong_bullish: 'STRONG BULLISH',
+    bullish: 'BULLISH',
+    neutral: 'NEUTRAL',
+    bearish: 'BEARISH',
+    strong_bearish: 'STRONG BEARISH',
   }[signal];
 
   return `${signalText} signal detected across ${totalPatterns} pattern${totalPatterns !== 1 ? 's' : ''} with ${confidencePercent}% confidence (${breakdown.bullish} bullish, ${breakdown.bearish} bearish, ${breakdown.neutral} neutral)`;
@@ -317,7 +317,7 @@ function generateRecommendations(
     sp => sp.pattern.type === 'head_and_shoulders'
   );
   if (hasHeadAndShoulders) {
-    recommendations.push('⚠️ Head & Shoulders pattern present - significant reversal signal');
+    recommendations.push('Head & Shoulders pattern present - significant reversal signal');
   }
 
   const hasDoubleTopBottom = scoredPatterns.some(
@@ -329,7 +329,7 @@ function generateRecommendations(
 
   // Confidence warning
   if (confidence < 0.6) {
-    recommendations.push('⚠️ Low confidence - wait for more confirmation before taking action');
+    recommendations.push('Low confidence - wait for more confirmation before taking action');
   }
 
   return recommendations;

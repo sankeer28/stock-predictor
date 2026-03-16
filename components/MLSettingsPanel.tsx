@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Settings, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Settings, ChevronDown, ChevronUp, Info, AlertTriangle, Scale, Zap, SlidersHorizontal } from 'lucide-react';
 import {
   MLSettings,
   MLPreset,
@@ -95,10 +95,10 @@ const MLSettingsPanel = React.memo(function MLSettingsPanel({
               color: 'var(--text-5)',
               border: '1px solid var(--bg-1)'
             }}>
-              {currentPreset === 'conservative' && '⚠️ More stable, wider confidence intervals, less responsive to recent changes'}
-              {currentPreset === 'balanced' && '⚖️ Default settings, balanced between accuracy and stability'}
-              {currentPreset === 'aggressive' && '🚀 More responsive to trends, tighter predictions, higher learning rate'}
-              {currentPreset === 'custom' && '🛠️ Custom settings - manually configured parameters'}
+              {currentPreset === 'conservative' && <><AlertTriangle className="w-3 h-3 inline mr-1" /> More stable, wider confidence intervals, less responsive to recent changes</>}
+              {currentPreset === 'balanced' && <><Scale className="w-3 h-3 inline mr-1" /> Default settings, balanced between accuracy and stability</>}
+              {currentPreset === 'aggressive' && <><Zap className="w-3 h-3 inline mr-1" /> More responsive to trends, tighter predictions, higher learning rate</>}
+              {currentPreset === 'custom' && <><SlidersHorizontal className="w-3 h-3 inline mr-1" /> Custom settings - manually configured parameters</>}
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, BarChart2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { calculateCorrelationMatrix } from '@/lib/correlationAnalysis';
 
 interface CorrelationHeatmapProps {
@@ -142,7 +142,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
       <div className="mb-4 p-4 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', borderLeftWidth: '3px', borderLeftColor: 'var(--accent)' }}>
         <div className="flex items-start gap-2 mb-2">
           <div className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>
-            📊 How to Read This Matrix
+            <BarChart2 className="w-4 h-4 inline mr-1" style={{ color: 'var(--accent)' }} /> How to Read This Matrix
           </div>
         </div>
         <div className="text-xs space-y-1.5" style={{ color: 'var(--text-4)' }}>
@@ -430,26 +430,26 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                     <div className="font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Correlation Distribution</div>
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px]">🟢 High (≥0.7):</span>
+                        <span className="text-[11px]"><span style={{ display:'inline-block', width:'10px', height:'10px', borderRadius:'50%', background:'#10b981', marginRight:'4px', verticalAlign:'middle' }}></span>High (≥0.7):</span>
                         <span className="font-mono font-bold" style={{ color: highCorrelationPct > 50 ? 'var(--danger)' : 'var(--text-3)' }}>
                           {highCorrelationCount} pairs ({highCorrelationPct.toFixed(0)}%)
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px]">🟡 Moderate (0.4-0.7):</span>
+                        <span className="text-[11px]"><span style={{ display:'inline-block', width:'10px', height:'10px', borderRadius:'50%', background:'#fbbf24', marginRight:'4px', verticalAlign:'middle' }}></span>Moderate (0.4-0.7):</span>
                         <span className="font-mono" style={{ color: 'var(--text-3)' }}>
                           {moderateCorrelationCount} pairs ({moderateCorrelationPct.toFixed(0)}%)
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px]">⚪ Low (0-0.4):</span>
+                        <span className="text-[11px]"><span style={{ display:'inline-block', width:'10px', height:'10px', borderRadius:'50%', background:'#94a3b8', marginRight:'4px', verticalAlign:'middle' }}></span>Low (0-0.4):</span>
                         <span className="font-mono" style={{ color: 'var(--text-3)' }}>
                           {lowCorrelationCount} pairs ({lowCorrelationPct.toFixed(0)}%)
                         </span>
                       </div>
                       {negativeCorrelationCount > 0 && (
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px]">🔴 Negative (&lt;0):</span>
+                          <span className="text-[11px]"><span style={{ display:'inline-block', width:'10px', height:'10px', borderRadius:'50%', background:'#ef4444', marginRight:'4px', verticalAlign:'middle' }}></span>Negative (&lt;0):</span>
                           <span className="font-mono" style={{ color: 'var(--success)' }}>
                             {negativeCorrelationCount} pairs ({negativeCorrelationPct.toFixed(0)}%)
                           </span>
@@ -517,7 +517,7 @@ const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({
                     borderLeftWidth: '3px'
                   }}>
                     <div className="font-semibold mb-2" style={{ color: 'var(--text-2)' }}>
-                      {highCorrelationPct > 50 ? '⚠️ Investment Insights' : '✓ Investment Insights'}
+                      {highCorrelationPct > 50 ? (<><AlertTriangle className="w-3.5 h-3.5 inline mr-1" style={{ color: 'var(--warning)' }} /> Investment Insights</>) : (<><CheckCircle className="w-3.5 h-3.5 inline mr-1" style={{ color: 'var(--success)' }} /> Investment Insights</>)}
                     </div>
                     <div className="space-y-2">
                       {highCorrelationPct > 50 ? (

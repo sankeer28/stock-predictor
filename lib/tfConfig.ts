@@ -30,7 +30,7 @@ export async function initializeTensorFlow(): Promise<void> {
   // Start initialization
   initializationPromise = (async () => {
     try {
-      console.log('🚀 Initializing TensorFlow.js with WebGPU backend...');
+      console.log('[INIT] Initializing TensorFlow.js with WebGPU backend...');
       console.log(`   Available backends: ${tf.engine().backendNames().join(', ')}`);
 
       // Try to set WebGPU backend first (fastest)
@@ -41,23 +41,23 @@ export async function initializeTensorFlow(): Promise<void> {
         }
         await tf.ready();
         const actualBackend = tf.getBackend();
-        console.log(`✅ WebGPU backend initialized successfully!`);
+        console.log(`[SUCCESS] WebGPU backend initialized successfully!`);
         console.log(`   Active backend: ${actualBackend}`);
         console.log(`   Memory: ${JSON.stringify(tf.memory())}`);
 
         if (actualBackend !== 'webgpu') {
-          console.warn(`⚠️  Expected webgpu but got ${actualBackend}, trying WebGL...`);
+          console.warn(`[WARN] Expected webgpu but got ${actualBackend}, trying WebGL...`);
           throw new Error(`Backend mismatch: expected webgpu, got ${actualBackend}`);
         }
       } catch (webgpuError) {
-        console.warn('⚠️  WebGPU not available, falling back to WebGL');
+        console.warn('[WARN] WebGPU not available, falling back to WebGL');
         console.warn('   Reason:', webgpuError);
 
         // Fallback to WebGL (default)
         await tf.setBackend('webgl');
         await tf.ready();
         const actualBackend = tf.getBackend();
-        console.log(`✅ WebGL backend initialized`);
+        console.log(`[SUCCESS] WebGL backend initialized`);
         console.log(`   Active backend: ${actualBackend}`);
       }
 
@@ -77,9 +77,9 @@ export async function initializeTensorFlow(): Promise<void> {
     tf.engine().startScope(); // Enable automatic memory management
 
       isInitialized = true;
-      console.log('✅ TensorFlow.js fully configured for production');
+      console.log('[SUCCESS] TensorFlow.js fully configured for production');
     } catch (error) {
-      console.error('❌ Failed to initialize TensorFlow.js:', error);
+      console.error('[ERROR] Failed to initialize TensorFlow.js:', error);
       throw error;
     }
   })();
@@ -113,7 +113,7 @@ export function getTensorFlowInfo(): {
  */
 export function cleanupTensorFlowMemory(): void {
   const before = tf.memory();
-  console.log('🧹 Cleaning up TensorFlow.js memory...');
+  console.log('[CLEANUP] Cleaning up TensorFlow.js memory...');
   console.log(`   Before: ${before.numTensors} tensors, ${(before.numBytes / 1024 / 1024).toFixed(2)} MB`);
 
   // Dispose leaked tensors
@@ -122,7 +122,7 @@ export function cleanupTensorFlowMemory(): void {
 
   const after = tf.memory();
   console.log(`   After: ${after.numTensors} tensors, ${(after.numBytes / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`   ✅ Freed ${before.numTensors - after.numTensors} tensors, ${((before.numBytes - after.numBytes) / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`   [SUCCESS] Freed ${before.numTensors - after.numTensors} tensors, ${((before.numBytes - after.numBytes) / 1024 / 1024).toFixed(2)} MB`);
 }
 
 /**
@@ -137,5 +137,5 @@ export async function warmupGPU(): Promise<void> {
   x.dispose();
   y.dispose();
   result.dispose();
-  console.log('🔥 GPU warmed up');
+  console.log('[WARMUP] GPU warmed up');
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Brain, TrendingUp, Loader2, X, Menu } from 'lucide-react';
+import { Brain, TrendingUp, TrendingDown, Loader2, X, Menu } from 'lucide-react';
 import { MLPrediction } from '@/lib/mlAlgorithms';
 import { MLForecast } from '@/lib/mlForecasting';
 
@@ -45,7 +45,7 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
 
   // Memoize the algorithms array to avoid recreation on every render
   const algorithms = useMemo(() => [
-    { name: '🏆 Ensemble', key: 'ensemble', data: predictions.ensemble, color: '#f59e0b', description: 'Best: Combines all models' },
+    { name: 'Ensemble', key: 'ensemble', data: predictions.ensemble, color: '#f59e0b', description: 'Combines all models for best accuracy' },
     { name: 'LSTM', key: 'lstm', data: predictions.lstm, color: 'var(--accent)', description: 'Deep learning neural network' },
     { name: 'Prophet-Lite', key: 'prophetLite', data: predictions.prophetLite, color: '#10b981', description: 'Trend + seasonality analysis' },
     { name: 'GRU', key: 'gru', data: predictions.gru, color: '#3b82f6', description: 'Simplified LSTM, faster' },
@@ -193,12 +193,13 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
                         ${stats.price.toFixed(2)}
                       </span>
                       <span
-                        className="text-xs font-semibold"
+                        className="text-xs font-semibold flex items-center gap-1"
                         style={{
                           color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
                         }}
                       >
-                        {stats.direction === 'up' ? '↑' : '↓'} {Math.abs(stats.change).toFixed(2)}%
+                        {stats.direction === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} 
+                        {Math.abs(stats.change).toFixed(2)}%
                       </span>
                     </div>
                     <div className="text-xs" style={{ color: 'var(--text-4)' }}>

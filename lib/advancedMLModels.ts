@@ -213,7 +213,7 @@ export async function generateGRUForecast(
   try {
     // Log TensorFlow backend info
     const tfInfo = getTensorFlowInfo();
-    console.log(`📊 GRU Training started on ${tfInfo.backend.toUpperCase()} backend`);
+    console.log(`[TRAIN] GRU Training started on ${tfInfo.backend.toUpperCase()} backend`);
 
     if (stockData.length < 60) {
       throw new Error('Insufficient data for GRU forecasting');
@@ -340,7 +340,7 @@ export async function generateGRUForecast(
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     const memoryUsed = ((memoryAfter.numBytes - memoryBefore.numBytes) / 1024 / 1024).toFixed(2);
 
-    console.log(`✅ GRU Training completed in ${duration}s`);
+    console.log(`[SUCCESS] GRU Training completed in ${duration}s`);
     console.log(`   Memory: ${memoryUsed} MB used, ${memoryAfter.numTensors} tensors`);
     console.log(`   Backend: ${getTensorFlowInfo().backend.toUpperCase()}`);
 
@@ -502,7 +502,7 @@ export async function generateCNNLSTMForecast(
   try {
     // Log TensorFlow backend info
     const tfInfo = getTensorFlowInfo();
-    console.log(`📊 CNN-LSTM Training started on ${tfInfo.backend.toUpperCase()} backend`);
+    console.log(`[TRAIN] CNN-LSTM Training started on ${tfInfo.backend.toUpperCase()} backend`);
 
     if (stockData.length < 60) {
       throw new Error('Insufficient data for CNN-LSTM forecasting');
@@ -639,7 +639,7 @@ export async function generateCNNLSTMForecast(
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     const memoryUsed = ((memoryAfter.numBytes - memoryBefore.numBytes) / 1024 / 1024).toFixed(2);
 
-    console.log(`✅ CNN-LSTM Training completed in ${duration}s`);
+    console.log(`[SUCCESS] CNN-LSTM Training completed in ${duration}s`);
     console.log(`   Memory: ${memoryUsed} MB used, ${memoryAfter.numTensors} tensors`);
     console.log(`   Backend: ${getTensorFlowInfo().backend.toUpperCase()}`);
 
@@ -734,7 +734,7 @@ export function generateEnsembleFromPredictions(
       });
     }
 
-    console.log(`✅ Ensemble created from ${validModels.length} models (instant, no retraining!)`);
+    console.log(`[SUCCESS] Ensemble created from ${validModels.length} models (instant, no retraining!)`);
     return ensemblePredictions;
   } catch (error) {
     console.error('Ensemble error:', error);
@@ -751,7 +751,7 @@ export async function generateEnsembleForecast(
   forecastDays: number = 30,
   settings?: MLSettings
 ): Promise<MLPrediction[]> {
-  console.warn('⚠️ Using slow ensemble (retraining models). Use generateEnsembleFromPredictions() instead!');
+  console.warn('[WARN] Using slow ensemble (retraining models). Use generateEnsembleFromPredictions() instead!');
   const mlSettings = settings || DEFAULT_ML_SETTINGS;
   
   try {

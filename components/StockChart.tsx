@@ -21,6 +21,7 @@ import {
   Customized,
 } from 'recharts';
 import { ChartDataPoint, ChartPattern } from '@/types';
+import { ZoomIn, ZoomOut, RotateCcw, Wrench, ChevronRight } from 'lucide-react';
 
 const PATTERN_DIRECTION_STYLES: Record<
   ChartPattern['direction'],
@@ -815,7 +816,7 @@ export default function StockChart({
     const filtered = viewPatterns.filter(
       pattern => pattern.endIndex >= start && pattern.startIndex <= cappedEnd
     );
-    console.log(`🎯 Pattern filtering: Total=${viewPatterns.length}, Visible=${filtered.length}, Range=[${start}, ${cappedEnd}] (${cappedEnd - start + 1} points)`);
+    console.log(`[Pattern Filter] Total=${viewPatterns.length}, Visible=${filtered.length}, Range=[${start}, ${cappedEnd}] (${cappedEnd - start + 1} points)`);
     return filtered;
   }, [enablePatterns, viewPatterns, brushRange, combinedData.length, data.length]);
 
@@ -1122,7 +1123,7 @@ export default function StockChart({
             }}
             title="Zoom In (or press +)"
           >
-            🔍+
+            <ZoomIn className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleZoomOut}
@@ -1134,7 +1135,7 @@ export default function StockChart({
             }}
             title="Zoom Out (or press -)"
           >
-            🔍-
+            <ZoomOut className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleResetZoom}
@@ -1146,7 +1147,7 @@ export default function StockChart({
             }}
             title="Reset Zoom (or press R)"
           >
-            ↺ Reset
+            <RotateCcw className="w-3.5 h-3.5 mr-1 inline" /> Reset
           </button>
         </div>
 
@@ -1166,10 +1167,10 @@ export default function StockChart({
             }}
           >
             <div
-              className="text-xs font-semibold uppercase tracking-wide"
+              className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
               style={{ color: 'var(--text-4)' }}
             >
-              patterns WIP ({visiblePatterns.length})
+              <Wrench className="w-3 h-3" style={{ color: 'var(--accent)' }} /> Pattern Analysis (WIP)
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               {patternBadges.map(pattern => {
@@ -1409,12 +1410,30 @@ export default function StockChart({
               x={data[data.length - 1]?.date}
               stroke="oklch(60% 0 0)"
               strokeDasharray="5 5"
-              label={{
-                value: 'Forecast →',
-                position: 'top',
-                fill: 'oklch(60% 0 0)',
-                fontSize: 11,
-                fontFamily: 'DM Mono, monospace'
+              label={(props: any) => {
+                const { x, y, fill, value } = props;
+                return (
+                  <g transform={`translate(${x},${y - 20})`}>
+                    <text
+                      x={0}
+                      y={0}
+                      dy={4}
+                      fill={fill}
+                      fontSize={11}
+                      fontFamily="DM Mono, monospace"
+                      textAnchor="start"
+                    >
+                      Forecast
+                    </text>
+                    <path 
+                      d="M55 0 L60 4 L55 8" 
+                      fill="none" 
+                      stroke={fill} 
+                      strokeWidth="1.5" 
+                      transform="translate(0, -6)" 
+                    />
+                  </g>
+                );
               }}
             />
           )}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock } from 'lucide-react';
+import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles } from 'lucide-react';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateTradingSignal } from '@/lib/tradingSignals';
@@ -231,12 +231,12 @@ export default function Home() {
 
   // Memoize Pattern settings callbacks to prevent unnecessary re-renders
   const handlePatternSettingsChange = React.useCallback((newSettings: PatternSettings) => {
-    console.log('🔄 Pattern settings updated:', newSettings);
+    console.log('[UPDATE] Pattern settings updated:', newSettings);
     setPatternSettings(newSettings);
   }, []);
 
   const handlePatternPresetChange = React.useCallback((newPreset: PatternPreset) => {
-    console.log('🔄 Pattern preset updated:', newPreset);
+    console.log('[UPDATE] Pattern preset updated:', newPreset);
     setPatternPreset(newPreset);
   }, []);
 
@@ -247,7 +247,7 @@ export default function Home() {
       return;
     }
 
-    console.log('🔍 Starting pattern detection with settings:', patternSettings);
+    console.log('[INIT] Starting pattern detection with settings:', patternSettings);
     console.log('📊 Chart data points:', chartData.length);
 
     setPatternDetecting(true);
@@ -260,7 +260,7 @@ export default function Home() {
           const endTime = performance.now();
 
           console.log(`✅ Pattern detection completed in ${(endTime - startTime).toFixed(2)}ms`);
-          console.log(`📈 Detected ${patterns.length} patterns:`, patterns.map(p => `${p.type} (${(p.confidence * 100).toFixed(0)}%)`));
+          console.log(`[DATA] Detected ${patterns.length} patterns:`, patterns.map(p => `${p.type} (${(p.confidence * 100).toFixed(0)}%)`));
 
           setChartPatterns(patterns);
           setPatternDetecting(false);
@@ -280,7 +280,7 @@ export default function Home() {
         }, 0);
       }
     }).catch(error => {
-      console.error('❌ Pattern detection error:', error);
+      console.error('[ERROR] Pattern detection error:', error);
       setPatternDetecting(false);
     });
   }, [chartData, patternSettings]);
@@ -1428,7 +1428,7 @@ export default function Home() {
                         color: chartType === 'line' ? 'var(--text-0)' : 'var(--text-3)',
                       }}
                     >
-                      📈 LINE
+                      <div className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> LINE</div>
                     </button>
                     <button
                       onClick={() => handleChartTypeChange('candlestick')}
@@ -1439,7 +1439,7 @@ export default function Home() {
                         color: chartType === 'candlestick' ? 'var(--text-0)' : 'var(--text-3)',
                       }}
                     >
-                      📊 CANDLE
+                      <div className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5" /> CANDLE</div>
                     </button>
                   </div>
 
@@ -1456,7 +1456,7 @@ export default function Home() {
                         color: !useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
                       }}
                     >
-                      🤖 ML
+                      <div className="flex items-center gap-1.5"><Brain className="w-3.5 h-3.5" /> ML</div>
                     </button>
                     <button
                       onClick={() => setUseProphetForecast(true)}
@@ -1467,7 +1467,7 @@ export default function Home() {
                         color: useProphetForecast ? 'var(--text-0)' : 'var(--text-3)',
                       }}
                     >
-                      🔮 PROPHET
+                      <div className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> PROPHET</div>
                     </button>
                   </div>
 

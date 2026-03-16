@@ -313,8 +313,14 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
               <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
                 {stocks.find(s => s.rankChange > 0)?.ticker || '-'}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>
-                {stocks.find(s => s.rankChange > 0)?.rankChange ? `↑${stocks.find(s => s.rankChange > 0)?.rankChange}` : 'positions'}
+              <div className="text-xs flex items-center gap-1" style={{ color: 'var(--text-5)' }}>
+                {(() => {
+                  const hotStock = stocks.find(s => s.rankChange > 0);
+                  if (hotStock?.rankChange) {
+                    return <><TrendingUp className="w-3 h-3 text-success" /> {hotStock.rankChange} positions</>;
+                  }
+                  return 'positions';
+                })()}
               </div>
             </div>
           </div>

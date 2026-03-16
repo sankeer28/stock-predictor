@@ -2,6 +2,19 @@
 
 import React from 'react';
 import {
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Zap,
+  CheckCircle,
+  Circle,
+  ArrowUpRight,
+  ArrowDownRight,
+  RefreshCw,
+  Flame,
+  Gem,
+} from 'lucide-react';
+import {
   LineChart,
   Line,
   XAxis,
@@ -47,7 +60,7 @@ export default function TechnicalIndicatorsChart({
     let meaning = '';
     let momentumStrength = '';
     let color = '';
-    let icon = '';
+    let icon: React.ReactNode = null;
     let interpretation = '';
 
     if (rsi >= 80) {
@@ -55,56 +68,56 @@ export default function TechnicalIndicatorsChart({
       meaning = 'Exceptional buying pressure';
       momentumStrength = 'Very Strong';
       color = 'var(--danger)';
-      icon = '🔴';
+      icon = <Circle className="w-5 h-5" style={{ color: 'var(--danger)', fill: 'var(--danger)' }} />;
       interpretation = `Price is in extreme overbought territory (RSI: ${rsi.toFixed(1)}). Buyers are dominant but exhaustion is imminent. Strong chance of reversal or consolidation. ${rsiTrend === 'rising' ? 'Momentum still strengthening - classic parabolic move, extremely risky to buy here.' : 'Momentum peaked and turning down - reversal may be starting. Consider profit-taking or short positions.'}`;
     } else if (rsi >= 70) {
       condition = 'OVERBOUGHT ZONE';
       meaning = 'Strong buying pressure';
       momentumStrength = 'Strong';
       color = 'var(--danger)';
-      icon = '⚠️';
+      icon = <AlertTriangle className="w-5 h-5" />;
       interpretation = `Stock is overbought (RSI: ${rsi.toFixed(1)}). Uptrend is mature and vulnerable to pullback. ${rsiTrend === 'rising' ? `Momentum accelerating (Δ${rsiChange.toFixed(1)}) - trend continuation possible but risky. Watch for divergence.` : `Momentum slowing (Δ${rsiChange.toFixed(1)}) - likely topping pattern forming. Tighten stops on longs.`}`;
     } else if (rsi >= 60) {
       condition = 'BULLISH MOMENTUM';
       meaning = 'Healthy upward trend';
       momentumStrength = 'Moderate to Strong';
       color = 'var(--success)';
-      icon = '📈';
+      icon = <TrendingUp className="w-5 h-5" />;
       interpretation = `Solid upward momentum (RSI: ${rsi.toFixed(1)}). Price trend is rising with buyers in control. ${rsiTrend === 'rising' ? `Trend strengthening (Δ${rsiChange.toFixed(1)}) - good for swing trades and trend following. Still room to run before overbought.` : `Slight consolidation (Δ${rsiChange.toFixed(1)}) within uptrend - healthy pullback or early warning? Monitor price action.`}`;
     } else if (rsi >= 50) {
       condition = 'NEUTRAL-BULLISH BIAS';
       meaning = 'Slight buyer advantage';
       momentumStrength = 'Weak to Moderate';
       color = 'var(--info)';
-      icon = '↗️';
+      icon = <ArrowUpRight className="w-5 h-5" />;
       interpretation = `Slightly bullish conditions (RSI: ${rsi.toFixed(1)}). Price in equilibrium with mild upward bias. ${rsiTrend === 'rising' ? `Building momentum (Δ${rsiChange.toFixed(1)}) - potential early stage of uptrend. Wait for confirmation above 60.` : `Losing steam (Δ${rsiChange.toFixed(1)}) - transition phase, could go either way. Neutral stance recommended.`}`;
     } else if (rsi >= 40) {
       condition = 'NEUTRAL-BEARISH BIAS';
       meaning = 'Slight seller advantage';
       momentumStrength = 'Weak to Moderate';
       color = 'var(--text-4)';
-      icon = '↘️';
+      icon = <ArrowDownRight className="w-5 h-5" />;
       interpretation = `Slightly bearish conditions (RSI: ${rsi.toFixed(1)}). Price in equilibrium with mild downward bias. ${rsiTrend === 'falling' ? `Weakening momentum (Δ${rsiChange.toFixed(1)}) - potential early stage of downtrend. Watch for break below 40.` : `Attempting recovery (Δ${rsiChange.toFixed(1)}) - transition phase, stabilization possible. Cautiously optimistic.`}`;
     } else if (rsi >= 30) {
       condition = 'BEARISH MOMENTUM';
       meaning = 'Downward trend active';
       momentumStrength = 'Moderate to Strong';
       color = 'var(--warning)';
-      icon = '📉';
+      icon = <TrendingDown className="w-5 h-5" />;
       interpretation = `Downward momentum present (RSI: ${rsi.toFixed(1)}). Price trend declining with sellers in control. ${rsiTrend === 'falling' ? `Selling pressure increasing (Δ${rsiChange.toFixed(1)}) - downtrend intact. Approaching oversold zone where bounce possible.` : `Selling exhausting (Δ${rsiChange.toFixed(1)}) - potential bottoming process. Early reversal signal if confirmed.`}`;
     } else if (rsi >= 20) {
       condition = 'OVERSOLD ZONE';
       meaning = 'Heavy selling pressure';
       momentumStrength = 'Strong';
       color = 'var(--success)';
-      icon = '✅';
+      icon = <CheckCircle className="w-5 h-5" />;
       interpretation = `Stock is oversold (RSI: ${rsi.toFixed(1)}). Downtrend is extended and due for relief rally. ${rsiTrend === 'falling' ? `Capitulation ongoing (Δ${rsiChange.toFixed(1)}) - extreme fear, but catching falling knife risk. Wait for RSI to turn up.` : `Bottom forming (Δ${rsiChange.toFixed(1)}) - sellers exhausted, buyers stepping in. Good risk/reward for contrarian entry.`}`;
     } else {
       condition = 'EXTREMELY OVERSOLD';
       meaning = 'Panic selling / capitulation';
       momentumStrength = 'Very Strong';
       color = 'var(--success)';
-      icon = '🟢';
+      icon = <Circle className="w-5 h-5" style={{ color: 'var(--success)', fill: 'var(--success)' }} />;
       interpretation = `Extreme oversold levels (RSI: ${rsi.toFixed(1)}). Panic selling evident - historically strong reversal zone. ${rsiTrend === 'falling' ? 'Final capitulation phase - maximum pain point. High probability bounce imminent but timing uncertain.' : 'Reversal initiated - smart money accumulating. Strong recovery potential but scale in gradually.'}`;
     }
 
@@ -137,7 +150,7 @@ export default function TechnicalIndicatorsChart({
     let meaning = '';
     let momentumStrength = '';
     let color = '';
-    let icon = '';
+    let icon: React.ReactNode = null;
     let interpretation = '';
 
     // Crossover detection
@@ -162,7 +175,7 @@ export default function TechnicalIndicatorsChart({
       meaning = 'MACD crossed above Signal line';
       momentumStrength = aboveZero ? 'Strong' : 'Moderate';
       color = 'var(--success)';
-      icon = '🚀';
+      icon = <Zap className="w-5 h-5" />;
       if (aboveZero && signalAboveZero) {
         interpretation = `Bullish crossover in positive territory (MACD: ${macd.toFixed(3)} > Signal: ${signal.toFixed(3)}). Strong continuation signal - uptrend accelerating. Both lines above zero confirms bullish environment. Price likely to rise; buyers dominant. ${histogramExpanding ? 'Momentum expanding rapidly.' : 'Initial crossover - monitor for follow-through.'}`;
       } else {
@@ -173,7 +186,7 @@ export default function TechnicalIndicatorsChart({
       meaning = 'MACD crossed below Signal line';
       momentumStrength = !aboveZero ? 'Strong' : 'Moderate';
       color = 'var(--danger)';
-      icon = '⚠️';
+      icon = <AlertTriangle className="w-5 h-5" />;
       if (!aboveZero && !signalAboveZero) {
         interpretation = `Bearish crossover in negative territory (MACD: ${macd.toFixed(3)} < Signal: ${signal.toFixed(3)}). Strong continuation signal - downtrend accelerating. Both lines below zero confirms bearish environment. Price likely to fall; sellers dominant. ${histogramExpanding ? 'Selling pressure intensifying.' : 'Initial breakdown - monitor for acceleration.'}`;
       } else {
@@ -184,21 +197,21 @@ export default function TechnicalIndicatorsChart({
       meaning = 'Extreme bullish momentum';
       momentumStrength = 'Very Strong';
       color = 'var(--warning)';
-      icon = '🔥';
+      icon = <Flame className="w-5 h-5" />;
       interpretation = `MACD far above signal line (Histogram: ${histogram.toFixed(3)}). Extreme bullish momentum - possible exhaustion ahead. ${histogramExpanding ? 'Parabolic move - momentum still accelerating but unsustainable. High risk of sharp reversal.' : 'Momentum peaked and weakening - possible top forming. Bullish momentum may soon exhaust; consider taking profits.'}`;
     } else if (isOversold) {
       condition = 'OVERSOLD (Far Below Signal)';
       meaning = 'Extreme bearish momentum';
       momentumStrength = 'Very Strong';
       color = 'var(--info)';
-      icon = '💎';
+      icon = <Gem className="w-5 h-5" />;
       interpretation = `MACD far below signal line (Histogram: ${histogram.toFixed(3)}). Extreme bearish momentum - possible bounce ahead. ${histogramContracting ? 'Selling pressure easing - potential reversal zone. Bearish momentum may soon exhaust; possible rebound opportunity.' : 'Capitulation ongoing - downside momentum extreme. Wait for histogram contraction before considering entries.'}`;
     } else if (Math.abs(histogram) < 0.1) {
       condition = 'NEUTRAL / INDECISIVE';
       meaning = 'MACD ≈ Signal (convergence)';
       momentumStrength = 'Very Low';
       color = 'var(--text-4)';
-      icon = '🔄';
+      icon = <RefreshCw className="w-5 h-5" />;
       interpretation = `MACD and Signal nearly equal (Histogram: ${histogram.toFixed(3)}). Market in consolidation or transition phase. Directional momentum absent - waiting for catalyst. ${aboveZero ? 'In positive zone - slight bullish bias but needs confirmation.' : 'In negative zone - slight bearish bias but indecisive.'} Watch for breakout in either direction.`;
     } else if (macd > signal) {
       const strength = separation > 1.0 ? 'Strong' : separation > 0.3 ? 'Moderate' : 'Weak';
@@ -208,21 +221,21 @@ export default function TechnicalIndicatorsChart({
         meaning = 'MACD rising & above Signal';
         momentumStrength = strength;
         color = 'var(--success)';
-        icon = '📈';
+        icon = <TrendingUp className="w-5 h-5" />;
         interpretation = `MACD above signal with expanding histogram (${histogram.toFixed(3)}). Positive momentum accelerating - trend strengthening. ${aboveZero ? 'Both above zero - established uptrend gaining strength. Price trend rising; buyers dominant.' : 'Rising from negative levels - recovery gaining traction. Building bullish momentum.'} Histogram widening = ${strength.toLowerCase()} momentum expansion.`;
       } else if (histogramContracting) {
         condition = 'BULLISH WEAKENING';
         meaning = 'MACD falling but above Signal';
         momentumStrength = separation > 0.3 ? 'Moderate' : 'Weak';
         color = 'var(--warning)';
-        icon = '↗️';
+        icon = <ArrowUpRight className="w-5 h-5" />;
         interpretation = `MACD above signal but histogram contracting (${histogram.toFixed(3)}). Upward momentum decelerating - possible upcoming bearish crossover. ${aboveZero ? 'Still in bullish territory but losing steam. Potential top forming - monitor closely.' : 'Recovery stalling - may need consolidation before next move.'} Possible trend reversal if crossover occurs.`;
       } else {
         condition = 'BULLISH TREND';
         meaning = 'MACD > Signal (stable)';
         momentumStrength = separation > 0.5 ? 'Moderate' : 'Weak';
         color = 'var(--info)';
-        icon = '↗️';
+        icon = <ArrowUpRight className="w-5 h-5" />;
         interpretation = `MACD maintaining position above signal (Histogram: ${histogram.toFixed(3)}). ${aboveZero ? 'Steady uptrend in positive territory. Price likely rising at consistent pace.' : 'Gradual recovery from negative levels - early improvement phase.'} Momentum stable but watch for changes in histogram direction.`;
       }
     } else {
@@ -233,21 +246,21 @@ export default function TechnicalIndicatorsChart({
         meaning = 'MACD falling & below Signal';
         momentumStrength = strength;
         color = 'var(--danger)';
-        icon = '📉';
+        icon = <TrendingDown className="w-5 h-5" />;
         interpretation = `MACD below signal with expanding histogram (${histogram.toFixed(3)}). Negative momentum accelerating - trend strengthening. ${!aboveZero ? 'Both below zero - established downtrend intensifying. Price trend falling; sellers dominant.' : 'Weakening from positive levels - concerning deterioration. Building bearish pressure.'} Histogram widening = ${strength.toLowerCase()} momentum expansion.`;
       } else if (histogramContracting) {
         condition = 'BEARISH WEAKENING';
         meaning = 'MACD rising but below Signal';
         momentumStrength = separation > 0.3 ? 'Moderate' : 'Weak';
         color = 'var(--info)';
-        icon = '↘️';
+        icon = <ArrowDownRight className="w-5 h-5" />;
         interpretation = `MACD below signal but histogram contracting (${histogram.toFixed(3)}). Downward momentum decelerating - possible upcoming bullish crossover. ${!aboveZero ? 'Still in bearish territory but bottoming process may be starting. Potential support forming.' : 'Attempting to stabilize after decline - early warning of reversal.'} Watch for bullish crossover confirmation.`;
       } else {
         condition = 'BEARISH TREND';
         meaning = 'MACD < Signal (stable)';
         momentumStrength = separation > 0.5 ? 'Moderate' : 'Weak';
         color = 'var(--warning)';
-        icon = '↘️';
+        icon = <ArrowDownRight className="w-5 h-5" />;
         interpretation = `MACD maintaining position below signal (Histogram: ${histogram.toFixed(3)}). ${!aboveZero ? 'Steady downtrend in negative territory. Price likely falling at consistent pace.' : 'Gradual deterioration from positive levels - concerning but not accelerating.'} Momentum stable but in negative direction.`;
       }
     }
@@ -330,7 +343,7 @@ export default function TechnicalIndicatorsChart({
             borderLeftWidth: '3px'
           }}>
             <div className="flex items-start gap-3">
-              <span className="text-2xl">{rsiAnalysis.icon}</span>
+              <span className="mt-0.5" style={{ color: rsiAnalysis.color }}>{rsiAnalysis.icon}</span>
               <div className="flex-1">
                 {/* Header */}
                 <div className="mb-3">
@@ -442,7 +455,7 @@ export default function TechnicalIndicatorsChart({
           borderLeftWidth: '3px'
         }}>
           <div className="flex items-start gap-3">
-            <span className="text-2xl">{macdAnalysis.icon}</span>
+            <span className="mt-0.5" style={{ color: macdAnalysis.color }}>{macdAnalysis.icon}</span>
             <div className="flex-1">
               {/* Header */}
               <div className="mb-3">

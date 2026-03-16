@@ -3,7 +3,7 @@
 import { ChartPattern } from '@/types';
 import { analyzePatterns, PatternAnalysisResult } from '@/lib/patternAnalysis';
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, TrendingUp, TrendingDown, Scale, Zap, ChevronsDown, Target, BarChart2, Lightbulb, Sparkles } from 'lucide-react';
 
 interface PatternAnalysisProps {
   patterns: ChartPattern[];
@@ -69,17 +69,18 @@ export default function PatternAnalysis({
 
   // Get signal icon
   const getSignalIcon = (signal: PatternAnalysisResult['signal']) => {
+    const cls = 'w-5 h-5';
     switch (signal) {
       case 'strong_bullish':
-        return '🚀';
+        return <Zap className={cls} />;
       case 'bullish':
-        return '📈';
+        return <TrendingUp className={cls} />;
       case 'neutral':
-        return '⚖️';
+        return <Scale className={cls} />;
       case 'bearish':
-        return '📉';
+        return <TrendingDown className={cls} />;
       case 'strong_bearish':
-        return '🔻';
+        return <ChevronsDown className={cls} />;
     }
   };
 
@@ -179,9 +180,9 @@ export default function PatternAnalysis({
               <div className="flex-1">
                 <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-2)' }}>
                   {isDetecting ? (
-                    <>🔄 Re-detecting patterns on chart...</>
+                    <><RefreshCw className="w-3 h-3 inline mr-1" /> Re-detecting patterns on chart...</>
                   ) : (
-                    <>Click ↻ to re-run pattern detection</>
+                    <>Click <RefreshCw className="w-3 h-3 inline" /> to re-run pattern detection</>
                   )}
                 </div>
                 <div className="text-[10px]" style={{ color: 'var(--text-4)' }}>
@@ -302,7 +303,7 @@ export default function PatternAnalysis({
           {/* Key Reasoning */}
           <div className="mb-4">
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--text-1)' }}>
-              <span>🎯</span> Key Insights
+              <Target className="w-4 h-4" style={{ color: 'var(--accent)' }} /> Key Insights
             </h3>
             <div className="space-y-2">
               {analysis.reasoning.map((reason, index) => (
@@ -325,7 +326,7 @@ export default function PatternAnalysis({
           {analysis.keyPatterns.length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--text-1)' }}>
-                <span>📊</span> Key Patterns
+                <BarChart2 className="w-4 h-4" style={{ color: 'var(--accent)' }} /> Key Patterns
               </h3>
               <div className="space-y-2">
                 {analysis.keyPatterns.map((kp, index) => {
@@ -392,7 +393,7 @@ export default function PatternAnalysis({
           {/* Recommendations */}
           <div>
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--text-1)' }}>
-              <span>💡</span> Recommendations
+              <Lightbulb className="w-4 h-4" style={{ color: 'var(--accent)' }} /> Recommendations
             </h3>
             <div className="space-y-2">
               {analysis.recommendations.map((rec, index) => (
@@ -419,7 +420,7 @@ export default function PatternAnalysis({
                 {new Date(endDate).toLocaleDateString()}
               </div>
               <div className="text-xs text-center mt-1" style={{ color: 'var(--text-5)' }}>
-                ✨ This analysis updates dynamically as you zoom in/out
+                <Sparkles className="w-3 h-3 inline mr-1" /> This analysis updates dynamically as you zoom in/out
               </div>
             </div>
           )}

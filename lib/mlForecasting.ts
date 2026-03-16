@@ -97,7 +97,7 @@ export async function generateMLForecast(
   try {
     // Log TensorFlow backend info
     const tfInfo = getTensorFlowInfo();
-    console.log(`📊 LSTM Training started on ${tfInfo.backend.toUpperCase()} backend`);
+    console.log(`[TRAIN] LSTM Training started on ${tfInfo.backend.toUpperCase()} backend`);
 
     // Extract closing prices
     const closePrices = stockData.map(d => d.close);
@@ -250,7 +250,7 @@ export async function generateMLForecast(
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     const memoryUsed = ((memoryAfter.numBytes - memoryBefore.numBytes) / 1024 / 1024).toFixed(2);
 
-    console.log(`✅ LSTM Training completed in ${duration}s`);
+    console.log(`[SUCCESS] LSTM Training completed in ${duration}s`);
     console.log(`   Memory: ${memoryUsed} MB used, ${memoryAfter.numTensors} tensors`);
     console.log(`   Backend: ${getTensorFlowInfo().backend.toUpperCase()}`);
 

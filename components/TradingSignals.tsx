@@ -8,6 +8,7 @@ import {
   MinusCircle,
   AlertCircle,
   Target,
+  MoveRight,
 } from 'lucide-react';
 
 interface TradingSignalsProps {
@@ -243,8 +244,14 @@ export default function TradingSignals({ signal, currentPrice }: TradingSignalsP
                 }}
               >
                 <div className="flex items-start gap-2">
-                  <span className="text-lg mt-[-2px]">
-                    {isBullish ? '📈' : isBearish ? '📉' : '➡️'}
+                  <span className="mt-0.5 flex-shrink-0">
+                    {isBullish ? (
+                      <TrendingUp className="w-4 h-4" style={{ color: 'var(--success)' }} />
+                    ) : isBearish ? (
+                      <TrendingDown className="w-4 h-4" style={{ color: 'var(--danger)' }} />
+                    ) : (
+                      <MoveRight className="w-4 h-4" style={{ color: 'var(--text-4)' }} />
+                    )}
                   </span>
                   <div className="flex-1">
                     <div className="text-sm font-medium mb-1">{reason}</div>
