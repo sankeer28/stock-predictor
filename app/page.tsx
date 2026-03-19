@@ -43,6 +43,7 @@ const InsiderTransactions = dynamic(() => import('@/components/InsiderTransactio
 const EarningsCalendar = dynamic(() => import('@/components/EarningsCalendar'), { ssr: false });
 const AnalystRecommendations = dynamic(() => import('@/components/AnalystRecommendations'), { ssr: false });
 const PeerStocks = dynamic(() => import('@/components/PeerStocks'), { ssr: false });
+const AIAnalysis = dynamic(() => import('@/components/AIAnalysis'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -1611,6 +1612,24 @@ export default function Home() {
               </div>
             )}
 
+            {/* AI Analysis - Full Width in Main Content */}
+            <div className="mb-6">
+              <AIAnalysis
+                symbol={symbol}
+                companyName={companyName}
+                currentPrice={currentPrice}
+                companyInfo={companyInfo}
+                fundamentalsData={fundamentalsData}
+                tradingSignal={tradingSignal}
+                forecastInsights={forecastInsights}
+                mlPredictions={mlPredictions}
+                newsArticles={newsArticles}
+                newsSentiments={newsSentiments}
+                chartData={chartData}
+                chartPatterns={chartPatterns}
+              />
+            </div>
+
             {/* Two Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Trading Signals */}
@@ -1822,6 +1841,7 @@ export default function Home() {
                 }}
               />
             </div>
+
           </div>
         )}
       </div>
