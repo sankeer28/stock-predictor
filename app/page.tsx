@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles } from 'lucide-react';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
@@ -167,6 +167,8 @@ export default function Home() {
   const [forecastInsights, setForecastInsights] = useState<any>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const historyRef = React.useRef<HTMLDivElement>(null);
 
   // Chart display options
   const [showMA20, setShowMA20] = useState(true);
@@ -186,7 +188,7 @@ export default function Home() {
   );
 
   const handleChartTypeChange = (type: 'line' | 'candlestick') => {
-    setChartType(type);
+    startTransition(() => setChartType(type));
   };
 
   // State for pattern detection loading
@@ -206,6 +208,7 @@ export default function Home() {
   const [mlTraining, setMlTraining] = useState(false);
   const [mlFromCache, setMlFromCache] = useState(false);
   const isLoadingFromCacheTable = React.useRef(false);
+  const suggestionsDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ML Settings
   const [mlSettings, setMlSettings] = useState<MLSettings>(DEFAULT_ML_SETTINGS);
@@ -851,6 +854,17 @@ export default function Home() {
     }
   };
 
+  // Close history dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setShowHistory(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   // Update market status on interval
   useEffect(() => {
     const interval = setInterval(() => {
@@ -925,8 +939,9 @@ export default function Home() {
                     onChange={(e) => {
                       const value = e.target.value.toUpperCase();
                       setInputSymbol(value);
+                      if (suggestionsDebounce.current) clearTimeout(suggestionsDebounce.current);
                       if (value) {
-                        getTickerFromAPi(value);
+                        suggestionsDebounce.current = setTimeout(() => getTickerFromAPi(value), 300);
                       } else {
                         setSuggestions([]);
                       }
@@ -994,68 +1009,74 @@ export default function Home() {
 
                 {/* Search History Dropdown */}
                 {searchHistory.length > 0 && (
-                  <details className="relative">
-                    <summary className="px-4 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border list-none"
+                  <div className="relative" ref={historyRef}>
+                    <button
+                      onClick={() => setShowHistory(prev => !prev)}
+                      className="px-4 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
                       style={{
                         background: 'var(--bg-3)',
                         borderColor: 'var(--bg-1)',
                         color: 'var(--text-3)'
-                      }}>
+                      }}
+                    >
                       <Clock className="w-5 h-5" />
                       <span className="hidden sm:inline">History ({searchHistory.length})</span>
                       <span className="sm:hidden">{searchHistory.length}</span>
-                    </summary>
-                    <div className="absolute right-0 mt-2 w-64 border-2 shadow-lg z-50 max-h-96 overflow-y-auto"
-                      style={{
-                        background: 'var(--bg-2)',
-                        borderColor: 'var(--bg-1)'
-                      }}>
-                      <div className="p-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--bg-1)' }}>
-                        <span className="text-xs font-semibold" style={{ color: 'var(--text-4)' }}>Recent Searches</span>
-                        <button
-                          onClick={clearHistory}
-                          className="text-xs px-2 py-1 border transition-all"
-                          style={{
-                            background: 'var(--bg-3)',
-                            borderColor: 'var(--bg-1)',
-                            color: 'var(--danger)'
-                          }}
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      {searchHistory.map((item, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            setInputSymbol(item.symbol);
-                            fetchData(item.symbol);
-                          }}
-                          className="w-full text-left px-3 py-2 transition-all border-b hover:opacity-80"
-                          style={{
-                            borderColor: 'var(--bg-1)',
-                            background: item.symbol === symbol ? 'var(--bg-3)' : 'transparent'
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-2)' }}>
-                                {item.symbol}
-                              </div>
-                              {item.companyName && (
-                                <div className="text-xs truncate" style={{ color: 'var(--text-4)' }}>
-                                  {item.companyName}
+                    </button>
+                    {showHistory && (
+                      <div className="absolute right-0 mt-2 w-64 border-2 shadow-lg z-50 max-h-96 overflow-y-auto"
+                        style={{
+                          background: 'var(--bg-2)',
+                          borderColor: 'var(--bg-1)'
+                        }}>
+                        <div className="p-3 border-b flex items-center justify-between" style={{ borderColor: 'var(--bg-1)' }}>
+                          <span className="text-xs font-semibold" style={{ color: 'var(--text-4)' }}>Recent Searches</span>
+                          <button
+                            onClick={clearHistory}
+                            className="text-xs px-2 py-1 border transition-all"
+                            style={{
+                              background: 'var(--bg-3)',
+                              borderColor: 'var(--bg-1)',
+                              color: 'var(--danger)'
+                            }}
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        {searchHistory.map((item, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              setInputSymbol(item.symbol);
+                              setShowHistory(false);
+                              fetchData(item.symbol);
+                            }}
+                            className="w-full text-left px-3 py-2 transition-all border-b hover:opacity-80"
+                            style={{
+                              borderColor: 'var(--bg-1)',
+                              background: item.symbol === symbol ? 'var(--bg-3)' : 'transparent'
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-2)' }}>
+                                  {item.symbol}
                                 </div>
-                              )}
+                                {item.companyName && (
+                                  <div className="text-xs truncate" style={{ color: 'var(--text-4)' }}>
+                                    {item.companyName}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-xs" style={{ color: 'var(--text-5)' }}>
+                                {new Date(item.timestamp).toLocaleDateString()}
+                              </div>
                             </div>
-                            <div className="text-xs" style={{ color: 'var(--text-5)' }}>
-                              {new Date(item.timestamp).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </details>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1136,7 +1157,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={showMA20}
-                    onChange={(e) => setShowMA20(e.target.checked)}
+                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowMA20(v)); }}
                     className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
@@ -1157,7 +1178,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={showMA50}
-                    onChange={(e) => setShowMA50(e.target.checked)}
+                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowMA50(v)); }}
                     className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
@@ -1178,7 +1199,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={showBB}
-                    onChange={(e) => setShowBB(e.target.checked)}
+                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowBB(v)); }}
                     className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
@@ -1199,7 +1220,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={showVolume}
-                    onChange={(e) => setShowVolume(e.target.checked)}
+                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowVolume(v)); }}
                     className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
@@ -1220,7 +1241,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={showIndicators}
-                    onChange={(e) => setShowIndicators(e.target.checked)}
+                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowIndicators(v)); }}
                     className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                     style={{
                       borderColor: 'var(--bg-1)',
@@ -1241,7 +1262,7 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={showPatterns}
-                  onChange={(e) => setShowPatterns(e.target.checked)}
+                  onChange={(e) => { const v = e.target.checked; startTransition(() => setShowPatterns(v)); }}
                   className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
                   style={{
                     borderColor: 'var(--bg-1)',

@@ -70,67 +70,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Subtle CRT vignette */
-body::after {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 140%;
-  height: 140%;
-  top: -20%;
-  left: -20%;
-  pointer-events: none;
-  z-index: 9999;
-  background:
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='3.2' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
-  opacity: 0.18;
-  mix-blend-mode: overlay;
-  animation: grain 8s steps(10) infinite;
-}
 
-@keyframes grain {
-  0%, 100% { transform: translate(0, 0); }
-  10% { transform: translate(-5%, -5%); }
-  20% { transform: translate(-10%, 5%); }
-  30% { transform: translate(5%, -10%); }
-  40% { transform: translate(-5%, 15%); }
-  50% { transform: translate(-10%, 5%); }
-  60% { transform: translate(15%, 0); }
-  70% { transform: translate(0, 10%); }
-  80% { transform: translate(-15%, 0); }
-  90% { transform: translate(10%, 5%); }
-}
-
-/* Enhanced scanlines with subtle CRT flicker */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 9998;
-  opacity: 0.035;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.4) 2px,
-      rgba(0, 0, 0, 0.4) 3px
-    );
-  background-size: 100% 3px;
-  mix-blend-mode: multiply;
-  animation: scanline 12s linear infinite;
-}
-
-@keyframes scanline {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(3px); }
-}
 
 * {
   box-sizing: border-box;
@@ -142,7 +82,7 @@ body::before {
   background: rgba(0, 0, 0, 0.2);
   border: var(--border-thickness) solid var(--accent);
   padding: calc(var(--gap) * 2);
-  transition: all var(--transition);
+  transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition);
   position: relative;
   overflow: visible;
   display: flex;
@@ -159,7 +99,6 @@ body::before {
     0 0 20px rgba(0, 0, 0, 0.3),
     0 0 1px var(--accent-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
 }
 
 /* Panel Label - Enhanced Terminal Style */
@@ -174,7 +113,7 @@ body::before {
   font-weight: 500;
   z-index: 10;
   letter-spacing: 0.08em;
-  transition: all var(--transition);
+  transition: color var(--transition), text-shadow var(--transition);
   user-select: none;
   text-transform: uppercase;
   text-shadow: 0 0 8px currentColor;
@@ -186,7 +125,6 @@ body::before {
 .card:hover .card-label {
   color: var(--accent-hover);
   text-shadow: 0 0 12px currentColor;
-  letter-spacing: 0.1em;
 }
 
 .btn-primary {
@@ -195,7 +133,7 @@ body::before {
   padding: 12px 24px;
   border: 2px solid var(--accent);
   font-weight: 500;
-  transition: all var(--transition);
+  transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -244,7 +182,7 @@ body::before {
   padding: 12px 24px;
   border: 2px solid var(--bg-1);
   font-weight: 500;
-  transition: all var(--transition);
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition), transform var(--transition);
   cursor: pointer;
   position: relative;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -274,7 +212,7 @@ input[type="number"] {
   color: var(--text-2);
   padding: 12px 16px;
   font-family: var(--font-dm-mono), monospace;
-  transition: all var(--transition);
+  transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition), color var(--transition);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -318,7 +256,7 @@ input:focus::placeholder {
   box-shadow:
     inset 0 0 8px rgba(0, 255, 0, 0.1),
     0 0 4px rgba(0, 0, 0, 0.3);
-  transition: all var(--transition);
+  transition: box-shadow var(--transition);
 }
 
 .badge-success:hover {
@@ -338,7 +276,7 @@ input:focus::placeholder {
   box-shadow:
     inset 0 0 8px rgba(255, 0, 0, 0.1),
     0 0 4px rgba(0, 0, 0, 0.3);
-  transition: all var(--transition);
+  transition: box-shadow var(--transition);
 }
 
 .badge-danger:hover {
@@ -358,7 +296,7 @@ input:focus::placeholder {
   box-shadow:
     inset 0 0 8px rgba(255, 255, 0, 0.1),
     0 0 4px rgba(0, 0, 0, 0.3);
-  transition: all var(--transition);
+  transition: box-shadow var(--transition);
 }
 
 .badge-warning:hover {
@@ -378,7 +316,7 @@ input:focus::placeholder {
   box-shadow:
     inset 0 0 8px rgba(0, 100, 255, 0.1),
     0 0 4px rgba(0, 0, 0, 0.3);
-  transition: all var(--transition);
+  transition: box-shadow var(--transition);
 }
 
 .badge-info:hover {
@@ -402,7 +340,7 @@ input:focus::placeholder {
   background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
   border: 2px solid var(--bg-4);
   box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4);
-  transition: all var(--transition);
+  transition: background var(--transition), box-shadow var(--transition);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -443,130 +381,6 @@ input:focus::placeholder {
   opacity: 0.8;
 }
 
-/* Utility Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 5px currentColor;
-  }
-  50% {
-    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -100% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-/* Utility Classes */
-.fade-in {
-  animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.fade-in-scale {
-  animation: fadeInScale 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.slide-in-right {
-  animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.slide-in-left {
-  animation: slideInLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-/* Stagger animation delays */
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.1s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.2s; }
-.stagger-5 { animation-delay: 0.25s; }
-
-/* Terminal cursor effect */
-.terminal-cursor::after {
-  content: '▋';
-  animation: blink 1s step-end infinite;
-  color: var(--accent);
-  margin-left: 2px;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
-}
-
-/* Loading shimmer effect */
-.loading-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--bg-3) 0%,
-    var(--bg-2) 50%,
-    var(--bg-3) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
-}
-
-/* Glow text utility */
-.glow-text {
-  text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
-}
-
-.glow-text-sm {
-  text-shadow: 0 0 6px currentColor;
-}
-
-.glow-text-lg {
-  text-shadow: 0 0 15px currentColor, 0 0 30px currentColor, 0 0 45px currentColor;
-}
 
 /* Focus visible for accessibility */
 :focus-visible {
@@ -599,10 +413,5 @@ input:focus::placeholder {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  body::before,
-  body::after {
-    animation: none !important;
   }
 }
