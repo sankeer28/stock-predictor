@@ -29,17 +29,41 @@ function buildAnalysisPrompt(data: any): string {
     `${d.date?.slice(0, 10)}:$${Number(d.close).toFixed(2)}`
   ).join(' ');
 
+  const MODEL_LABELS: Record<string, string> = {
+    lstm: 'LSTM',
+    gru: 'GRU',
+    cnnLstm: 'CNN-LSTM',
+    ensemble: 'Ensemble',
+    linearRegression: 'LinearReg',
+    ema: 'EMA',
+    arima: 'ARIMA',
+    prophetLite: 'ProphetLite',
+  };
+
   const mlLines = Object.entries(mlPredictions || {})
     .filter(([, v]) => Array.isArray(v) && (v as any[]).length > 0)
     .map(([model, predictions]) => {
       const arr = predictions as any[];
-      const last = arr[arr.length - 1];
-      // Models use `predicted` field (MLPrediction interface), not `price`
-      const price = last?.predicted ?? last?.price ?? null;
-      const pct = price != null ? ((price - currentPrice) / currentPrice * 100).toFixed(1) : null;
-      return `${model}:$${price != null ? Number(price).toFixed(2) : 'N/A'}(${pct != null ? (Number(pct) >= 0 ? '+' : '') + pct + '%' : 'N/A'})`;
+      const label = MODEL_LABELS[model] ?? model;
+
+      const getPrice = (item: any) => item?.predicted ?? item?.price ?? null;
+
+      // 7-day prediction (index 6)
+      const item7 = arr[Math.min(6, arr.length - 1)];
+      const price7 = getPrice(item7);
+      const pct7 = price7 != null ? ((price7 - currentPrice) / currentPrice * 100) : null;
+
+      // End-of-horizon prediction (last item, typically day 30)
+      const itemEnd = arr[arr.length - 1];
+      const priceEnd = getPrice(itemEnd);
+      const pctEnd = priceEnd != null ? ((priceEnd - currentPrice) / currentPrice * 100) : null;
+
+      const fmt = (p: number | null, pct: number | null) =>
+        p != null ? `$${p.toFixed(2)}(${pct != null ? (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' : 'N/A'})` : 'N/A';
+
+      return `${label}: 7d=${fmt(price7, pct7)} 30d=${fmt(priceEnd, pctEnd)}`;
     });
-  const mlSummary = mlLines.length ? mlLines.join(' ') : 'none';
+  const mlSummary = mlLines.length ? mlLines.join(' | ') : 'none';
 
   const newsSummary = (newsArticles || []).slice(0, 6).map((article: any, i: number) => {
     const s = newsSentiments?.[i];
@@ -70,7 +94,7 @@ function buildAnalysisPrompt(data: any): string {
   const changePct = companyInfo?.changePercent != null ? Number(companyInfo.changePercent).toFixed(2) : 'N/A';
 
   const signalType = tradingSignal?.type?.replace(/_/g, ' ').toUpperCase() || 'N/A';
-  const signalScore = tradingSignal?.score ?? 'N/A';
+  const signalConfidence = tradingSignal?.confidence != null ? `${Number(tradingSignal.confidence).toFixed(0)}%` : 'N/A';
   const signalReasons = (tradingSignal?.reasons || []).slice(0, 4).join('; ');
 
   const stPrice = forecastInsights?.shortTerm?.price?.toFixed(2) ?? 'N/A';
@@ -98,7 +122,7 @@ RSI(14): ${rsi} | MACD: ${macd} | Signal: ${macdSignal} | MACD diff: ${(Number(m
 MA20: $${ma20} (price is ${ma20Diff >= '0' ? '+' : ''}$${ma20Diff}, ${ma20DiffPct}% ${aboveMA20 ? 'above' : 'below'})
 MA50: $${ma50} (price is ${ma50Diff >= '0' ? '+' : ''}$${ma50Diff}, ${ma50DiffPct}% ${aboveMA50 ? 'above' : 'below'})
 BB Upper: $${bbUpper} | BB Lower: $${bbLower}
-Algo Signal: ${signalType} (${signalScore}/100) | ${signalReasons}
+Algo Signal: ${signalType} (confidence: ${signalConfidence}) | ${signalReasons}
 7D Forecast: $${stPrice} (${stChange}%) | 30D Forecast: $${mtPrice} (${mtChange}%) | Trend: ${trendDir} ${trendStr}%
 ML Models: ${mlSummary}
 Patterns: ${patternsSummary}
@@ -129,7 +153,7 @@ RETURN EXACTLY THIS JSON STRUCTURE (fill in all values, use null for truly unkno
     "outlook_reason": "1-2 sentences citing specific indicators as evidence."
   },
   "forecasts": {
-    "note": "State all available model predictions with exact prices and % changes. Describe consensus direction and spread between most bullish and most bearish models.",
+    "note": "For each ML model listed above, state its 7-day and 30-day predicted price and % change. Identify the consensus direction, and note the spread between the most bullish and most bearish 30-day prediction.",
     "ml_consensus": "bullish|bearish|mixed|inconclusive"
   },
   "risks": [

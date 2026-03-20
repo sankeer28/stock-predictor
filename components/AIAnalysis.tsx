@@ -244,7 +244,7 @@ export default function AIAnalysis({
           </div>
         </div>
         <p className="text-xs mb-4" style={{ color: 'var(--text-4)' }}>
-          Comprehensive AI analysis using all available data — fundamentals, technicals, ML predictions, news sentiment, and chart patterns.
+          AI analysis using  — fundamentals, technicals, ML predictions, news sentiment, and chart patterns.
         </p>
         {error && (
           <div className="p-3 border mb-3 flex items-start gap-2"

@@ -142,8 +142,8 @@ export function getForecastInsights(
 ) {
   if (forecast.length === 0) return null;
 
-  const shortTermForecast = forecast[6]; // 7-day forecast
-  const mediumTermForecast = forecast[29]; // 30-day forecast
+  const shortTermForecast = forecast[Math.min(6, forecast.length - 1)];
+  const mediumTermForecast = forecast[forecast.length - 1];
 
   const shortTermChange = ((shortTermForecast.predicted - currentPrice) / currentPrice) * 100;
   const mediumTermChange = ((mediumTermForecast.predicted - currentPrice) / currentPrice) * 100;

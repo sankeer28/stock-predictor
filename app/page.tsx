@@ -147,7 +147,6 @@ export default function Home() {
   const [inputSymbol, setInputSymbol] = useState('AAPL');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [tfReady, setTfReady] = useState(false);
 
   const [stockData, setStockData] = useState<StockData[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number>(0);
@@ -168,7 +167,6 @@ export default function Home() {
   const [forecastInsights, setForecastInsights] = useState<any>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Chart display options
   const [showMA20, setShowMA20] = useState(true);
@@ -187,12 +185,8 @@ export default function Home() {
     [dataFrequencyId]
   );
 
-  // Optimize chart type changes to avoid blocking UI
   const handleChartTypeChange = (type: 'line' | 'candlestick') => {
-    // Use setTimeout to make the state update non-blocking
-    setTimeout(() => {
-      setChartType(type);
-    }, 0);
+    setChartType(type);
   };
 
   // State for pattern detection loading
@@ -232,12 +226,10 @@ export default function Home() {
 
   // Memoize Pattern settings callbacks to prevent unnecessary re-renders
   const handlePatternSettingsChange = React.useCallback((newSettings: PatternSettings) => {
-    console.log('[UPDATE] Pattern settings updated:', newSettings);
     setPatternSettings(newSettings);
   }, []);
 
   const handlePatternPresetChange = React.useCallback((newPreset: PatternPreset) => {
-    console.log('[UPDATE] Pattern preset updated:', newPreset);
     setPatternPreset(newPreset);
   }, []);
 
@@ -248,34 +240,19 @@ export default function Home() {
       return;
     }
 
-    console.log('[INIT] Starting pattern detection with settings:', patternSettings);
-    console.log('📊 Chart data points:', chartData.length);
-
     setPatternDetecting(true);
     loadMLLibraries().then(({ detectChartPatterns }) => {
       // Use requestIdleCallback to run pattern detection when browser is idle
       if (typeof requestIdleCallback !== 'undefined') {
         requestIdleCallback(() => {
-          const startTime = performance.now();
           const patterns = detectChartPatterns(chartData, patternSettings);
-          const endTime = performance.now();
-
-          console.log(`✅ Pattern detection completed in ${(endTime - startTime).toFixed(2)}ms`);
-          console.log(`[DATA] Detected ${patterns.length} patterns:`, patterns.map(p => `${p.type} (${(p.confidence * 100).toFixed(0)}%)`));
-
           setChartPatterns(patterns);
           setPatternDetecting(false);
         }, { timeout: 2000 });
       } else {
         // Fallback for browsers without requestIdleCallback
         setTimeout(() => {
-          const startTime = performance.now();
           const patterns = detectChartPatterns(chartData, patternSettings);
-          const endTime = performance.now();
-
-          console.log(`✅ Pattern detection completed in ${(endTime - startTime).toFixed(2)}ms`);
-          console.log(`📈 Detected ${patterns.length} patterns:`, patterns.map(p => `${p.type} (${(p.confidence * 100).toFixed(0)}%)`));
-
           setChartPatterns(patterns);
           setPatternDetecting(false);
         }, 0);
@@ -319,11 +296,7 @@ export default function Home() {
     try {
       const savedHistory = localStorage.getItem('stockSearchHistory');
       if (savedHistory) {
-        const parsed = JSON.parse(savedHistory);
-        console.log('Loaded search history from localStorage:', parsed);
-        setSearchHistory(parsed);
-      } else {
-        console.log('No search history found in localStorage');
+        setSearchHistory(JSON.parse(savedHistory));
       }
 
       // Load ML settings
@@ -370,12 +343,6 @@ export default function Home() {
     }
   }, [patternSettings, patternPreset]);
 
-  // Save search history to localStorage
-  const saveSearchHistory = (history: SearchHistoryItem[]) => {
-    localStorage.setItem('stockSearchHistory', JSON.stringify(history));
-    setSearchHistory(history);
-  };
-
   // Add to search history
   const addToHistory = (stockSymbol: string, price?: number, companyName?: string) => {
     const newItem: SearchHistoryItem = {
@@ -394,7 +361,6 @@ export default function Home() {
       // Save to localStorage
       try {
         localStorage.setItem('stockSearchHistory', JSON.stringify(newHistory));
-        console.log('Saved search history to localStorage:', newHistory);
       } catch (e) {
         console.error('Failed to save search history to localStorage:', e);
       }
@@ -408,7 +374,6 @@ export default function Home() {
     try {
       localStorage.removeItem('stockSearchHistory');
       setSearchHistory([]);
-      console.log('Cleared search history from localStorage');
     } catch (e) {
       console.error('Failed to clear search history from localStorage:', e);
     }
@@ -442,9 +407,6 @@ export default function Home() {
         ? 'CLOSED'
         : (currentMinutes < openMinutes ? 'PRE' : currentMinutes >= closeMinutes ? 'POST' : 'REGULAR');
 
-      // eslint-disable-next-line no-console
-      console.debug('[MarketStatus]', { now: now.toString(), et: { hour, minute, weekdayShort, weekdayIndex }, currentMinutes, status });
-
       return status;
     } catch (e) {
       const monthIdx = now.getMonth();
@@ -455,15 +417,76 @@ export default function Home() {
       const hour = etTime.getHours();
       const minute = etTime.getMinutes();
 
-      // eslint-disable-next-line no-console
-      console.debug('[MarketStatus-fallback]', { now: now.toString(), etTime: etTime.toString(), dayIdx, hour, minute });
-
       if (dayIdx === 0 || dayIdx === 6) return 'CLOSED';
       const currentMinutes = hour * 60 + minute;
       if (currentMinutes < 9 * 60 + 30) return 'PRE';
       if (currentMinutes >= 16 * 60) return 'POST';
       return 'REGULAR';
     }
+  };
+
+  // Shared ML training runner — used by fetchData and the forecastHorizon effect.
+  // Trains all models sequentially (to avoid browser freeze), updating predictions
+  // incrementally, then saves the full set to cache.
+  const runMLTraining = (
+    data: StockData[],
+    sym: string,
+    horizon: number,
+    settings: MLSettings,
+    delay: number
+  ) => {
+    setMlFromCache(false);
+    setMlTraining(true);
+
+    setTimeout(async () => {
+      try {
+        const mlLibs = await loadMLLibraries();
+
+        // Fast algorithms first — display immediately
+        const basePredictions = {
+          linearRegression: mlLibs.generateLinearRegression(data, horizon),
+          ema: mlLibs.generateEMAForecast(data, horizon),
+          arima: mlLibs.generateARIMAForecast(data, horizon),
+          prophetLite: mlLibs.generateProphetLiteForecast(data, horizon),
+        };
+        setMlPredictions(basePredictions);
+
+        // Neural networks trained one at a time to keep the UI responsive
+        let lstm = null;
+        try {
+          lstm = await mlLibs.generateMLForecast(data, horizon, settings);
+          setMlPredictions(prev => ({ ...prev, lstm }));
+        } catch (err) { console.error('LSTM failed:', err); }
+
+        let gru = null;
+        try {
+          gru = await mlLibs.generateGRUForecast(data, horizon, settings);
+          setMlPredictions(prev => ({ ...prev, gru }));
+        } catch (err) { console.error('GRU failed:', err); }
+
+        let cnnLstm = null;
+        try {
+          cnnLstm = await mlLibs.generateCNNLSTMForecast(data, horizon, settings);
+          setMlPredictions(prev => ({ ...prev, cnnLstm }));
+        } catch (err) { console.error('CNN-LSTM failed:', err); }
+
+        const ensemble = mlLibs.generateEnsembleFromPredictions({ gru, cnnLstm, lstm }, horizon);
+        if (ensemble) setMlPredictions(prev => ({ ...prev, ensemble }));
+
+        savePredictionsToCache(sym, {
+          ...basePredictions,
+          ...(lstm && { lstm }),
+          ...(gru && { gru }),
+          ...(cnnLstm && { cnnLstm }),
+          ...(ensemble && { ensemble }),
+        }, horizon);
+
+        setMlTraining(false);
+      } catch (mlError) {
+        console.error('ML algorithms error:', mlError);
+        setMlTraining(false);
+      }
+    }, delay);
   };
 
   const fetchData = async (
@@ -542,7 +565,6 @@ export default function Home() {
       if (cachedFundamentals && cachedTime) {
         const age = Date.now() - parseInt(cachedTime);
         if (age < 24 * 60 * 60 * 1000) { // 24 hours
-          console.log(`Using cached fundamentals for ${stockSymbol}`);
           setFundamentalsData(JSON.parse(cachedFundamentals));
         } else {
           // Cache expired, fetch new data
@@ -619,107 +641,17 @@ export default function Home() {
         }
       }, 100);
 
-      // Skip ML if requested (e.g., when loading from cache table)
-      if (skipMLCalculations) {
-        console.log('Skipping ML calculations as requested');
-        return;
-      }
+      if (skipMLCalculations) return;
 
       // Check cache first unless force recalculate is true
       const cached = !forceRecalc ? getCachedPredictions(stockSymbol, forecastHorizon) : null;
 
       if (cached && !forceRecalc) {
-        // Use cached predictions
-        console.log(`Loading cached ML predictions for ${stockSymbol}`);
         setMlPredictions(cached.predictions);
         setMlFromCache(true);
         setMlTraining(false);
       } else {
-        // Run ML algorithms in background (much lower priority - wait for chart to render)
-        setMlFromCache(false);
-        setMlTraining(true);
-        setTimeout(async () => {
-          try {
-            // Lazy load ML libraries first
-            const mlLibs = await loadMLLibraries();
-
-            // Fast algorithms (non-neural network) - run first for immediate display
-            const linearReg = mlLibs.generateLinearRegression(stockResult.data, forecastHorizon);
-            const emaForecast = mlLibs.generateEMAForecast(stockResult.data, forecastHorizon);
-            const arimaForecast = mlLibs.generateARIMAForecast(stockResult.data, forecastHorizon);
-            const prophetLite = mlLibs.generateProphetLiteForecast(stockResult.data, forecastHorizon);
-
-            const predictions = {
-              linearRegression: linearReg,
-              ema: emaForecast,
-              arima: arimaForecast,
-              prophetLite,
-            };
-
-            setMlPredictions(predictions);
-
-            // Neural network models - TRAIN SEQUENTIALLY to prevent browser freeze
-            console.log('Starting neural network models (sequential training)...');
-
-            // Train models ONE AT A TIME to avoid freezing the browser
-            let lstm = null;
-            try {
-              console.log('Training LSTM...');
-              lstm = await mlLibs.generateMLForecast(stockResult.data, forecastHorizon, mlSettings);
-              setMlPredictions(prev => ({ ...prev, lstm }));
-              console.log('✅ LSTM complete');
-            } catch (err) {
-              console.error('LSTM failed:', err);
-            }
-
-            let gru = null;
-            try {
-              console.log('Training GRU...');
-              gru = await mlLibs.generateGRUForecast(stockResult.data, forecastHorizon, mlSettings);
-              setMlPredictions(prev => ({ ...prev, gru }));
-              console.log('✅ GRU complete');
-            } catch (err) {
-              console.error('GRU failed:', err);
-            }
-
-            let cnnLstm = null;
-            try {
-              console.log('Training CNN-LSTM...');
-              cnnLstm = await mlLibs.generateCNNLSTMForecast(stockResult.data, forecastHorizon, mlSettings);
-              setMlPredictions(prev => ({ ...prev, cnnLstm }));
-              console.log('✅ CNN-LSTM complete');
-            } catch (err) {
-              console.error('CNN-LSTM failed:', err);
-            }
-
-            // Generate ensemble INSTANTLY from already-trained models (no retraining!)
-            const ensemble = mlLibs.generateEnsembleFromPredictions(
-              { gru, cnnLstm, lstm },
-              forecastHorizon
-            );
-
-            if (ensemble) {
-              setMlPredictions(prev => ({ ...prev, ensemble }));
-            }
-
-            // Save all predictions to cache
-            const allPredictions = {
-              ...predictions,
-              ...(gru && { gru }),
-              ...(cnnLstm && { cnnLstm }),
-              ...(lstm && { lstm }),
-              ...(ensemble && { ensemble }),
-            };
-
-            savePredictionsToCache(stockSymbol, allPredictions, forecastHorizon);
-
-            setMlTraining(false);
-            console.log('All ML algorithms completed and cached!');
-          } catch (mlError) {
-            console.error('ML algorithms error:', mlError);
-            setMlTraining(false);
-          }
-        }, 2000); // Wait 2 seconds to let chart fully render first
+        runMLTraining(stockResult.data, stockSymbol, forecastHorizon, mlSettings, 2000);
       }
 
       // Fetch news asynchronously (fast, no sentiment)
@@ -811,95 +743,11 @@ export default function Home() {
           const cached = getCachedPredictions(symbol, forecastHorizon);
 
           if (cached) {
-            console.log(`Loading cached ML predictions for ${symbol} (horizon: ${forecastHorizon})`);
             setMlPredictions(cached.predictions);
             setMlFromCache(true);
             setMlTraining(false);
           } else {
-            // Run all ML algorithms in background (delay to avoid blocking UI)
-            setMlFromCache(false);
-            setMlTraining(true);
-            setTimeout(async () => {
-            try {
-              // Lazy load ML libraries first
-              const mlLibs = await loadMLLibraries();
-
-              // Fast algorithms (non-neural network)
-              const linearReg = mlLibs.generateLinearRegression(stockData, forecastHorizon);
-              const emaForecast = mlLibs.generateEMAForecast(stockData, forecastHorizon);
-              const arimaForecast = mlLibs.generateARIMAForecast(stockData, forecastHorizon);
-              const prophetLite = mlLibs.generateProphetLiteForecast(stockData, forecastHorizon);
-
-              const predictions = {
-                linearRegression: linearReg,
-                ema: emaForecast,
-                arima: arimaForecast,
-                prophetLite,
-              };
-
-              setMlPredictions(predictions);
-
-              // Neural network models - TRAIN SEQUENTIALLY to prevent browser freeze
-              console.log('Starting neural network models (sequential training)...');
-
-              // Train models ONE AT A TIME to avoid freezing the browser
-              let lstm = null;
-              try {
-                console.log('Training LSTM...');
-                lstm = await mlLibs.generateMLForecast(stockData, forecastHorizon, mlSettings);
-                setMlPredictions(prev => ({ ...prev, lstm }));
-                console.log('✅ LSTM complete');
-              } catch (err) {
-                console.error('LSTM failed:', err);
-              }
-
-              let gru = null;
-              try {
-                console.log('Training GRU...');
-                gru = await mlLibs.generateGRUForecast(stockData, forecastHorizon, mlSettings);
-                setMlPredictions(prev => ({ ...prev, gru }));
-                console.log('✅ GRU complete');
-              } catch (err) {
-                console.error('GRU failed:', err);
-              }
-
-              let cnnLstm = null;
-              try {
-                console.log('Training CNN-LSTM...');
-                cnnLstm = await mlLibs.generateCNNLSTMForecast(stockData, forecastHorizon, mlSettings);
-                setMlPredictions(prev => ({ ...prev, cnnLstm }));
-                console.log('✅ CNN-LSTM complete');
-              } catch (err) {
-                console.error('CNN-LSTM failed:', err);
-              }
-
-              // Generate ensemble INSTANTLY from already-trained models (no retraining!)
-              const ensemble = mlLibs.generateEnsembleFromPredictions(
-                { gru, cnnLstm, lstm },
-                forecastHorizon
-              );
-
-              if (ensemble) {
-                setMlPredictions(prev => ({ ...prev, ensemble }));
-              }
-
-              // Save all predictions to cache
-              const allPredictions = {
-                ...predictions,
-                ...(gru && { gru }),
-                ...(cnnLstm && { cnnLstm }),
-                ...(lstm && { lstm }),
-                ...(ensemble && { ensemble }),
-              };
-
-              savePredictionsToCache(symbol, allPredictions, forecastHorizon);
-
-              setMlTraining(false);
-            } catch (mlError) {
-              console.error('ML algorithms error:', mlError);
-              setMlTraining(false);
-            }
-          }, 1500); // Delay ML to let chart render smoothly
+            runMLTraining(stockData, symbol, forecastHorizon, mlSettings, 1500);
           }
         } catch (forecastError) {
           console.error('Forecast update error:', forecastError);
@@ -955,8 +803,6 @@ export default function Home() {
   };
 
   const handleLoadCachedPrediction = async (cachedPred: CachedPrediction) => {
-    console.log('Loading cached prediction:', cachedPred);
-
     // Set flag to prevent useEffect from interfering
     isLoadingFromCacheTable.current = true;
 
@@ -976,7 +822,6 @@ export default function Home() {
       setMlFromCache(true);
       setMlTraining(false);
 
-      console.log('Successfully loaded cached prediction from table');
     } finally {
       // Reset flag after a short delay to allow state updates to complete
       setTimeout(() => {
