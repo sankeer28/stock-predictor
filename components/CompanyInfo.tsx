@@ -127,6 +127,29 @@ export default function CompanyInfo({
     return num.toLocaleString();
   };
 
+  // Finviz keys where positive = good, negative = bad
+  const FV_DIRECTIONAL = new Set([
+    'Perf Week', 'Perf Month', 'Perf Quarter', 'Perf Half Y', 'Perf Year', 'Perf YTD',
+    'EPS next Y', 'EPS this Y', 'EPS past 5Y', 'EPS next 5Y', 'Sales past 5Y', 'Sales Q/Q', 'EPS Q/Q',
+    'ROI', 'Insider Trans', 'Inst Trans',
+  ]);
+
+  const fvColor = (key: string, val: string): string => {
+    if (FV_DIRECTIONAL.has(key)) {
+      const num = parseFloat(val.replace('%', '').replace('+', ''));
+      if (!isNaN(num)) return num > 0 ? 'var(--success)' : num < 0 ? 'var(--danger)' : 'var(--text-2)';
+    }
+    if (key === 'RSI (14)') {
+      const num = parseFloat(val);
+      if (!isNaN(num)) return num < 30 ? 'var(--success)' : num > 70 ? 'var(--danger)' : 'var(--text-2)';
+    }
+    if (key === 'Short Float' || key === 'Short Ratio') {
+      const num = parseFloat(val);
+      if (!isNaN(num)) return num > 20 ? 'var(--danger)' : num > 10 ? 'var(--text-2)' : 'var(--success)';
+    }
+    return 'var(--text-2)';
+  };
+
   // Render a single row from the Finviz stock record
   const fv = (key: string) => {
     if (!finvizStock) return null;
@@ -135,7 +158,7 @@ export default function CompanyInfo({
     return (
       <div key={key} className="flex justify-between">
         <span style={{ color: 'var(--text-4)' }}>{key}:</span>
-        <span style={{ color: 'var(--text-2)' }}>{val}</span>
+        <span style={{ color: fvColor(key, val) }}>{val}</span>
       </div>
     );
   };
@@ -288,32 +311,32 @@ export default function CompanyInfo({
                 {fundamentalsData?.fundamentals.pegRatio && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>PEG:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.pegRatio.toFixed(2)}</span>
+                    <span style={{ color: fundamentalsData.fundamentals.pegRatio < 1 ? 'var(--success)' : fundamentalsData.fundamentals.pegRatio > 2 ? 'var(--danger)' : 'var(--text-2)' }}>{fundamentalsData.fundamentals.pegRatio.toFixed(2)}</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.eps != null && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>EPS:</span>
-                    <span style={{ color: 'var(--text-2)' }}>${fmt(fundamentalsData.fundamentals.eps)}</span>
+                    <span style={{ color: fundamentalsData.fundamentals.eps > 0 ? 'var(--success)' : fundamentalsData.fundamentals.eps < 0 ? 'var(--danger)' : 'var(--text-2)' }}>${fmt(fundamentalsData.fundamentals.eps)}</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.priceToBook && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>P/B:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.priceToBook.toFixed(2)}</span>
+                    <span style={{ color: fundamentalsData.fundamentals.priceToBook < 1 ? 'var(--success)' : fundamentalsData.fundamentals.priceToBook > 3 ? 'var(--danger)' : 'var(--text-2)' }}>{fundamentalsData.fundamentals.priceToBook.toFixed(2)}</span>
                   </div>
                 )}
                 {fvSection(FV_VALUATION)}
                 {companyInfo.dividendRate != null && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>Div Rate:</span>
-                    <span style={{ color: 'var(--text-2)' }}>${fmt(companyInfo.dividendRate)}</span>
+                    <span style={{ color: 'var(--success)' }}>${fmt(companyInfo.dividendRate)}</span>
                   </div>
                 )}
                 {companyInfo.dividendYield != null && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>Div Yield:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{fmtPct(companyInfo.dividendYield)}</span>
+                    <span style={{ color: 'var(--success)' }}>{fmtPct(companyInfo.dividendYield)}</span>
                   </div>
                 )}
               </div>
@@ -326,31 +349,31 @@ export default function CompanyInfo({
                 {companyInfo.grossMargins != null && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>Gross Mgn:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{fmtPct(companyInfo.grossMargins)}</span>
+                    <span style={{ color: companyInfo.grossMargins > 0.4 ? 'var(--success)' : companyInfo.grossMargins < 0.2 ? 'var(--danger)' : 'var(--text-2)' }}>{fmtPct(companyInfo.grossMargins)}</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.profitMargin && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>Net Mgn:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.profitMargin * 100).toFixed(2)}%</span>
+                    <span style={{ color: fundamentalsData.fundamentals.profitMargin > 0 ? 'var(--success)' : 'var(--danger)' }}>{(fundamentalsData.fundamentals.profitMargin * 100).toFixed(2)}%</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.operatingMargin && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>Op Mgn:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.operatingMargin * 100).toFixed(2)}%</span>
+                    <span style={{ color: fundamentalsData.fundamentals.operatingMargin > 0 ? 'var(--success)' : 'var(--danger)' }}>{(fundamentalsData.fundamentals.operatingMargin * 100).toFixed(2)}%</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.roe && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>ROE:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.roe * 100).toFixed(2)}%</span>
+                    <span style={{ color: fundamentalsData.fundamentals.roe > 0.15 ? 'var(--success)' : fundamentalsData.fundamentals.roe < 0 ? 'var(--danger)' : 'var(--text-2)' }}>{(fundamentalsData.fundamentals.roe * 100).toFixed(2)}%</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.roa && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>ROA:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{(fundamentalsData.fundamentals.roa * 100).toFixed(2)}%</span>
+                    <span style={{ color: fundamentalsData.fundamentals.roa > 0.05 ? 'var(--success)' : fundamentalsData.fundamentals.roa < 0 ? 'var(--danger)' : 'var(--text-2)' }}>{(fundamentalsData.fundamentals.roa * 100).toFixed(2)}%</span>
                   </div>
                 )}
                 {fvSection(FV_PROFITABILITY)}
@@ -364,13 +387,13 @@ export default function CompanyInfo({
                 {fundamentalsData?.fundamentals.debtToEquity && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>D/E:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.debtToEquity.toFixed(2)}</span>
+                    <span style={{ color: fundamentalsData.fundamentals.debtToEquity < 1 ? 'var(--success)' : fundamentalsData.fundamentals.debtToEquity > 2 ? 'var(--danger)' : 'var(--text-2)' }}>{fundamentalsData.fundamentals.debtToEquity.toFixed(2)}</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.currentRatio && (
                   <div className="flex justify-between gap-2">
                     <span style={{ color: 'var(--text-4)' }}>Curr Ratio:</span>
-                    <span style={{ color: 'var(--text-2)' }}>{fundamentalsData.fundamentals.currentRatio.toFixed(2)}</span>
+                    <span style={{ color: fundamentalsData.fundamentals.currentRatio >= 2 ? 'var(--success)' : fundamentalsData.fundamentals.currentRatio < 1 ? 'var(--danger)' : 'var(--text-2)' }}>{fundamentalsData.fundamentals.currentRatio.toFixed(2)}</span>
                   </div>
                 )}
                 {fundamentalsData?.fundamentals.revenueGrowth && (
