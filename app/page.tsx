@@ -1236,146 +1236,37 @@ export default function Home() {
               onChartsData={(charts, links) => { setFinvizCharts(charts); setFinvizLinks(links); }}
             />
 
-            {/* Technical Indicators - Compact Bar */}
-            <div className="card mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="card-label">Technical Indicators</span>
-                <span className="text-xs" style={{ color: 'var(--text-5)' }}>Toggle overlays on chart</span>
-              </div>
-              
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-1">
-                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
-                  background: showMA20 ? 'var(--bg-3)' : 'var(--bg-4)',
-                  borderColor: showMA20 ? 'var(--accent)' : 'var(--bg-1)',
-                  borderLeftWidth: showMA20 ? '3px' : '1px'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={showMA20}
-                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowMA20(v)); }}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showMA20 ? 'var(--accent)' : 'var(--bg-4)',
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>20-Day MA</div>
-                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Short-term</div>
-                  </div>
-                </label>
-                
-                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
-                  background: showMA50 ? 'var(--bg-3)' : 'var(--bg-4)',
-                  borderColor: showMA50 ? 'var(--accent)' : 'var(--bg-1)',
-                  borderLeftWidth: showMA50 ? '3px' : '1px'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={showMA50}
-                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowMA50(v)); }}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showMA50 ? 'var(--accent)' : 'var(--bg-4)',
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>50-Day MA</div>
-                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Mid-term</div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
-                  background: showBB ? 'var(--bg-3)' : 'var(--bg-4)',
-                  borderColor: showBB ? 'var(--accent)' : 'var(--bg-1)',
-                  borderLeftWidth: showBB ? '3px' : '1px'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={showBB}
-                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowBB(v)); }}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showBB ? 'var(--accent)' : 'var(--bg-4)',
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>Bollinger</div>
-                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Volatility</div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
-                  background: showVolume ? 'var(--bg-3)' : 'var(--bg-4)',
-                  borderColor: showVolume ? 'var(--accent)' : 'var(--bg-1)',
-                  borderLeftWidth: showVolume ? '3px' : '1px'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={showVolume}
-                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowVolume(v)); }}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showVolume ? 'var(--accent)' : 'var(--bg-4)',
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>Volume</div>
-                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Strength</div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
-                  background: showIndicators ? 'var(--bg-3)' : 'var(--bg-4)',
-                  borderColor: showIndicators ? 'var(--accent)' : 'var(--bg-1)',
-                  borderLeftWidth: showIndicators ? '3px' : '1px'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={showIndicators}
-                    onChange={(e) => { const v = e.target.checked; startTransition(() => setShowIndicators(v)); }}
-                    className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
-                    style={{
-                      borderColor: 'var(--bg-1)',
-                      background: showIndicators ? 'var(--accent)' : 'var(--bg-4)',
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>RSI/MACD</div>
-                    <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>Momentum</div>
-                  </div>
-                </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer group px-2 py-1.5 border transition-all" style={{
-                background: showPatterns ? 'var(--bg-3)' : 'var(--bg-4)',
-                borderColor: showPatterns ? 'var(--accent)' : 'var(--bg-1)',
-                borderLeftWidth: showPatterns ? '3px' : '1px'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showPatterns}
-                  onChange={(e) => { const v = e.target.checked; startTransition(() => setShowPatterns(v)); }}
-                  className="w-4 h-4 cursor-pointer border-2 appearance-none transition-all flex-shrink-0"
-                  style={{
-                    borderColor: 'var(--bg-1)',
-                    background: showPatterns ? 'var(--accent)' : 'var(--bg-4)',
-                  }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-2)' }}>Chart Patterns</div>
-                  <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>(beta)</div>
-                </div>
-              </label>
-              </div>
-            </div>
-
             {/* Main Chart with Integrated Controls */}
             <div className="card mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <span className="card-label">Price Chart with Forecast</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="card-label">Price Chart with Forecast</span>
+                  {!showFinvizChart && <div className="flex flex-wrap gap-1">
+                    {([
+                      { label: 'MA20', checked: showMA20, set: setShowMA20 },
+                      { label: 'MA50', checked: showMA50, set: setShowMA50 },
+                      { label: 'Bollinger', checked: showBB, set: setShowBB },
+                      { label: 'Volume', checked: showVolume, set: setShowVolume },
+                      { label: 'RSI/MACD', checked: showIndicators, set: setShowIndicators },
+                      { label: 'Patterns', checked: showPatterns, set: setShowPatterns },
+                    ] as const).map(({ label, checked, set }) => (
+                      <label key={label} className="flex items-center gap-1 cursor-pointer px-2 py-1 border transition-all" style={{
+                        background: checked ? 'var(--bg-3)' : 'var(--bg-4)',
+                        borderColor: checked ? 'var(--accent)' : 'var(--bg-1)',
+                        borderLeftWidth: checked ? '2px' : '1px',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => { const v = e.target.checked; startTransition(() => set(v)); }}
+                          className="w-3 h-3 cursor-pointer border appearance-none transition-all flex-shrink-0"
+                          style={{ borderColor: 'var(--bg-1)', background: checked ? 'var(--accent)' : 'var(--bg-4)' }}
+                        />
+                        <span className="text-xs font-medium" style={{ color: checked ? 'var(--text-2)' : 'var(--text-4)' }}>{label}</span>
+                      </label>
+                    ))}
+                  </div>}
+                </div>
 
                 {/* Compact Controls */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -1485,12 +1376,13 @@ export default function Home() {
                       max="90"
                       value={forecastHorizon}
                       onChange={(e) => setForecastHorizon(parseInt(e.target.value) || 30)}
-                      className="w-20 px-2 py-1 border font-mono text-[10px]"
+                      className="w-16 border font-mono text-[10px]"
                       style={{
                         background: 'var(--bg-4)',
                         borderColor: 'var(--bg-1)',
                         color: 'var(--text-2)',
-                        outline: 'none'
+                        outline: 'none',
+                        padding: '4px 6px',
                       }}
                     />
                   </div>

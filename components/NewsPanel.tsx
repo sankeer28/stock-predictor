@@ -149,56 +149,52 @@ export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment =
       </div>
 
       {/* News Articles */}
-      <div className="space-y-3 max-h-[600px] overflow-y-auto">
+      <div className="space-y-1.5 max-h-[600px] overflow-y-auto">
         {articles.map((article, index) => {
           const sentiment = sentiments[index] ?? { sentiment: 'neutral' as const, score: 0, confidence: 0 };
+          const sentColor = sentiment.sentiment === 'positive' ? 'var(--success)' : sentiment.sentiment === 'negative' ? 'var(--danger)' : 'var(--bg-1)';
           return (
             <div
               key={index}
-              className="p-4 border-2"
-              style={{
-                background: 'var(--bg-2)',
-                borderColor: sentiment.sentiment === 'positive' ? 'var(--success)' : sentiment.sentiment === 'negative' ? 'var(--danger)' : 'var(--bg-1)',
-                borderLeftWidth: '3px'
-              }}
+              className="px-3 py-2 border-l-2"
+              style={{ background: 'var(--bg-2)', borderColor: sentColor }}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    {getSentimentIcon(sentiment.sentiment)}
-                    <h4 className="font-semibold text-sm line-clamp-2" style={{ color: 'var(--text-2)' }}>
+              <div className="flex items-start gap-2">
+                <div className="mt-0.5 flex-shrink-0">{getSentimentIcon(sentiment.sentiment)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-xs font-semibold line-clamp-2 leading-snug" style={{ color: 'var(--text-2)' }}>
                       {article.title}
                     </h4>
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 mt-0.5"
+                      style={{ color: 'var(--info)' }}
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                  <p className="text-sm mb-2 line-clamp-2" style={{ color: 'var(--text-3)' }}>
+                  <p className="text-xs line-clamp-1 mt-0.5" style={{ color: 'var(--text-3)' }}>
                     {article.description}
                   </p>
-                  <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-4)' }}>
+                  <div className="flex items-center gap-2 mt-1 text-[10px]" style={{ color: 'var(--text-4)' }}>
                     <span>{article.source}</span>
+                    <span>·</span>
                     <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
                     <span
-                      className="text-xs px-2 py-1 border"
+                      className="ml-auto px-1.5 py-0.5 border"
                       style={{
                         background: 'var(--bg-3)',
-                        borderColor: sentiment.sentiment === 'positive' ? 'var(--success)' : sentiment.sentiment === 'negative' ? 'var(--danger)' : 'var(--bg-1)',
-                        color: sentiment.sentiment === 'positive' ? 'var(--success)' : sentiment.sentiment === 'negative' ? 'var(--danger)' : 'var(--text-3)'
+                        borderColor: sentColor,
+                        color: sentiment.sentiment === 'neutral' ? 'var(--text-4)' : sentColor,
                       }}
                     >
-                      {sentiment.confidence.toFixed(0)}% confidence
+                      {sentiment.confidence.toFixed(0)}%
                     </span>
                   </div>
                 </div>
-                <a
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0"
-                  style={{ color: 'var(--info)' }}
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
               </div>
             </div>
           );

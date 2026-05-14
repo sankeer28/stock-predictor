@@ -149,7 +149,7 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
         </div>
 
         {/* Algorithms List */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           {algorithms.map((algo) => {
             const stats = calculateStats(algo.data);
             const isReady = algo.data && algo.data.length > 0;
@@ -157,59 +157,45 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
             return (
               <div
                 key={algo.key}
-                className="p-2 border-2"
+                className="flex items-center gap-2 px-2 py-1.5 border-l-2"
                 style={{
                   background: 'var(--bg-2)',
                   borderColor: algo.color,
-                  borderLeftWidth: '3px',
                   opacity: isReady ? 1 : 0.5,
                 }}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>
-                      {algo.name}
-                    </span>
-                    {algo.key === 'ensemble' && isReady && (
-                      <span className="text-xs px-1" style={{ 
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)',
-                        color: 'white',
-                        borderRadius: '2px',
-                        fontWeight: 'bold'
-                      }}>
-                        BEST
-                      </span>
-                    )}
-                  </div>
-                  {!isReady && isTraining && (
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: algo.color }} />
+                <div className="flex items-center gap-1 w-24 flex-shrink-0">
+                  <span className="text-xs font-semibold truncate" style={{ color: 'var(--text-2)' }}>
+                    {algo.name}
+                  </span>
+                  {algo.key === 'ensemble' && isReady && (
+                    <span className="text-[9px] px-1 leading-tight flex-shrink-0" style={{
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)',
+                      color: 'white',
+                      borderRadius: '2px',
+                      fontWeight: 'bold'
+                    }}>BEST</span>
                   )}
                 </div>
 
                 {isReady && stats ? (
                   <>
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-sm font-bold font-mono" style={{ color: algo.color }}>
-                        ${stats.price.toFixed(2)}
-                      </span>
-                      <span
-                        className="text-xs font-semibold flex items-center gap-1"
-                        style={{
-                          color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)',
-                        }}
-                      >
-                        {stats.direction === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} 
-                        {Math.abs(stats.change).toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-                      {algo.description}
-                    </div>
+                    <span className="text-xs font-bold font-mono" style={{ color: algo.color }}>
+                      ${stats.price.toFixed(2)}
+                    </span>
+                    <span
+                      className="text-xs font-semibold flex items-center gap-0.5 ml-auto"
+                      style={{ color: stats.direction === 'up' ? 'var(--success)' : 'var(--danger)' }}
+                    >
+                      {stats.direction === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {Math.abs(stats.change).toFixed(2)}%
+                    </span>
                   </>
                 ) : (
-                  <div className="text-xs" style={{ color: 'var(--text-4)' }}>
+                  <span className="text-xs ml-auto flex items-center gap-1" style={{ color: 'var(--text-4)' }}>
+                    {!isReady && isTraining && <Loader2 className="w-3 h-3 animate-spin" style={{ color: algo.color }} />}
                     {isTraining ? (algo.key === 'lstm' ? 'Training...' : 'Computing...') : 'Waiting...'}
-                  </div>
+                  </span>
                 )}
               </div>
             );

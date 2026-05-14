@@ -143,7 +143,7 @@ export default function InsiderTransactions({ symbol, inlineMobile }: InsiderTra
 
             <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
               <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Net</div>
-              <div className="text-lg font-bold" style={{ color: netBuying > 0 ? 'var(--success)' : netBuying < 0 ? 'var(--danger)' : 'var(--text-3)' }}>
+              <div className="text-sm font-bold leading-tight break-all" style={{ color: netBuying > 0 ? 'var(--success)' : netBuying < 0 ? 'var(--danger)' : 'var(--text-3)' }}>
                 {netBuying > 0 ? '+' : ''}{formatNumber(netBuying)}
               </div>
               <div className="text-xs" style={{ color: 'var(--text-5)' }}>shares</div>
@@ -151,61 +151,34 @@ export default function InsiderTransactions({ symbol, inlineMobile }: InsiderTra
           </div>
 
           {/* Transaction List */}
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {transactions.map((transaction, index) => (
-              <div
-                key={index}
-                className="p-3 border transition-all"
-                style={{
-                  background: 'var(--bg-2)',
-                  borderColor: 'var(--bg-1)',
-                  borderLeftWidth: '3px',
-                  borderLeftColor: getTransactionColor(transaction.transactionCode),
-                }}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="space-y-1 max-h-96 overflow-y-auto">
+            {transactions.map((transaction, index) => {
+              const txColor = getTransactionColor(transaction.transactionCode);
+              const txType = getTransactionType(transaction.transactionCode);
+              return (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 px-2 py-1.5 border-l-2"
+                  style={{ background: 'var(--bg-2)', borderColor: txColor }}
+                >
+                  <div className="flex-shrink-0" style={{ color: txColor }}>
+                    {txType === 'Buy' ? <TrendingUp className="w-3 h-3" /> : txType === 'Sell' ? <TrendingDown className="w-3 h-3" /> : <span className="w-3 h-3 block" />}
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm truncate" style={{ color: 'var(--text-2)' }}>
+                    <span className="text-xs font-semibold truncate block" style={{ color: 'var(--text-2)' }}>
                       {transaction.name}
-                    </div>
-                    <div className="text-xs" style={{ color: 'var(--text-5)' }}>
-                      {formatDate(transaction.transactionDate)}
-                    </div>
-                  </div>
-                  <div
-                    className="px-2 py-1 text-xs font-semibold flex items-center gap-1"
-                    style={{
-                      background: getTransactionColor(transaction.transactionCode) + '20',
-                      color: getTransactionColor(transaction.transactionCode),
-                    }}
-                  >
-                    {getTransactionType(transaction.transactionCode) === 'Buy' ? (
-                      <TrendingUp className="w-3 h-3" />
-                    ) : getTransactionType(transaction.transactionCode) === 'Sell' ? (
-                      <TrendingDown className="w-3 h-3" />
-                    ) : null}
-                    {getTransactionType(transaction.transactionCode)}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span style={{ color: 'var(--text-4)' }}>Shares: </span>
-                    <span className="font-mono font-semibold" style={{ color: 'var(--text-2)' }}>
-                      {formatNumber(Math.abs(transaction.change))}
                     </span>
                   </div>
-                  {transaction.transactionPrice > 0 && (
-                    <div>
-                      <span style={{ color: 'var(--text-4)' }}>Price: </span>
-                      <span className="font-mono font-semibold" style={{ color: 'var(--text-2)' }}>
-                        ${transaction.transactionPrice.toFixed(2)}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0 text-xs font-mono">
+                    <span style={{ color: 'var(--text-3)' }}>{formatNumber(Math.abs(transaction.change))} sh</span>
+                    {transaction.transactionPrice > 0 && (
+                      <span style={{ color: txColor }}>${transaction.transactionPrice.toFixed(2)}</span>
+                    )}
+                    <span style={{ color: 'var(--text-5)' }}>{formatDate(transaction.transactionDate)}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {transactions.length === 0 && !loading && (

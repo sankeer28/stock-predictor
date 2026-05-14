@@ -119,57 +119,38 @@ export default function EarningsCalendar({ symbol, inlineMobile }: EarningsCalen
           </div>
 
           {/* Earnings List */}
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-1 max-h-96 overflow-y-auto">
             {earnings.map((earning, index) => {
               const beat = earning.actual !== null && earning.estimate !== null && earning.actual > earning.estimate;
               const missed = earning.actual !== null && earning.estimate !== null && earning.actual < earning.estimate;
+              const borderColor = beat ? 'var(--success)' : missed ? 'var(--danger)' : 'var(--text-4)';
 
               return (
                 <div
                   key={index}
-                  className="p-3 border transition-all"
-                  style={{
-                    background: 'var(--bg-2)',
-                    borderColor: 'var(--bg-1)',
-                    borderLeftWidth: '3px',
-                    borderLeftColor: beat ? 'var(--success)' : missed ? 'var(--danger)' : 'var(--text-4)',
-                  }}
+                  className="flex items-center gap-3 px-2 py-1.5 border-l-2"
+                  style={{ background: 'var(--bg-2)', borderColor }}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-semibold text-sm" style={{ color: 'var(--text-2)' }}>
-                      Q{earning.quarter} {earning.year}
-                    </div>
-                    {earning.surprisePercent !== null && (
-                      <div
-                        className="px-2 py-1 text-xs font-semibold"
-                        style={{
-                          background: beat ? 'rgba(34, 197, 94, 0.1)' : missed ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-3)',
-                          color: beat ? 'var(--success)' : missed ? 'var(--danger)' : 'var(--text-4)',
-                        }}
-                      >
-                        {earning.surprisePercent > 0 ? '+' : ''}{earning.surprisePercent.toFixed(2)}%
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+                  <span className="text-xs font-semibold w-14 flex-shrink-0" style={{ color: 'var(--text-2)' }}>
+                    Q{earning.quarter} {String(earning.year).slice(2)}
+                  </span>
+                  <div className="flex items-center gap-3 flex-1 text-xs font-mono">
                     {earning.actual !== null && (
-                      <div>
-                        <div style={{ color: 'var(--text-4)' }}>Actual EPS</div>
-                        <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-2)' }}>
-                          ${earning.actual.toFixed(2)}
-                        </div>
-                      </div>
+                      <span style={{ color: 'var(--text-2)' }}>
+                        <span style={{ color: 'var(--text-4)' }}>Act </span>${earning.actual.toFixed(2)}
+                      </span>
                     )}
                     {earning.estimate !== null && (
-                      <div>
-                        <div style={{ color: 'var(--text-4)' }}>Estimate</div>
-                        <div className="font-mono font-bold text-sm" style={{ color: 'var(--text-3)' }}>
-                          ${earning.estimate.toFixed(2)}
-                        </div>
-                      </div>
+                      <span style={{ color: 'var(--text-3)' }}>
+                        <span style={{ color: 'var(--text-4)' }}>Est </span>${earning.estimate.toFixed(2)}
+                      </span>
                     )}
                   </div>
+                  {earning.surprisePercent !== null && (
+                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: beat ? 'var(--success)' : missed ? 'var(--danger)' : 'var(--text-4)' }}>
+                      {earning.surprisePercent > 0 ? '+' : ''}{earning.surprisePercent.toFixed(1)}%
+                    </span>
+                  )}
                 </div>
               );
             })}
