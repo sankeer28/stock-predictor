@@ -45,6 +45,7 @@ const AnalystRecommendations = dynamic(() => import('@/components/AnalystRecomme
 const PeerStocks = dynamic(() => import('@/components/PeerStocks'), { ssr: false });
 const AIAnalysis = dynamic(() => import('@/components/AIAnalysis'), { ssr: false });
 const FinvizPanel = dynamic(() => import('@/components/FinvizPanel'), { ssr: false });
+const LivePredictionChart = dynamic(() => import('@/components/LivePredictionChart'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -981,7 +982,7 @@ export default function Home() {
     };
 
     poll(); // immediate first poll
-    const ms = getMarketStatus() === 'OPEN' ? 15000 : 60000;
+    const ms = getMarketStatus() === 'REGULAR' ? 15000 : 60000;
     const id = setInterval(poll, ms);
     return () => clearInterval(id);
   }, [symbol]);
@@ -1578,6 +1579,11 @@ export default function Home() {
               />
             </div>
 
+            {/* Live Prediction Lab */}
+            <div className="mt-6">
+              <LivePredictionChart symbol={symbol} />
+            </div>
+
             {/* Mobile: stack ML panels below News */}
             <div className="block xl:hidden mt-6 space-y-4">
               <MLPredictions
@@ -1673,15 +1679,17 @@ export default function Home() {
         {/* ML Predictions Sidebar - Right Side (Desktop) */}
         {!loading && stockData.length > 0 && (
           <div className="hidden xl:block flex-shrink-0">
-            <MLPredictions
-              currentPrice={currentPrice}
-              predictions={mlPredictions}
-              isTraining={mlTraining}
-              fromCache={mlFromCache}
-              onRecalculate={() => {
-                fetchData(symbol, { forceRecalc: true });
-              }}
-            />
+            <div className="mt-4">
+              <MLPredictions
+                currentPrice={currentPrice}
+                predictions={mlPredictions}
+                isTraining={mlTraining}
+                fromCache={mlFromCache}
+                onRecalculate={() => {
+                  fetchData(symbol, { forceRecalc: true });
+                }}
+              />
+            </div>
 
             {/* ML Cache - Below ML Predictions */}
             <div className="mt-4">
