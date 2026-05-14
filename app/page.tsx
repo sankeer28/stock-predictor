@@ -44,6 +44,7 @@ const EarningsCalendar = dynamic(() => import('@/components/EarningsCalendar'), 
 const AnalystRecommendations = dynamic(() => import('@/components/AnalystRecommendations'), { ssr: false });
 const PeerStocks = dynamic(() => import('@/components/PeerStocks'), { ssr: false });
 const AIAnalysis = dynamic(() => import('@/components/AIAnalysis'), { ssr: false });
+const FinvizPanel = dynamic(() => import('@/components/FinvizPanel'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -155,6 +156,15 @@ export default function Home() {
   const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [fundamentalsData, setFundamentalsData] = useState<any>(null);
   const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
+  const [finvizStock, setFinvizStock] = useState<Record<string, string | null> | null>(null);
+  const [finvizAnalystTargets, setFinvizAnalystTargets] = useState<Array<{ date: string; category: string; analyst: string; rating: string; target: string }> | null>(null);
+  const [finvizCharts, setFinvizCharts] = useState<Record<string, string> | null>(null);
+  const [finvizLinks, setFinvizLinks] = useState<Record<string, string>>({});
+  const [showFinvizChart, setShowFinvizChart] = useState(false);
+  const [activeFinvizChart, setActiveFinvizChart] = useState('dailyCandle');
+  const sentimentByUrl = React.useRef<Map<string, any>>(new Map());
+  const newsArticlesRef = React.useRef<NewsArticle[]>([]);
+  const [finvizNewsLoading, setFinvizNewsLoading] = useState(false);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [chartPatterns, setChartPatterns] = useState<ChartPattern[]>([]);
   const [forecastData, setForecastData] = useState<any[]>([]);
@@ -503,11 +513,18 @@ export default function Home() {
 
     setLoading(true);
     setError('');
-    setNewsArticles([]); // Reset news to show loading state
+    setNewsArticles([]);
     setNewsSentiments([]);
     setIsAnalyzingSentiment(false);
-    setMlPredictions({}); // Reset ML predictions for new stock
-    setMlTraining(false); // Reset training state
+    setMlPredictions({});
+    setMlTraining(false);
+    setFinvizStock(null);
+    setFinvizAnalystTargets(null);
+    setFinvizCharts(null);
+    setShowFinvizChart(false);
+    sentimentByUrl.current.clear();
+    newsArticlesRef.current = [];
+    setFinvizNewsLoading(true);
 
     try {
       // Fetch stock data for the selected frequency/range
@@ -664,17 +681,13 @@ export default function Home() {
           if (newsResponse.ok) {
             const newsResult = await newsResponse.json();
             const articles = newsResult.articles || [];
+            newsArticlesRef.current = articles;
             setNewsArticles(articles);
 
-            // Set placeholder sentiments
-            const placeholders = articles.map(() => ({
-              sentiment: 'neutral' as const,
-              score: 0,
-              confidence: 0
-            }));
-            setNewsSentiments(placeholders);
+            const neutral = { sentiment: 'neutral' as const, score: 0, confidence: 0 };
+            setNewsSentiments(articles.map(() => neutral));
 
-            // Analyze sentiment in background (slower)
+            // Analyze sentiment in background
             setTimeout(async () => {
               try {
                 setIsAnalyzingSentiment(true);
@@ -686,7 +699,13 @@ export default function Home() {
 
                 if (sentimentResponse.ok) {
                   const sentimentResult = await sentimentResponse.json();
-                  setNewsSentiments(sentimentResult.sentiments || placeholders);
+                  const sentiments = sentimentResult.sentiments || articles.map(() => neutral);
+                  sentiments.forEach((s: any, i: number) => {
+                    if (articles[i]) sentimentByUrl.current.set(articles[i].url, s);
+                  });
+                  // Rebuild aligned to current article order (may include finviz articles by now)
+                  const current = newsArticlesRef.current;
+                  setNewsSentiments(current.map(a => sentimentByUrl.current.get(a.url) || neutral));
                 }
               } catch (sentimentError) {
                 console.error('Error analyzing sentiment:', sentimentError);
@@ -786,6 +805,73 @@ export default function Home() {
       setFundamentalsLoading(false);
     }
   };
+
+  const handleFinvizNews = React.useCallback((finvizNews: Array<{ timestamp: string; headline: string; url: string; source: string }>) => {
+    const parseTs = (ts: string): string => {
+      const now = new Date();
+      if (/^today/i.test(ts)) {
+        const m = (ts.split(' ')[1] || '').match(/^(\d{1,2}):(\d{2})(AM|PM)$/i);
+        if (m) {
+          let h = parseInt(m[1]);
+          if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+          if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+          return new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, parseInt(m[2])).toISOString();
+        }
+        return now.toISOString();
+      }
+      const m = ts.match(/^([A-Za-z]{3})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})(AM|PM)$/i);
+      if (m) {
+        const mo: Record<string, number> = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+        let h = parseInt(m[4]);
+        if (m[6].toUpperCase() === 'PM' && h !== 12) h += 12;
+        if (m[6].toUpperCase() === 'AM' && h === 12) h = 0;
+        return new Date(2000 + parseInt(m[3]), mo[m[1].toLowerCase()] ?? 0, parseInt(m[2]), h, parseInt(m[5])).toISOString();
+      }
+      const p = new Date(ts);
+      return isNaN(p.getTime()) ? now.toISOString() : p.toISOString();
+    };
+
+    const neutral = { sentiment: 'neutral' as const, score: 0, confidence: 0 };
+    const converted = finvizNews.map(item => ({
+      title: item.headline,
+      description: '',
+      url: item.url,
+      publishedAt: parseTs(item.timestamp),
+      source: item.source || 'Finviz',
+    }));
+
+    setFinvizNewsLoading(false);
+    const existingUrls = new Set(newsArticlesRef.current.map(a => a.url));
+    const newOnes = converted.filter(a => !existingUrls.has(a.url));
+    if (!newOnes.length) return;
+
+    const merged = [...newsArticlesRef.current, ...newOnes].sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+    newsArticlesRef.current = merged;
+    setNewsArticles(merged);
+    setNewsSentiments(merged.map(a => sentimentByUrl.current.get(a.url) || neutral));
+
+    // Run sentiment on the new Finviz articles
+    const toAnalyze = newOnes.filter(a => !sentimentByUrl.current.has(a.url));
+    if (!toAnalyze.length) return;
+
+    setIsAnalyzingSentiment(true);
+    fetch('/api/sentiment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articles: toAnalyze }),
+    })
+      .then(r => r.json())
+      .then(result => {
+        (result.sentiments || []).forEach((s: any, i: number) => {
+          if (toAnalyze[i]) sentimentByUrl.current.set(toAnalyze[i].url, s);
+        });
+        setNewsSentiments(newsArticlesRef.current.map(a => sentimentByUrl.current.get(a.url) || neutral));
+      })
+      .catch(console.error)
+      .finally(() => setIsAnalyzingSentiment(false));
+  }, []);
 
   const handleSearch = () => {
     if (inputSymbol.trim()) {
@@ -1137,9 +1223,18 @@ export default function Home() {
                   companyInfo={companyInfo}
                   fundamentalsData={fundamentalsData}
                   fundamentalsLoading={fundamentalsLoading}
+                  finvizStock={finvizStock}
                 />
               </div>
             )}
+
+            <FinvizPanel
+              symbol={symbol}
+              onStockData={setFinvizStock}
+              onAnalystTargets={setFinvizAnalystTargets}
+              onNewsData={handleFinvizNews}
+              onChartsData={(charts, links) => { setFinvizCharts(charts); setFinvizLinks(links); }}
+            />
 
             {/* Technical Indicators - Compact Bar */}
             <div className="card mb-4">
@@ -1284,6 +1379,44 @@ export default function Home() {
 
                 {/* Compact Controls */}
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Finviz toggle */}
+                  {finvizCharts && (
+                    <>
+                      <button
+                        onClick={() => setShowFinvizChart(v => !v)}
+                        className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                        style={{
+                          background: showFinvizChart ? 'var(--info)' : 'var(--bg-4)',
+                          borderColor: showFinvizChart ? 'var(--info)' : 'var(--bg-1)',
+                          color: showFinvizChart ? 'var(--text-0)' : 'var(--text-3)',
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5" /> FINVIZ</div>
+                      </button>
+                      <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
+                    </>
+                  )}
+
+                  {/* Finviz chart type buttons (shown only in Finviz mode) */}
+                  {showFinvizChart && finvizCharts ? (
+                    <>
+                      {([['dailyCandle','Daily'],['weeklyCandle','Weekly'],['monthlyCandle','Monthly'],['dailyLine','Line']] as const).map(([id, label]) => (
+                        <button
+                          key={id}
+                          onClick={() => setActiveFinvizChart(id)}
+                          className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                          style={{
+                            background: activeFinvizChart === id ? 'var(--accent)' : 'var(--bg-4)',
+                            borderColor: activeFinvizChart === id ? 'var(--accent)' : 'var(--bg-1)',
+                            color: activeFinvizChart === id ? 'var(--text-0)' : 'var(--text-3)',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                  <>
                   {/* Chart Type */}
                   <div className="flex gap-1">
                     <button
@@ -1386,9 +1519,19 @@ export default function Home() {
                       </button>
                     );
                   })}
+                  </>
+                  )}
                 </div>
               </div>
 
+              {showFinvizChart && finvizCharts ? (
+                <img
+                  src={finvizCharts[activeFinvizChart]}
+                  alt={`${symbol} ${activeFinvizChart} Finviz chart`}
+                  className="w-full border"
+                  style={{ borderColor: 'var(--bg-1)', background: 'var(--bg-4)' }}
+                />
+              ) : (
               <StockChart
                 data={chartData}
                 showMA20={showMA20}
@@ -1402,6 +1545,7 @@ export default function Home() {
                 dataInterval={dataInterval}
                 onVisibleRangeChange={handleVisibleRangeChange}
               />
+              )}
             </div>
 
             {/* Technical Indicators Charts */}
@@ -1508,6 +1652,7 @@ export default function Home() {
                 articles={newsArticles}
                 sentiments={newsSentiments}
                 isAnalyzingSentiment={isAnalyzingSentiment}
+                finvizNewsLoading={finvizNewsLoading}
               />
             </div>
 
@@ -1589,7 +1734,7 @@ export default function Home() {
 
               <EarningsCalendar symbol={symbol} inlineMobile={true} />
 
-              <AnalystRecommendations symbol={symbol} inlineMobile={true} />
+              <AnalystRecommendations symbol={symbol} inlineMobile={true} finvizTargets={finvizAnalystTargets} />
 
               <PeerStocks
                 symbol={symbol}
@@ -1695,7 +1840,7 @@ export default function Home() {
             </div>
 
             <div className="mt-4">
-              <AnalystRecommendations symbol={symbol} />
+              <AnalystRecommendations symbol={symbol} finvizTargets={finvizAnalystTargets} />
             </div>
 
             <div className="mt-4">

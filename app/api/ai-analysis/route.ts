@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${OLLAMA_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-v3.1:671b-cloud',
+        model: 'qwen3.5:cloud',
         messages: [
           {
             role: 'system',

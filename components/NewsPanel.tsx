@@ -2,15 +2,16 @@
 
 import React from 'react';
 import { NewsArticle, SentimentResult } from '@/types';
-import { TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ExternalLink, Loader2 } from 'lucide-react';
 
 interface NewsPanelProps {
   articles: NewsArticle[];
   sentiments: SentimentResult[];
   isAnalyzingSentiment?: boolean;
+  finvizNewsLoading?: boolean;
 }
 
-export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment = false }: NewsPanelProps) {
+export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment = false, finvizNewsLoading = false }: NewsPanelProps) {
   if (articles.length === 0) {
     return (
       <div className="card">
@@ -25,13 +26,14 @@ export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment =
     );
   }
 
-  // Calculate overall sentiment
-  const positiveSentiments = sentiments.filter(s => s.sentiment === 'positive').length;
-  const negativeSentiments = sentiments.filter(s => s.sentiment === 'negative').length;
-  const neutralSentiments = sentiments.filter(s => s.sentiment === 'neutral').length;
-  const total = sentiments.length;
+  // Calculate overall sentiment — guard against undefined entries during merge
+  const validSentiments = sentiments.filter(Boolean);
+  const positiveSentiments = validSentiments.filter(s => s.sentiment === 'positive').length;
+  const negativeSentiments = validSentiments.filter(s => s.sentiment === 'negative').length;
+  const neutralSentiments = validSentiments.filter(s => s.sentiment === 'neutral').length;
+  const total = validSentiments.length || 1;
 
-  const avgScore = sentiments.reduce((sum, s) => sum + s.score, 0) / total;
+  const avgScore = validSentiments.reduce((sum, s) => sum + s.score, 0) / total;
   const overallSentiment =
     avgScore > 0.15 ? 'positive' : avgScore < -0.15 ? 'negative' : 'neutral';
 
@@ -61,12 +63,20 @@ export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment =
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <span className="card-label">Latest News & Sentiment</span>
-        {isAnalyzingSentiment && (
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-4)' }}>Analyzing sentiment...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {finvizNewsLoading && (
+            <div className="flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--text-4)' }} />
+              <span className="text-xs" style={{ color: 'var(--text-4)' }}>Loading Finviz news...</span>
+            </div>
+          )}
+          {isAnalyzingSentiment && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-3.5 h-3.5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
+              <span className="text-xs" style={{ color: 'var(--text-4)' }}>Analyzing sentiment...</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Overall Sentiment Summary */}
@@ -141,7 +151,7 @@ export default function NewsPanel({ articles, sentiments, isAnalyzingSentiment =
       {/* News Articles */}
       <div className="space-y-3 max-h-[600px] overflow-y-auto">
         {articles.map((article, index) => {
-          const sentiment = sentiments[index];
+          const sentiment = sentiments[index] ?? { sentiment: 'neutral' as const, score: 0, confidence: 0 };
           return (
             <div
               key={index}

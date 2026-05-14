@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Loader2, RefreshCw } from 'lucide-react';
+import { BarChart3, Loader2, RefreshCw, Target } from 'lucide-react';
 
 interface Recommendation {
   buy: number;
@@ -13,12 +13,21 @@ interface Recommendation {
   symbol: string;
 }
 
+interface FinvizTarget {
+  date: string;
+  category: string;
+  analyst: string;
+  rating: string;
+  target: string;
+}
+
 interface AnalystRecommendationsProps {
   symbol: string;
   inlineMobile?: boolean;
+  finvizTargets?: FinvizTarget[] | null;
 }
 
-export default function AnalystRecommendations({ symbol, inlineMobile }: AnalystRecommendationsProps) {
+export default function AnalystRecommendations({ symbol, inlineMobile, finvizTargets }: AnalystRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -260,6 +269,32 @@ export default function AnalystRecommendations({ symbol, inlineMobile }: Analyst
             </div>
           )}
         </>
+      )}
+
+      {/* Finviz Price Targets */}
+      {finvizTargets && finvizTargets.length > 0 && (
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--bg-1)' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+            <div className="text-xs font-semibold" style={{ color: 'var(--text-4)' }}>Price Targets</div>
+          </div>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {finvizTargets.map((t, i) => (
+              <div key={i} className="p-2 border text-xs" style={{ background: 'var(--bg-2)', borderColor: 'var(--bg-1)' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold" style={{ color: 'var(--text-2)' }}>{t.analyst}</span>
+                  {t.target && t.target !== '-' && (
+                    <span className="font-mono font-bold" style={{ color: 'var(--success)' }}>{t.target}</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between" style={{ color: 'var(--text-4)' }}>
+                  <span>{t.category} · {t.rating}</span>
+                  <span>{t.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
