@@ -158,23 +158,22 @@ export default function InsiderTransactions({ symbol, inlineMobile }: InsiderTra
               return (
                 <div
                   key={index}
-                  className="flex items-center gap-2 px-2 py-1.5 border-l-2"
+                  className="px-2 py-1.5 border-l-2"
                   style={{ background: 'var(--bg-2)', borderColor: txColor }}
                 >
-                  <div className="flex-shrink-0" style={{ color: txColor }}>
-                    {txType === 'Buy' ? <TrendingUp className="w-3 h-3" /> : txType === 'Sell' ? <TrendingDown className="w-3 h-3" /> : <span className="w-3 h-3 block" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs font-semibold truncate block" style={{ color: 'var(--text-2)' }}>
-                      {transaction.name}
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="flex-shrink-0" style={{ color: txColor }}>
+                      {txType === 'Buy' ? <TrendingUp className="w-3 h-3" /> : txType === 'Sell' ? <TrendingDown className="w-3 h-3" /> : null}
                     </span>
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>{transaction.name}</span>
+                    <span className="text-[10px] font-semibold ml-auto flex-shrink-0" style={{ color: txColor }}>{txType}</span>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 text-xs font-mono">
-                    <span style={{ color: 'var(--text-3)' }}>{formatNumber(Math.abs(transaction.change))} sh</span>
+                  <div className="flex items-center gap-3 text-[10px] font-mono" style={{ color: 'var(--text-4)' }}>
+                    <span><span style={{ color: 'var(--text-5)' }}>Shares </span><span style={{ color: 'var(--text-3)' }}>{formatNumber(Math.abs(transaction.change))}</span></span>
                     {transaction.transactionPrice > 0 && (
-                      <span style={{ color: txColor }}>${transaction.transactionPrice.toFixed(2)}</span>
+                      <span><span style={{ color: 'var(--text-5)' }}>@ </span><span style={{ color: txColor }}>${transaction.transactionPrice.toFixed(2)}</span></span>
                     )}
-                    <span style={{ color: 'var(--text-5)' }}>{formatDate(transaction.transactionDate)}</span>
+                    <span className="ml-auto">{formatDate(transaction.transactionDate)}</span>
                   </div>
                 </div>
               );

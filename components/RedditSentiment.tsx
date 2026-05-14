@@ -176,53 +176,22 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
           </div>
 
           {/* Stock List */}
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-1 max-h-96 overflow-y-auto">
             {stocks.map((stock, index) => (
               <button
                 key={stock.ticker}
                 onClick={() => onTickerClick?.(stock.ticker)}
-                className="w-full text-left p-3 border transition-all hover:opacity-80 overflow-hidden"
-                style={{
-                  background: 'var(--bg-2)',
-                  borderColor: 'var(--bg-1)',
-                  borderLeftWidth: '3px',
-                  borderLeftColor: getSentimentColor(stock.sentiment),
-                }}
+                className="w-full text-left px-2 py-1.5 border-l-2 transition-all hover:opacity-80"
+                style={{ background: 'var(--bg-2)', borderColor: getSentimentColor(stock.sentiment) }}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    {/* Rank */}
-                    <div className="flex-shrink-0 w-6 text-center font-mono text-sm" style={{ color: 'var(--text-4)' }}>
-                      {index + 1}
-                    </div>
-
-                    {/* Ticker */}
-                    <div className="font-mono font-bold text-sm flex-shrink-0" style={{ color: 'var(--text-2)' }}>
-                      ${stock.ticker}
-                    </div>
-
-                    {/* Sentiment Badge */}
-                    <div
-                      className="px-2 py-0.5 text-xs font-semibold whitespace-nowrap flex-shrink-0"
-                      style={{
-                        background: getSentimentBg(stock.sentiment),
-                        color: getSentimentColor(stock.sentiment),
-                      }}
-                    >
-                      {stock.sentiment}
-                    </div>
-
-                    {/* Score */}
-                    <div className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-3)' }}>
-                      {formatScore(stock.sentiment_score)}
-                    </div>
-                  </div>
-
-                  {/* Comments */}
-                  <div className="flex items-center gap-1 text-xs whitespace-nowrap flex-shrink-0" style={{ color: 'var(--text-4)' }}>
-                    <MessageCircle className="w-3 h-3 flex-shrink-0" />
-                    <span>{stock.no_of_comments}</span>
-                  </div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[10px] font-mono w-4 text-right flex-shrink-0" style={{ color: 'var(--text-5)' }}>{index + 1}</span>
+                  <span className="font-mono font-bold text-xs" style={{ color: 'var(--text-2)' }}>${stock.ticker}</span>
+                  <span className="text-[10px] font-semibold ml-auto" style={{ color: getSentimentColor(stock.sentiment) }}>{stock.sentiment}</span>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] font-mono pl-6" style={{ color: 'var(--text-4)' }}>
+                  <span><span style={{ color: 'var(--text-5)' }}>Score </span><span style={{ color: 'var(--text-3)' }}>{formatScore(stock.sentiment_score)}</span></span>
+                  <span className="flex items-center gap-0.5 ml-auto"><MessageCircle className="w-2.5 h-2.5" /> {stock.no_of_comments}</span>
                 </div>
               </button>
             ))}

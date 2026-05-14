@@ -963,6 +963,29 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  // Live price polling — every 15s during market hours, every 60s otherwise
+  useEffect(() => {
+    if (!symbol) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/price?symbol=${encodeURIComponent(symbol)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.price === 'number') {
+          setCurrentPrice(data.price);
+          setCompanyInfo((prev: any) => prev ? { ...prev, change: data.change, changePercent: data.changePercent } : prev);
+          if (data.marketState) setMarketState(data.marketState);
+        }
+      } catch { /* silently ignore poll errors */ }
+    };
+
+    poll(); // immediate first poll
+    const ms = getMarketStatus() === 'OPEN' ? 15000 : 60000;
+    const id = setInterval(poll, ms);
+    return () => clearInterval(id);
+  }, [symbol]);
+
   // Helper to show ET clock next to the market status for easier debugging/visibility
   const getETTimeString = () => {
     try {

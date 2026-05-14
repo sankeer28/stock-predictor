@@ -114,153 +114,52 @@ export default function AnalystRecommendations({ symbol, inlineMobile, finvizTar
         <>
           {latestRec && (
             <>
-              {/* Current Consensus */}
-              <div className="mb-4 p-4 border-2" style={{
-                background: 'var(--bg-2)',
-                borderColor: 'var(--accent)',
-                borderLeftWidth: '3px'
-              }}>
-                <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>
-                  Current Consensus ({formatDate(latestRec.period)})
-                </div>
-                <div className="text-2xl font-bold mb-1" style={{ color: 'var(--accent)' }}>
-                  {getConsensus(latestRec)}
-                </div>
-                <div className="text-sm" style={{ color: 'var(--text-4)' }}>
-                  {totalAnalysts} analysts
-                </div>
+              {/* Current Consensus — compact inline row */}
+              <div className="flex items-center gap-2 mb-3 px-2 py-1.5 border-l-2" style={{ background: 'var(--bg-2)', borderColor: 'var(--accent)' }}>
+                <span className="text-[10px] font-semibold" style={{ color: 'var(--text-4)' }}>Consensus</span>
+                <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{getConsensus(latestRec)}</span>
+                <span className="text-[10px] font-mono ml-auto" style={{ color: 'var(--text-5)' }}>{formatDate(latestRec.period)} · {totalAnalysts} analysts</span>
               </div>
 
-              {/* Breakdown */}
-              <div className="mb-4">
-                <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-4)' }}>
-                  Latest Breakdown
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text-3)' }}>Strong Buy</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2 bg-gray-200" style={{ background: 'var(--bg-3)' }}>
-                        <div
-                          className="h-full"
-                          style={{
-                            width: `${(latestRec.strongBuy / totalAnalysts) * 100}%`,
-                            background: 'var(--success)'
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono w-8 text-right" style={{ color: 'var(--text-2)' }}>
-                        {latestRec.strongBuy}
-                      </span>
-                    </div>
+              {/* Compact 3-stat grid */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {([
+                  { label: 'Buys', value: latestRec.strongBuy + latestRec.buy, sub: `${latestRec.strongBuy}SB+${latestRec.buy}B`, color: 'var(--success)' },
+                  { label: 'Hold', value: latestRec.hold, sub: `${totalAnalysts} total`, color: 'var(--text-3)' },
+                  { label: 'Sells', value: latestRec.sell + latestRec.strongSell, sub: `${latestRec.sell}S+${latestRec.strongSell}SS`, color: 'var(--danger)' },
+                ] as const).map(({ label, value, sub, color }) => (
+                  <div key={label} className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+                    <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>{label}</div>
+                    <div className="text-base font-bold leading-none mb-0.5" style={{ color }}>{value}</div>
+                    <div className="text-[9px] font-mono" style={{ color: 'var(--text-5)' }}>{sub}</div>
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text-3)' }}>Buy</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2" style={{ background: 'var(--bg-3)' }}>
-                        <div
-                          className="h-full"
-                          style={{
-                            width: `${(latestRec.buy / totalAnalysts) * 100}%`,
-                            background: 'rgba(34, 197, 94, 0.6)'
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono w-8 text-right" style={{ color: 'var(--text-2)' }}>
-                        {latestRec.buy}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text-3)' }}>Hold</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2" style={{ background: 'var(--bg-3)' }}>
-                        <div
-                          className="h-full"
-                          style={{
-                            width: `${(latestRec.hold / totalAnalysts) * 100}%`,
-                            background: 'var(--text-4)'
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono w-8 text-right" style={{ color: 'var(--text-2)' }}>
-                        {latestRec.hold}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text-3)' }}>Sell</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2" style={{ background: 'var(--bg-3)' }}>
-                        <div
-                          className="h-full"
-                          style={{
-                            width: `${(latestRec.sell / totalAnalysts) * 100}%`,
-                            background: 'rgba(239, 68, 68, 0.6)'
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono w-8 text-right" style={{ color: 'var(--text-2)' }}>
-                        {latestRec.sell}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text-3)' }}>Strong Sell</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2" style={{ background: 'var(--bg-3)' }}>
-                        <div
-                          className="h-full"
-                          style={{
-                            width: `${(latestRec.strongSell / totalAnalysts) * 100}%`,
-                            background: 'var(--danger)'
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono w-8 text-right" style={{ color: 'var(--text-2)' }}>
-                        {latestRec.strongSell}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </>
           )}
 
           {/* Historical Trend */}
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-4)' }}>
-              Historical Trend
-            </div>
-            {recommendations.map((rec, index) => (
-              <div
-                key={index}
-                className="p-3 border"
-                style={{
-                  background: 'var(--bg-2)',
-                  borderColor: 'var(--bg-1)',
-                }}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>
-                    {formatDate(rec.period)}
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            <div className="text-[10px] font-semibold mb-1.5" style={{ color: 'var(--text-4)' }}>Historical Trend</div>
+            {recommendations.map((rec, index) => {
+              const consensus = getConsensus(rec);
+              const consensusColor = consensus === 'Buy' ? 'var(--success)' : consensus === 'Sell' ? 'var(--danger)' : 'var(--text-3)';
+              return (
+                <div key={index} className="px-2 py-1.5 border-l-2" style={{ background: 'var(--bg-2)', borderColor: consensusColor }}>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>{formatDate(rec.period)}</span>
+                    <span className="text-[10px] font-semibold ml-auto" style={{ color: consensusColor }}>{consensus}</span>
                   </div>
-                  <div className="text-xs font-semibold px-2 py-1" style={{
-                    background: 'var(--bg-3)',
-                    color: 'var(--text-3)'
-                  }}>
-                    {getConsensus(rec)}
+                  <div className="text-[10px] font-mono" style={{ color: 'var(--text-4)' }}>
+                    <span style={{ color: 'var(--success)' }}>Buy {rec.strongBuy + rec.buy}</span>
+                    <span className="mx-1" style={{ color: 'var(--text-5)' }}>·</span>
+                    <span>Hold {rec.hold}</span>
+                    <span className="mx-1" style={{ color: 'var(--text-5)' }}>·</span>
+                    <span style={{ color: 'var(--danger)' }}>Sell {rec.sell + rec.strongSell}</span>
                   </div>
                 </div>
-                <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-                  Buy: {rec.strongBuy + rec.buy} • Hold: {rec.hold} • Sell: {rec.sell + rec.strongSell}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {recommendations.length === 0 && !loading && (
