@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, Loader2, Brain, Zap,
-  Activity, RotateCcw, ArrowUp, ArrowDown, Minus,
+  RotateCcw, ArrowUp, ArrowDown, Minus,
 } from 'lucide-react';
 
 // ── Horizon config ─────────────────────────────────────────────────────────────
@@ -755,7 +755,6 @@ export default function LivePredictionChart({ symbol }: Props) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />
           <span className="card-label">Live Prediction</span>
           <span className="text-[9px] px-1.5 py-0.5 font-bold"
             style={{ background: 'var(--bg-3)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>

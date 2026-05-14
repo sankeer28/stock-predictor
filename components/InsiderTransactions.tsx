@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Users, TrendingUp, TrendingDown, Loader2, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 
 interface InsiderTransaction {
   name: string;
@@ -86,25 +86,8 @@ export default function InsiderTransactions({ symbol, inlineMobile }: InsiderTra
 
   return (
     <div className={`card ${inlineMobile ? 'w-full' : 'w-80'}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-          <span className="card-label">Insider Trading</span>
-        </div>
-
-        <button
-          onClick={() => fetchTransactions()}
-          disabled={loading}
-          className="p-2 transition-all border disabled:opacity-50"
-          style={{
-            background: 'var(--bg-3)',
-            borderColor: 'var(--bg-1)',
-            color: 'var(--text-3)',
-          }}
-          title="Refresh data"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+      <div className="flex items-center mb-4">
+        <span className="card-label">Insider Trading</span>
       </div>
 
       {error && (
