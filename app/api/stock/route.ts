@@ -168,16 +168,15 @@ export async function GET(request: NextRequest) {
     const currentPrice = typeof result.meta.regularMarketPrice !== 'undefined' ? result.meta.regularMarketPrice : (validData.length > 0 ? validData[validData.length - 1].close : null);
     const prevCloseFromMeta = typeof result.meta.regularMarketPreviousClose !== 'undefined' ? result.meta.regularMarketPreviousClose : null;
 
-    // Try to read change values from meta first
-    let change = typeof result.meta.regularMarketChange !== 'undefined' ? result.meta.regularMarketChange : null;
-    let changePercent = typeof result.meta.regularMarketChangePercent !== 'undefined' ? result.meta.regularMarketChangePercent : null;
+    // Always compute from prices — Yahoo's meta change fields are often stale/wrong
+    let change: number | null = null;
+    let changePercent: number | null = null;
 
-    // Fallback: compute from the last two valid data points if meta fields are missing
-    if ((change === null || changePercent === null) && currentPrice !== null) {
+    if (currentPrice !== null) {
       const prevClose = prevCloseFromMeta ?? (validData.length > 1 ? validData[validData.length - 2].close : null);
-      if (prevClose !== null && typeof prevClose === 'number') {
+      if (prevClose !== null && typeof prevClose === 'number' && prevClose !== 0) {
         change = currentPrice - prevClose;
-        changePercent = prevClose !== 0 ? (change / prevClose) * 100 : null;
+        changePercent = (change / prevClose) * 100;
       }
     }
 

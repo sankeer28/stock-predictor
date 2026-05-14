@@ -288,98 +288,31 @@ export default function TechnicalIndicatorsChart({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 15, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
-              <XAxis
-                dataKey="date"
-                tickFormatter={formatDate}
-                stroke="oklch(75% 0 0)"
-                style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
-              />
-              <YAxis
-                domain={[0, 100]}
-                stroke="oklch(75% 0 0)"
-                style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
-              />
-              <Tooltip
-                labelFormatter={formatDate}
-                contentStyle={{
-                  backgroundColor: 'oklch(23% 0 0)',
-                  border: '2px solid oklch(70% 0.12 170)',
-                  borderRadius: '0',
-                  color: 'oklch(85% 0 0)',
-                  fontFamily: 'DM Mono, monospace',
-                  fontSize: '12px',
-                }}
-                labelStyle={{
-                  color: 'oklch(70% 0.12 170)',
-                  fontWeight: 'bold',
-                }}
-              />
-              <Legend
-                wrapperStyle={{
-                  fontFamily: 'DM Mono, monospace',
-                  fontSize: '11px'
-                }}
-              />
+              <XAxis dataKey="date" tickFormatter={formatDate} stroke="oklch(75% 0 0)" style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }} />
+              <YAxis domain={[0, 100]} stroke="oklch(75% 0 0)" style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }} />
+              <Tooltip labelFormatter={formatDate} contentStyle={{ backgroundColor: 'oklch(23% 0 0)', border: '2px solid oklch(70% 0.12 170)', borderRadius: '0', color: 'oklch(85% 0 0)', fontFamily: 'DM Mono, monospace', fontSize: '12px' }} labelStyle={{ color: 'oklch(70% 0.12 170)', fontWeight: 'bold' }} />
+              <Legend wrapperStyle={{ fontFamily: 'DM Mono, monospace', fontSize: '11px' }} />
               <ReferenceLine y={70} stroke="oklch(70% 0.13 0)" strokeDasharray="3 3" label="Overbought" />
               <ReferenceLine y={30} stroke="oklch(70% 0.12 170)" strokeDasharray="3 3" label="Oversold" />
               <ReferenceLine y={50} stroke="oklch(60% 0 0)" strokeDasharray="2 2" />
-              <Line
-                type="monotone"
-                dataKey="rsi"
-                stroke="oklch(75% 0.12 90)"
-                strokeWidth={2}
-                dot={false}
-                name="RSI"
-              />
+              <Line type="monotone" dataKey="rsi" stroke="oklch(75% 0.12 90)" strokeWidth={2} dot={false} name="RSI" />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
-        {/* RSI Conclusion */}
         {rsiAnalysis && (
-          <div className="mt-4 p-4 border-2" style={{
-            background: 'var(--bg-2)',
-            borderColor: rsiAnalysis.color,
-            borderLeftWidth: '3px'
-          }}>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5" style={{ color: rsiAnalysis.color }}>{rsiAnalysis.icon}</span>
-              <div className="flex-1">
-                {/* Header */}
-                <div className="mb-3">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-sm font-mono font-bold" style={{ color: rsiAnalysis.color }}>
-                      {rsiAnalysis.condition}
-                    </span>
-                    <span className="text-xs font-mono" style={{ color: 'var(--text-5)' }}>
-                      ({rsiAnalysis.period})
-                    </span>
-                  </div>
-                  {/* Info Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono mb-2">
-                    <div>
-                      <span style={{ color: 'var(--text-5)' }}>Value: </span>
-                      <strong style={{ color: rsiAnalysis.color }}>{rsiAnalysis.value}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-5)' }}>Trend: </span>
-                      <strong style={{ color: 'var(--text-3)' }}>{rsiAnalysis.trend}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-5)' }}>Strength: </span>
-                      <strong style={{ color: 'var(--text-3)' }}>{rsiAnalysis.momentumStrength}</strong>
-                    </div>
-                  </div>
-                  <div className="text-xs italic" style={{ color: 'var(--text-4)' }}>
-                    {rsiAnalysis.meaning}
-                  </div>
-                </div>
-                {/* Interpretation */}
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-3)' }}>
-                  {rsiAnalysis.interpretation}
-                </p>
+          <div className="mt-2 px-3 py-2 border-l-2" style={{ background: 'var(--bg-2)', borderColor: rsiAnalysis.color }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="flex-shrink-0" style={{ color: rsiAnalysis.color }}>{rsiAnalysis.icon}</span>
+              <span className="text-xs font-mono font-bold" style={{ color: rsiAnalysis.color }}>{rsiAnalysis.condition}</span>
+              <span className="text-[10px] font-mono" style={{ color: 'var(--text-5)' }}>({rsiAnalysis.period})</span>
+              <div className="flex items-center gap-3 ml-auto text-[10px] font-mono flex-wrap">
+                <span><span style={{ color: 'var(--text-5)' }}>RSI </span><strong style={{ color: rsiAnalysis.color }}>{rsiAnalysis.value}</strong></span>
+                <span><span style={{ color: 'var(--text-5)' }}>Trend </span><strong style={{ color: 'var(--text-3)' }}>{rsiAnalysis.trend}</strong></span>
+                <span><span style={{ color: 'var(--text-5)' }}>Strength </span><strong style={{ color: 'var(--text-3)' }}>{rsiAnalysis.momentumStrength}</strong></span>
               </div>
             </div>
+            <p className="text-[10px] mt-1 leading-snug" style={{ color: 'var(--text-4)' }}>{rsiAnalysis.interpretation}</p>
           </div>
         )}
       </div>
@@ -395,107 +328,31 @@ export default function TechnicalIndicatorsChart({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 15, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="oklch(31% 0 0)" opacity={0.3} />
-            <XAxis
-              dataKey="date"
-              tickFormatter={formatDate}
-              stroke="oklch(75% 0 0)"
-              style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
-            />
-            <YAxis
-              stroke="oklch(75% 0 0)"
-              style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }}
-            />
-            <Tooltip
-              labelFormatter={formatDate}
-              contentStyle={{
-                backgroundColor: 'oklch(23% 0 0)',
-                border: '2px solid oklch(70% 0.12 170)',
-                borderRadius: '0',
-                color: 'oklch(85% 0 0)',
-                fontFamily: 'DM Mono, monospace',
-                fontSize: '12px',
-              }}
-              labelStyle={{
-                color: 'oklch(70% 0.12 170)',
-                fontWeight: 'bold',
-              }}
-            />
-            <Legend
-              wrapperStyle={{
-                fontFamily: 'DM Mono, monospace',
-                fontSize: '11px'
-              }}
-            />
+            <XAxis dataKey="date" tickFormatter={formatDate} stroke="oklch(75% 0 0)" style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }} />
+            <YAxis stroke="oklch(75% 0 0)" style={{ fontSize: '11px', fontFamily: 'DM Mono, monospace' }} />
+            <Tooltip labelFormatter={formatDate} contentStyle={{ backgroundColor: 'oklch(23% 0 0)', border: '2px solid oklch(70% 0.12 170)', borderRadius: '0', color: 'oklch(85% 0 0)', fontFamily: 'DM Mono, monospace', fontSize: '12px' }} labelStyle={{ color: 'oklch(70% 0.12 170)', fontWeight: 'bold' }} />
+            <Legend wrapperStyle={{ fontFamily: 'DM Mono, monospace', fontSize: '11px' }} />
             <ReferenceLine y={0} stroke="oklch(60% 0 0)" strokeDasharray="2 2" />
-            <Line
-              type="monotone"
-              dataKey="macd"
-              stroke="oklch(70% 0.11 215)"
-              strokeWidth={2}
-              dot={false}
-              name="MACD"
-            />
-            <Line
-              type="monotone"
-              dataKey="macdSignal"
-              stroke="oklch(70% 0.13 0)"
-              strokeWidth={2}
-              dot={false}
-              name="Signal"
-            />
+            <Line type="monotone" dataKey="macd" stroke="oklch(70% 0.11 215)" strokeWidth={2} dot={false} name="MACD" />
+            <Line type="monotone" dataKey="macdSignal" stroke="oklch(70% 0.13 0)" strokeWidth={2} dot={false} name="Signal" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* MACD Conclusion */}
       {macdAnalysis && (
-        <div className="mt-4 p-4 border-2" style={{
-          background: 'var(--bg-2)',
-          borderColor: macdAnalysis.color,
-          borderLeftWidth: '3px'
-        }}>
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5" style={{ color: macdAnalysis.color }}>{macdAnalysis.icon}</span>
-            <div className="flex-1">
-              {/* Header */}
-              <div className="mb-3">
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-sm font-mono font-bold" style={{ color: macdAnalysis.color }}>
-                    {macdAnalysis.condition}
-                  </span>
-                  <span className="text-xs font-mono" style={{ color: 'var(--text-5)' }}>
-                    ({macdAnalysis.period})
-                  </span>
-                </div>
-                {/* Info Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono mb-2">
-                  <div>
-                    <span style={{ color: 'var(--text-5)' }}>MACD: </span>
-                    <strong style={{ color: 'var(--info)' }}>{macdAnalysis.macd}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-5)' }}>Signal: </span>
-                    <strong style={{ color: 'var(--warning)' }}>{macdAnalysis.signal}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-5)' }}>Histogram: </span>
-                    <strong style={{ color: macdAnalysis.color }}>{macdAnalysis.histogram}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-5)' }}>Strength: </span>
-                    <strong style={{ color: 'var(--text-3)' }}>{macdAnalysis.momentumStrength}</strong>
-                  </div>
-                </div>
-                <div className="text-xs italic" style={{ color: 'var(--text-4)' }}>
-                  {macdAnalysis.meaning}
-                </div>
-              </div>
-              {/* Interpretation */}
-              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-3)' }}>
-                {macdAnalysis.interpretation}
-              </p>
+        <div className="mt-2 px-3 py-2 border-l-2" style={{ background: 'var(--bg-2)', borderColor: macdAnalysis.color }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex-shrink-0" style={{ color: macdAnalysis.color }}>{macdAnalysis.icon}</span>
+            <span className="text-xs font-mono font-bold" style={{ color: macdAnalysis.color }}>{macdAnalysis.condition}</span>
+            <span className="text-[10px] font-mono" style={{ color: 'var(--text-5)' }}>({macdAnalysis.period})</span>
+            <div className="flex items-center gap-3 ml-auto text-[10px] font-mono flex-wrap">
+              <span><span style={{ color: 'var(--text-5)' }}>MACD </span><strong style={{ color: 'var(--info)' }}>{macdAnalysis.macd}</strong></span>
+              <span><span style={{ color: 'var(--text-5)' }}>Sig </span><strong style={{ color: 'var(--warning)' }}>{macdAnalysis.signal}</strong></span>
+              <span><span style={{ color: 'var(--text-5)' }}>Hist </span><strong style={{ color: macdAnalysis.color }}>{macdAnalysis.histogram}</strong></span>
+              <span><span style={{ color: 'var(--text-5)' }}>Strength </span><strong style={{ color: 'var(--text-3)' }}>{macdAnalysis.momentumStrength}</strong></span>
             </div>
           </div>
+          <p className="text-[10px] mt-1 leading-snug" style={{ color: 'var(--text-4)' }}>{macdAnalysis.interpretation}</p>
         </div>
       )}
     </div>
