@@ -522,10 +522,12 @@ export default function LivePredictionChart({ symbol }: Props) {
       const data = await res.json();
       if (typeof data.price !== 'number') return;
 
-      // Skip stale ticks during non-regular sessions
+      // Freeze chart when market is not in a regular session
+      // Yahoo returns the same last-known price on every poll when closed — don't append it
       const isRegular = data.marketState === 'REGULAR';
-      if (!isRegular && data.dataAgeMs != null && data.dataAgeMs > 5 * 60_000) {
-        setLoading(false); setMarketState(data.marketState || '');
+      setMarketState(data.marketState || 'CLOSED');
+      if (!isRegular) {
+        setLoading(false);
         return;
       }
 
@@ -831,17 +833,24 @@ export default function LivePredictionChart({ symbol }: Props) {
         Predicts {horizonId === '1m' ? '1 min' : horizonId === '5m' ? '5 min' : horizonId === '15m' ? '15 min' : horizonId === '30m' ? '30 min' : '1 h'} ahead.
       </div>
 
-      {/* ── Market closed notice ── */}
+      {/* ── Market closed banner ── */}
       {marketState && marketState !== 'REGULAR' && (
-        <div className="mb-3 px-3 py-2 border flex items-center gap-2"
-          style={{ background: 'rgba(234,179,8,0.08)', borderColor: 'rgba(234,179,8,0.35)' }}>
-          <span className="text-[11px]" style={{ color: 'rgba(234,179,8,0.9)' }}>⚠</span>
-          <span className="text-[10px]" style={{ color: 'rgba(234,179,8,0.85)' }}>
-            Market is <span className="font-semibold">{
-              marketState === 'PRE'  ? 'in pre-market hours' :
-              marketState === 'POST' ? 'in after-hours trading' :
-              'closed'
-            }</span> — predictions are paused until the next regular session.
+        <div className="mb-3 px-3 py-3 border-2 flex flex-col gap-1"
+          style={{ background: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.55)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚠️</span>
+            <span className="text-xs font-bold" style={{ color: 'rgba(234,179,8,1)' }}>
+              Market is {
+                marketState === 'PRE'     ? 'in pre-market hours' :
+                marketState === 'POST'    ? 'in after-hours trading' :
+                marketState === 'PREPRE'  ? 'in early pre-market' :
+                marketState === 'POSTPOST'? 'in extended after-hours' :
+                'closed'
+              }
+            </span>
+          </div>
+          <span className="text-[10px]" style={{ color: 'rgba(234,179,8,0.75)' }}>
+            Live predictions are paused. Chart shows last session data. Predictions resume when the market opens.
           </span>
         </div>
       )}
