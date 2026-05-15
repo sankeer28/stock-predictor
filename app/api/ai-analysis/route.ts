@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${OLLAMA_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'qwen3.5:cloud',
+        model: 'nemotron-3-nano:30b-cloud',
         messages: [
           {
             role: 'system',
@@ -304,6 +304,8 @@ export async function POST(request: NextRequest) {
           },
         ],
         stream: true,
+        think: false,
+        format: 'json',
       }),
     });
 
@@ -334,8 +336,11 @@ export async function POST(request: NextRequest) {
               if (!trimmed) continue;
               try {
                 const json = JSON.parse(trimmed);
-                if (json.message?.content) {
-                  controller.enqueue(encoder.encode(json.message.content));
+                const content = json.message?.content;
+                if (content) {
+                  // Strip thinking tags emitted by reasoning models
+                  const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                  if (clean) controller.enqueue(encoder.encode(clean));
                 }
               } catch { /* skip malformed */ }
             }
@@ -343,8 +348,10 @@ export async function POST(request: NextRequest) {
           if (buffer.trim()) {
             try {
               const json = JSON.parse(buffer.trim());
-              if (json.message?.content) {
-                controller.enqueue(encoder.encode(json.message.content));
+              const content = json.message?.content;
+              if (content) {
+                const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                if (clean) controller.enqueue(encoder.encode(clean));
               }
             } catch { /* skip */ }
           }

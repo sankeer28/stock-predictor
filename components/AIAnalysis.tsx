@@ -54,8 +54,12 @@ interface AIAnalysisProps {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function parseAnalysisJSON(raw: string): AnalysisData | null {
-  // Strip code fences if model wrapped the JSON anyway
-  const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  // Strip thinking blocks and code fences
+  const stripped = raw
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
   try {
     return JSON.parse(stripped) as AnalysisData;
   } catch {
@@ -212,7 +216,7 @@ export default function AIAnalysis({
           <div className="flex items-center gap-1 px-2 py-0.5 border text-xs font-mono ml-auto"
             style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
             <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-            <span>deepseek-v3.1</span>
+            <span>nemotron-3-nano</span>
           </div>
         </div>
         <div className="flex flex-col items-center py-10 gap-4">
@@ -240,7 +244,7 @@ export default function AIAnalysis({
           <div className="flex items-center gap-1 px-2 py-0.5 border text-xs font-mono"
             style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
             <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-            <span>deepseek-v3.1 · 671B</span>
+            <span>nemotron-3-nano · 30B</span>
           </div>
         </div>
         <p className="text-xs mb-4" style={{ color: 'var(--text-4)' }}>
@@ -286,7 +290,7 @@ export default function AIAnalysis({
           <div className="flex items-center gap-1 px-2 py-0.5 border text-xs font-mono"
             style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
             <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-            <span>deepseek-v3.1</span>
+            <span>nemotron-3-nano</span>
           </div>
           <button
             onClick={generateAnalysis}

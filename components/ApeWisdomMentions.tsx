@@ -118,8 +118,8 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
 
   return (
     <div className={`card ${inlineMobile ? 'w-full' : 'w-80'}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
           <span className="card-label">Reddit Stock Mentions</span>
           <a
             href="https://apewisdom.io"
@@ -132,7 +132,7 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
           </a>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {lastUpdated && (
             <span className="text-xs" style={{ color: 'var(--text-5)' }}>
               {formatTimestamp(lastUpdated)}
@@ -141,7 +141,7 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
           <button
             onClick={() => fetchApeWisdomData()}
             disabled={loading}
-            className="p-2 transition-all border disabled:opacity-50"
+            className="p-1 transition-all border disabled:opacity-50"
             style={{
               background: 'var(--bg-3)',
               borderColor: 'var(--bg-1)',
@@ -149,16 +149,16 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
             }}
             title="Refresh data"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* Subreddit Filter Dropdown */}
-      <div className="mb-4 relative">
+      <div className="mb-3 relative">
         <button
           onClick={() => setShowDropdown(!showDropdown)}
-          className="w-full px-3 py-2 text-left text-sm font-medium border transition-all flex items-center justify-between"
+          className="w-full px-2 py-1.5 text-left text-xs font-medium border transition-all flex items-center justify-between"
           style={{
             background: 'var(--bg-3)',
             borderColor: 'var(--bg-1)',
@@ -289,49 +289,49 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
       ) : (
         <>
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Top Ticker</div>
-              <div className="text-lg font-bold font-mono" style={{ color: 'var(--text-2)' }}>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>Top</div>
+              <div className="text-sm font-bold font-mono" style={{ color: 'var(--text-2)' }}>
                 {stocks[0]?.ticker || '-'}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>
-                Rank #{stocks[0]?.rank || '-'}
+              <div className="text-[10px]" style={{ color: 'var(--text-5)' }}>
+                #{stocks[0]?.rank || '-'}
               </div>
             </div>
 
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Total Mentions</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--purple-2)' }}>
+            <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>Mentions</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--purple-2)' }}>
                 {stocks.length > 0 ? formatNumber(stocks.reduce((sum, s) => sum + s.mentions, 0)) : 0}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>across top 20</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-5)' }}>top 20</div>
             </div>
 
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Hot Stock</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
+            <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>Hot</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--success)' }}>
                 {stocks.find(s => s.rankChange > 0)?.ticker || '-'}
               </div>
-              <div className="text-xs flex items-center gap-1" style={{ color: 'var(--text-5)' }}>
+              <div className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--text-5)' }}>
                 {(() => {
                   const hotStock = stocks.find(s => s.rankChange > 0);
                   if (hotStock?.rankChange) {
-                    return <><TrendingUp className="w-3 h-3 text-success" /> {hotStock.rankChange} positions</>;
+                    return <><TrendingUp className="w-2.5 h-2.5" /> +{hotStock.rankChange}</>;
                   }
-                  return 'positions';
+                  return '-';
                 })()}
               </div>
             </div>
           </div>
 
           {/* Stock List */}
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-1 max-h-96 overflow-y-auto">
             {stocks.map((stock) => (
               <button
                 key={stock.ticker}
                 onClick={() => onTickerClick?.(stock.ticker)}
-                className="w-full text-left p-3 border transition-all hover:opacity-80 overflow-hidden"
+                className="w-full text-left px-2 py-1.5 border transition-all hover:opacity-80 overflow-hidden"
                 style={{
                   background: 'var(--bg-2)',
                   borderColor: 'var(--bg-1)',
@@ -339,41 +339,41 @@ export default function ApeWisdomMentions({ onTickerClick, inlineMobile }: ApeWi
                   borderLeftColor: stock.rankChange > 0 ? 'var(--success)' : stock.rankChange < 0 ? 'var(--danger)' : 'var(--text-5)',
                 }}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
                     {/* Rank with change */}
-                    <div className="flex items-center gap-1 flex-shrink-0" style={{ width: '50px' }}>
-                      <span className="font-mono text-sm font-bold" style={{ color: 'var(--text-3)' }}>
+                    <div className="flex items-center gap-0.5 flex-shrink-0" style={{ width: '40px' }}>
+                      <span className="font-mono text-xs font-bold" style={{ color: 'var(--text-3)' }}>
                         #{stock.rank}
                       </span>
                       {getRankChangeIcon(stock.rankChange)}
                     </div>
 
-                    {/* Ticker - constrained to prevent overflow */}
+                    {/* Ticker */}
                     <div className="flex flex-col flex-1 min-w-0">
-                      <div className="font-mono font-bold text-sm truncate" style={{ color: 'var(--text-2)' }}>
+                      <div className="font-mono font-bold text-xs truncate" style={{ color: 'var(--text-2)' }}>
                         ${stock.ticker}
                       </div>
-                      <div className="text-xs truncate" style={{ color: 'var(--text-5)' }}>
+                      <div className="text-[10px] truncate" style={{ color: 'var(--text-5)' }}>
                         {stock.name}
                       </div>
                     </div>
                   </div>
 
-                  {/* Stats - flex-shrink-0 to prevent squishing */}
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <div className="flex items-center gap-1 text-xs whitespace-nowrap" style={{ color: 'var(--text-3)' }}>
-                      <MessageSquare className="w-3 h-3 flex-shrink-0" />
-                      <span className="font-mono">{formatNumber(stock.mentions)}</span>
+                  {/* Stats */}
+                  <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <div className="flex items-center gap-0.5 text-[10px] whitespace-nowrap font-mono" style={{ color: 'var(--text-3)' }}>
+                      <MessageSquare className="w-2.5 h-2.5 flex-shrink-0" />
+                      {formatNumber(stock.mentions)}
                       {stock.mentionsChange !== 0 && (
-                        <span className="text-xs" style={{ color: getRankChangeColor(stock.mentionsChange) }}>
+                        <span style={{ color: getRankChangeColor(stock.mentionsChange) }}>
                           ({stock.mentionsChange > 0 ? '+' : ''}{stock.mentionsChange})
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 text-xs whitespace-nowrap" style={{ color: 'var(--text-4)' }}>
-                      <ThumbsUp className="w-3 h-3 flex-shrink-0" />
-                      <span className="font-mono">{formatNumber(stock.upvotes)}</span>
+                    <div className="flex items-center gap-0.5 text-[10px] whitespace-nowrap font-mono" style={{ color: 'var(--text-4)' }}>
+                      <ThumbsUp className="w-2.5 h-2.5 flex-shrink-0" />
+                      {formatNumber(stock.upvotes)}
                     </div>
                   </div>
                 </div>

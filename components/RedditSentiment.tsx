@@ -94,8 +94,8 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
 
   return (
     <div className={`card ${inlineMobile ? 'w-full' : 'w-80'}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
           <span className="card-label">r/WallStreetBets Sentiment</span>
           <a
             href="https://www.reddit.com/r/wallstreetbets/"
@@ -108,16 +108,16 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
           </a>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {lastUpdated && (
             <span className="text-xs" style={{ color: 'var(--text-5)' }}>
-              Updated {formatTimestamp(lastUpdated)}
+              {formatTimestamp(lastUpdated)}
             </span>
           )}
           <button
             onClick={() => fetchRedditData()}
             disabled={loading}
-            className="p-2 transition-all border disabled:opacity-50"
+            className="p-1 transition-all border disabled:opacity-50"
             style={{
               background: 'var(--bg-3)',
               borderColor: 'var(--bg-1)',
@@ -125,7 +125,7 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
             }}
             title="Refresh data"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -147,31 +147,31 @@ export default function RedditSentiment({ onTickerClick, inlineMobile }: RedditS
       ) : (
         <>
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Most Discussed</div>
-              <div className="text-lg font-bold font-mono" style={{ color: 'var(--text-2)' }}>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>Top</div>
+              <div className="text-sm font-bold font-mono" style={{ color: 'var(--text-2)' }}>
                 {stocks[0]?.ticker || '-'}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>
-                {stocks[0]?.no_of_comments || 0} comments
+              <div className="text-[10px]" style={{ color: 'var(--text-5)' }}>
+                {stocks[0]?.no_of_comments || 0} cmts
               </div>
             </div>
 
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Bullish</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
+            <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>Bullish</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--success)' }}>
                 {stocks.filter(s => s.sentiment === 'Bullish').length}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>stocks</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-5)' }}>stocks</div>
             </div>
 
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Bearish</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--danger)' }}>
+            <div className="p-2 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] mb-0.5" style={{ color: 'var(--text-4)' }}>Bearish</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--danger)' }}>
                 {stocks.filter(s => s.sentiment === 'Bearish').length}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>stocks</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-5)' }}>stocks</div>
             </div>
           </div>
 
