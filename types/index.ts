@@ -64,6 +64,7 @@ export interface ChartDataPoint {
   ma50?: number;
   ma200?: number;
   bbUpper?: number;
+  bbMiddle?: number;
   bbLower?: number;
   volume: number;
   rsi?: number;

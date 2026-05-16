@@ -272,101 +272,170 @@ async function fetchAdditionalData(symbol: string) {
   return { recommendations, priceTarget, insiderSummary, earningsSummary, redditSentiment, apeSentiment };
 }
 
+// ── Groq streaming (OpenAI-compatible SSE) ──────────────────────────────────
+async function streamGroq(prompt: string, apiKey: string): Promise<ReadableStream> {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a financial analyst. Output ONLY raw valid JSON. No markdown, no code fences, no text before or after the JSON object.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      stream: true,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!groqRes.ok) {
+    const err = await groqRes.text();
+    throw new Error(`Groq API ${groqRes.status}: ${err.slice(0, 200)}`);
+  }
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = groqRes.body!.getReader();
+      let buffer = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed === 'data: [DONE]') continue;
+            if (!trimmed.startsWith('data: ')) continue;
+            try {
+              const json = JSON.parse(trimmed.slice(6));
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) controller.enqueue(encoder.encode(content));
+            } catch { /* skip malformed SSE */ }
+          }
+        }
+      } finally {
+        controller.close();
+        reader.releaseLock();
+      }
+    },
+  });
+}
+
+// ── Ollama streaming (newline-delimited JSON) ─────────────────────────────────
+async function streamOllama(prompt: string, apiKey: string): Promise<ReadableStream> {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  const ollamaRes = await fetch('https://ollama.com/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'nemotron-3-nano:30b-cloud',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a financial analyst. Output ONLY raw valid JSON. No markdown, no code fences, no text before or after the JSON object.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      stream: true,
+      think: false,
+      format: 'json',
+    }),
+  });
+
+  if (!ollamaRes.ok) {
+    const err = await ollamaRes.text();
+    throw new Error(`Ollama API ${ollamaRes.status}: ${err.slice(0, 200)}`);
+  }
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = ollamaRes.body!.getReader();
+      let buffer = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const json = JSON.parse(trimmed);
+              const content = json.message?.content;
+              if (content) {
+                const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                if (clean) controller.enqueue(encoder.encode(clean));
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+      } finally {
+        controller.close();
+        reader.releaseLock();
+      }
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
     const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
 
-    if (!OLLAMA_API_KEY) {
-      return NextResponse.json({ error: 'Ollama API key not configured. Add OLLAMA_API_KEY to your .env.local file.' }, { status: 500 });
+    if (!GROQ_API_KEY && !OLLAMA_API_KEY) {
+      return NextResponse.json({
+        error: 'No AI API key configured. Add GROQ_API_KEY (free at console.groq.com) or OLLAMA_API_KEY to your .env.local file.',
+      }, { status: 500 });
     }
 
     // Fetch all additional container data in parallel before building prompt
     const extra = await fetchAdditionalData(data.symbol || '');
     const prompt = buildAnalysisPrompt({ ...data, extra });
 
-    const ollamaResponse = await fetch('https://ollama.com/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OLLAMA_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'nemotron-3-nano:30b-cloud',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a financial analyst. Output ONLY raw valid JSON. No markdown, no code fences, no text before or after the JSON object.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        stream: true,
-        think: false,
-        format: 'json',
-      }),
-    });
+    let stream: ReadableStream;
 
-    if (!ollamaResponse.ok) {
-      const errorText = await ollamaResponse.text();
-      return NextResponse.json(
-        { error: `Ollama API returned ${ollamaResponse.status}: ${errorText.slice(0, 200)}` },
-        { status: ollamaResponse.status }
-      );
-    }
-
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = ollamaResponse.body!.getReader();
-        try {
-          let buffer = '';
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed) continue;
-              try {
-                const json = JSON.parse(trimmed);
-                const content = json.message?.content;
-                if (content) {
-                  // Strip thinking tags emitted by reasoning models
-                  const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
-                  if (clean) controller.enqueue(encoder.encode(clean));
-                }
-              } catch { /* skip malformed */ }
-            }
-          }
-          if (buffer.trim()) {
-            try {
-              const json = JSON.parse(buffer.trim());
-              const content = json.message?.content;
-              if (content) {
-                const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
-                if (clean) controller.enqueue(encoder.encode(clean));
-              }
-            } catch { /* skip */ }
-          }
-        } finally {
-          controller.close();
-          reader.releaseLock();
+    // Prefer Groq (free tier) over Ollama
+    if (GROQ_API_KEY) {
+      try {
+        stream = await streamGroq(prompt, GROQ_API_KEY);
+      } catch (groqErr: any) {
+        // Fall back to Ollama if Groq fails and key is available
+        if (OLLAMA_API_KEY) {
+          stream = await streamOllama(prompt, OLLAMA_API_KEY);
+        } else {
+          throw groqErr;
         }
-      },
-    });
+      }
+    } else {
+      stream = await streamOllama(prompt, OLLAMA_API_KEY!);
+    }
 
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
         'X-Accel-Buffering': 'no',
+        'X-AI-Provider': GROQ_API_KEY ? 'groq' : 'ollama',
       },
     });
   } catch (error: any) {

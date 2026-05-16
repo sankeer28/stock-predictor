@@ -216,7 +216,7 @@ export default function AIAnalysis({
           <div className="flex items-center gap-1 px-2 py-0.5 border text-xs font-mono ml-auto"
             style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
             <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-            <span>nemotron-3-nano</span>
+            <span>Llama 3.3 70B</span>
           </div>
         </div>
         <div className="flex flex-col items-center py-10 gap-4">
@@ -225,7 +225,7 @@ export default function AIAnalysis({
             Analyzing {companyName}...
           </div>
           <div className="text-xs" style={{ color: 'var(--text-4)' }}>
-            {rawBuffer.length > 0 ? `Receiving data — ${rawBuffer.length} chars` : 'Waiting for DeepSeek V3.1 (671B)...'}
+            {rawBuffer.length > 0 ? `Receiving data — ${rawBuffer.length} chars` : 'Waiting for AI model...'}
           </div>
           <div className="w-64 h-1 overflow-hidden" style={{ background: 'var(--bg-1)' }}>
             <div className="h-full animate-pulse" style={{ background: 'var(--accent)', width: '70%' }} />
@@ -244,7 +244,7 @@ export default function AIAnalysis({
           <div className="flex items-center gap-1 px-2 py-0.5 border text-xs font-mono"
             style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
             <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-            <span>nemotron-3-nano · 30B</span>
+            <span>Llama 3.3 70B · Groq</span>
           </div>
         </div>
         <p className="text-xs mb-4" style={{ color: 'var(--text-4)' }}>
@@ -290,7 +290,7 @@ export default function AIAnalysis({
           <div className="flex items-center gap-1 px-2 py-0.5 border text-xs font-mono"
             style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-4)' }}>
             <Sparkles className="w-3 h-3" style={{ color: 'var(--accent)' }} />
-            <span>nemotron-3-nano</span>
+            <span>Llama 3.3 70B</span>
           </div>
           <button
             onClick={generateAnalysis}

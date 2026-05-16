@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles } from 'lucide-react';
+import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles, Download } from 'lucide-react';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateTradingSignal } from '@/lib/tradingSignals';
@@ -11,6 +11,7 @@ import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '
 import { MLSettings, MLPreset, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
 import { PatternSettings, PatternPreset, DEFAULT_PATTERN_SETTINGS } from '@/types/patternSettings';
 import type { SearchHistoryItem } from '@/components/Sidebar';
+import { exportToCSV } from '@/lib/exportData';
 
 // Lazy load heavy components with dynamic imports
 const StockChart = dynamic(() => import('@/components/StockChart'), {
@@ -46,6 +47,11 @@ const PeerStocks = dynamic(() => import('@/components/PeerStocks'), { ssr: false
 const AIAnalysis = dynamic(() => import('@/components/AIAnalysis'), { ssr: false });
 const FinvizPanel = dynamic(() => import('@/components/FinvizPanel'), { ssr: false });
 const LivePredictionChart = dynamic(() => import('@/components/LivePredictionChart'), { ssr: false });
+const FearGreedIndex = dynamic(() => import('@/components/FearGreedIndex'), { ssr: false });
+const MarketMovers = dynamic(() => import('@/components/MarketMovers'), { ssr: false });
+const Watchlist = dynamic(() => import('@/components/Watchlist'), { ssr: false });
+const OptionsChain = dynamic(() => import('@/components/OptionsChain'), { ssr: false });
+const PriceAlerts = dynamic(() => import('@/components/PriceAlerts'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -615,6 +621,7 @@ export default function Home() {
         ma50: indicators.ma50[i],
         ma200: indicators.ma200[i],
         bbUpper: indicators.bbUpper[i],
+        bbMiddle: indicators.bbMiddle[i],
         bbLower: indicators.bbLower[i],
         rsi: indicators.rsi[i],
         macd: indicators.macd[i],
@@ -1435,6 +1442,24 @@ export default function Home() {
                       </button>
                     );
                   })}
+                  {/* Export CSV */}
+                  {chartData.length > 0 && (
+                    <>
+                      <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
+                      <button
+                        onClick={() => exportToCSV(symbol, chartData)}
+                        className="px-2 py-1 text-[10px] font-semibold border transition-all flex items-center gap-1"
+                        style={{
+                          background: 'var(--bg-4)',
+                          borderColor: 'var(--bg-1)',
+                          color: 'var(--text-3)',
+                        }}
+                        title="Export chart data to CSV"
+                      >
+                        <Download className="w-3 h-3" /> CSV
+                      </button>
+                    </>
+                  )}
                   </>
                   )}
                 </div>
@@ -1671,14 +1696,55 @@ export default function Home() {
                 symbol={symbol}
                 inlineMobile={true}
               />
+
+              {/* Watchlist - Mobile */}
+              <Watchlist
+                currentSymbol={symbol}
+                onSymbolClick={(s) => { setInputSymbol(s); fetchData(s); }}
+                inlineMobile={true}
+              />
+
+              {/* Options Chain - Mobile */}
+              <OptionsChain symbol={symbol} />
+
+              {/* Market Movers - Mobile */}
+              <MarketMovers
+                onTickerClick={(ticker) => { setInputSymbol(ticker); fetchData(ticker); }}
+                inlineMobile={true}
+              />
+
+              {/* Fear & Greed - Mobile */}
+              <FearGreedIndex />
             </div>
           </>
         )}
         </div>
 
-        {/* ML Predictions Sidebar - Right Side (Desktop) */}
-        {!loading && stockData.length > 0 && (
-          <div className="hidden xl:block flex-shrink-0">
+        {/* Right Sidebar - Desktop */}
+        <div className="hidden xl:block flex-shrink-0 w-80">
+          {/* Watchlist - Always visible */}
+          <div>
+            <Watchlist
+              currentSymbol={symbol}
+              onSymbolClick={(s) => { setInputSymbol(s); fetchData(s); }}
+            />
+          </div>
+
+          {/* Fear & Greed Index */}
+          <div className="mt-4">
+            <FearGreedIndex />
+          </div>
+
+          {/* Market Movers */}
+          <div className="mt-4">
+            <MarketMovers
+              onTickerClick={(ticker) => { setInputSymbol(ticker); fetchData(ticker); }}
+            />
+          </div>
+
+          {/* Stock-specific panels */}
+          {!loading && stockData.length > 0 && (
+            <>
             <div className="mt-4">
               <MLPredictions
                 currentPrice={currentPrice}
@@ -1776,8 +1842,13 @@ export default function Home() {
               />
             </div>
 
-          </div>
-        )}
+            {/* Options Chain */}
+            <div className="mt-4">
+              <OptionsChain symbol={symbol} />
+            </div>
+            </>
+          )}
+        </div>
       </div>
     </main>
   );
