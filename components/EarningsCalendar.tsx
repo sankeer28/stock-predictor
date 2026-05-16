@@ -76,26 +76,26 @@ export default function EarningsCalendar({ symbol, inlineMobile }: EarningsCalen
       ) : (
         <>
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Beat</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="px-2 py-1.5 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] leading-tight" style={{ color: 'var(--text-4)' }}>Beat</div>
+              <div className="text-base leading-tight font-bold" style={{ color: 'var(--success)' }}>
                 {beatEstimate}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>quarters</div>
+              <div className="text-[9px] leading-tight" style={{ color: 'var(--text-5)' }}>quarters</div>
             </div>
 
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Missed</div>
-              <div className="text-lg font-bold" style={{ color: 'var(--danger)' }}>
+            <div className="px-2 py-1.5 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] leading-tight" style={{ color: 'var(--text-4)' }}>Missed</div>
+              <div className="text-base leading-tight font-bold" style={{ color: 'var(--danger)' }}>
                 {missedEstimate}
               </div>
-              <div className="text-xs" style={{ color: 'var(--text-5)' }}>quarters</div>
+              <div className="text-[9px] leading-tight" style={{ color: 'var(--text-5)' }}>quarters</div>
             </div>
 
-            <div className="p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
-              <div className="text-xs mb-1" style={{ color: 'var(--text-4)' }}>Avg Surprise</div>
-              <div className="text-lg font-bold" style={{ color: avgSurprise > 0 ? 'var(--success)' : avgSurprise < 0 ? 'var(--danger)' : 'var(--text-3)' }}>
+            <div className="px-2 py-1.5 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+              <div className="text-[10px] leading-tight" style={{ color: 'var(--text-4)' }}>Avg Surprise</div>
+              <div className="text-base leading-tight font-bold" style={{ color: avgSurprise > 0 ? 'var(--success)' : avgSurprise < 0 ? 'var(--danger)' : 'var(--text-3)' }}>
                 {avgSurprise > 0 ? '+' : ''}{avgSurprise.toFixed(1)}%
               </div>
             </div>
