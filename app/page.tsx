@@ -146,12 +146,14 @@ type FetchDataOptions = {
   forceRecalc?: boolean;
   skipMLCalculations?: boolean;
   frequencyId?: DataFrequencyId;
+  chartOnly?: boolean;
 };
 
 export default function Home() {
   const [symbol, setSymbol] = useState('AAPL');
   const [inputSymbol, setInputSymbol] = useState('AAPL');
   const [loading, setLoading] = useState(false);
+  const [chartRefreshing, setChartRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const [stockData, setStockData] = useState<StockData[]>([]);
@@ -191,7 +193,7 @@ export default function Home() {
   const [showBB, setShowBB] = useState(false);
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
-  const [chartType, setChartType] = useState<'line' | 'candlestick'>('line');
+  const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
   const [showVolume, setShowVolume] = useState(true);
   const [showPatterns, setShowPatterns] = useState(false);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
@@ -511,10 +513,56 @@ export default function Home() {
     stockSymbol: string,
     options: FetchDataOptions = {}
   ) => {
-    const { forceRecalc = false, skipMLCalculations = false, frequencyId } = options;
+    const { forceRecalc = false, skipMLCalculations = false, frequencyId, chartOnly = false } = options;
     const targetFrequency = getFrequencyOption(frequencyId ?? dataFrequencyId);
     const intervalParam = targetFrequency.interval;
     const rangeDays = targetFrequency.days;
+
+    // Fast path: frequency change only — refetch OHLCV and recalculate chart data without
+    // resetting news, ML predictions, Finviz, or company info.
+    if (chartOnly) {
+      setChartRefreshing(true);
+      try {
+        const params = new URLSearchParams({ symbol: stockSymbol, days: String(rangeDays), interval: intervalParam });
+        const stockResponse = await fetch(`/api/stock?${params.toString()}`);
+        if (!stockResponse.ok) throw new Error('Failed to fetch stock data');
+        const stockResult = await stockResponse.json();
+        if (stockResult.error) throw new Error(stockResult.error);
+
+        setStockData(stockResult.data);
+        const price = stockResult.currentPrice || stockResult.data[stockResult.data.length - 1].close;
+        setCurrentPrice(price);
+        setDataInterval(stockResult.interval || intervalParam);
+
+        const indicators = calculateAllIndicators(stockResult.data);
+        const preparedChartData: ChartDataPoint[] = stockResult.data.map((d: StockData, i: number) => ({
+          date: d.date, open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume,
+          ma20: indicators.ma20[i], ma50: indicators.ma50[i], ma200: indicators.ma200[i],
+          bbUpper: indicators.bbUpper[i], bbMiddle: indicators.bbMiddle[i], bbLower: indicators.bbLower[i],
+          rsi: indicators.rsi[i], macd: indicators.macd[i], macdSignal: indicators.macdSignal[i],
+        }));
+        setChartData(preparedChartData);
+
+        setTimeout(async () => {
+          try {
+            const simpleForecast = generateForecast(stockResult.data, forecastHorizon);
+            const simpleInsights = getForecastInsights(price, simpleForecast);
+            setForecastData(simpleForecast);
+            setForecastInsights(simpleInsights);
+            try {
+              const { generateProphetWithChangepoints } = await loadMLLibraries();
+              setProphetForecastData(generateProphetWithChangepoints(stockResult.data, forecastHorizon, 5, mlSettings));
+            } catch {}
+            setTradingSignal(generateTradingSignal(stockResult.data, indicators, simpleInsights?.mediumTerm.change));
+          } catch {}
+        }, 100);
+      } catch (err: any) {
+        setError(err.message || 'Failed to refresh chart');
+      } finally {
+        setChartRefreshing(false);
+      }
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -926,11 +974,9 @@ export default function Home() {
   };
 
   const handleFrequencyChange = (nextId: DataFrequencyId) => {
-    if (nextId === dataFrequencyId && stockData.length > 0 && !error) {
-      return;
-    }
+    if (nextId === dataFrequencyId && stockData.length > 0 && !error) return;
     setDataFrequencyId(nextId);
-    fetchData(symbol, { forceRecalc: true, frequencyId: nextId });
+    fetchData(symbol, { chartOnly: true, frequencyId: nextId });
   };
 
   const handleVisibleRangeChange = (startDate: string, endDate: string) => {
@@ -1477,19 +1523,26 @@ export default function Home() {
                   style={{ borderColor: 'var(--bg-1)', background: 'var(--bg-4)' }}
                 />
               ) : (
-              <StockChart
-                data={chartData}
-                showMA20={showMA20}
-                showMA50={showMA50}
-                showBB={showBB}
-                forecastData={useProphetForecast ? prophetForecastData : forecastData}
-                chartType={chartType}
-                showVolume={showVolume}
-                patterns={showPatterns ? chartPatterns : []}
-                enablePatterns={showPatterns}
-                dataInterval={dataInterval}
-                onVisibleRangeChange={handleVisibleRangeChange}
-              />
+              <div className="relative">
+                <StockChart
+                  data={chartData}
+                  showMA20={showMA20}
+                  showMA50={showMA50}
+                  showBB={showBB}
+                  forecastData={useProphetForecast ? prophetForecastData : forecastData}
+                  chartType={chartType}
+                  showVolume={showVolume}
+                  patterns={showPatterns ? chartPatterns : []}
+                  enablePatterns={showPatterns}
+                  dataInterval={dataInterval}
+                  onVisibleRangeChange={handleVisibleRangeChange}
+                />
+                {chartRefreshing && (
+                  <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.25)', zIndex: 10 }}>
+                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
+                  </div>
+                )}
+              </div>
               )}
             </div>
 
