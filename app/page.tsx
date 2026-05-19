@@ -1322,10 +1322,16 @@ export default function Home() {
                   {/* Finviz chart type buttons (shown only in Finviz mode) */}
                   {showFinvizChart && finvizCharts ? (
                     <>
-                      {([['dailyCandle','Daily'],['weeklyCandle','Weekly'],['monthlyCandle','Monthly'],['dailyLine','Line']] as const).map(([id, label]) => (
+                      {([
+                        ['dailyCandle','6M','~6 months · daily candles'],
+                        ['weeklyCandle','2Y','~2 years · weekly candles'],
+                        ['monthlyCandle','All','10+ years · monthly candles'],
+                        ['dailyLine','Line','~6 months · daily line'],
+                      ] as const).map(([id, label, tip]) => (
                         <button
                           key={id}
                           onClick={() => setActiveFinvizChart(id)}
+                          title={tip}
                           className="px-2 py-1 text-[10px] font-semibold border transition-all"
                           style={{
                             background: activeFinvizChart === id ? 'var(--accent)' : 'var(--bg-4)',
