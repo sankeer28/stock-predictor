@@ -17,6 +17,7 @@ interface MLSettingsPanelProps {
   onPresetChange: (preset: MLPreset) => void;
   currentPreset: MLPreset;
   inlineMobile?: boolean;
+  embedded?: boolean;
 }
 
 const MLSettingsPanel = React.memo(function MLSettingsPanel({
@@ -25,6 +26,7 @@ const MLSettingsPanel = React.memo(function MLSettingsPanel({
   onPresetChange,
   currentPreset,
   inlineMobile,
+  embedded,
 }: MLSettingsPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -44,7 +46,10 @@ const MLSettingsPanel = React.memo(function MLSettingsPanel({
   }, [settings, onSettingsChange, currentPreset, onPresetChange]);
 
   return (
-    <div className={`card mb-6 ${inlineMobile ? 'w-full' : 'w-80'}`}>
+    <div
+      className={embedded ? 'pt-3 mt-3' : `card mb-6 ${inlineMobile ? 'w-full' : 'w-80'}`}
+      style={embedded ? { borderTop: '1px solid var(--bg-1)' } : {}}
+    >
       <div
         className="flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}

@@ -4,6 +4,10 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { Brain, TrendingUp, TrendingDown, Loader2, X, Menu } from 'lucide-react';
 import { MLPrediction } from '@/lib/mlAlgorithms';
 import { MLForecast } from '@/lib/mlForecasting';
+import PredictionsCache from '@/components/PredictionsCache';
+import MLSettingsPanel from '@/components/MLSettingsPanel';
+import { CachedPrediction } from '@/lib/predictionsCache';
+import { MLSettings, MLPreset } from '@/types/mlSettings';
 
 interface MLPredictionsProps {
   currentPrice: number;
@@ -20,11 +24,15 @@ interface MLPredictionsProps {
   isTraining: boolean;
   fromCache?: boolean;
   onRecalculate?: () => void;
-  // Render inline on mobile (stacked below news) when true
   inlineMobile?: boolean;
+  onLoadPrediction?: (prediction: CachedPrediction) => void;
+  mlSettings?: MLSettings;
+  onSettingsChange?: (settings: MLSettings) => void;
+  onPresetChange?: (preset: MLPreset) => void;
+  currentPreset?: MLPreset;
 }
 
-const MLPredictions = React.memo(function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate, inlineMobile }: MLPredictionsProps) {
+const MLPredictions = React.memo(function MLPredictions({ currentPrice, predictions, isTraining, fromCache, onRecalculate, inlineMobile, onLoadPrediction, mlSettings, onSettingsChange, onPresetChange, currentPreset }: MLPredictionsProps) {
   const [isOpen, setIsOpen] = useState<boolean>(!!inlineMobile);
   const [selectedDays, setSelectedDays] = useState<number>(7);
 
@@ -217,6 +225,20 @@ const MLPredictions = React.memo(function MLPredictions({ currentPrice, predicti
             </div>
           </div>
         </div>
+
+        {onLoadPrediction && (
+          <PredictionsCache onLoadPrediction={onLoadPrediction} embedded />
+        )}
+
+        {mlSettings && onSettingsChange && onPresetChange && currentPreset && (
+          <MLSettingsPanel
+            settings={mlSettings}
+            onSettingsChange={onSettingsChange}
+            onPresetChange={onPresetChange}
+            currentPreset={currentPreset}
+            embedded
+          />
+        )}
       </div>
 
       {/* Mobile Overlay (skip when inline) */}

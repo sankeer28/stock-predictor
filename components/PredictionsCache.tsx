@@ -11,9 +11,10 @@ import {
 
 interface PredictionsCacheProps {
   onLoadPrediction?: (prediction: CachedPrediction) => void;
+  embedded?: boolean;
 }
 
-export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheProps) {
+export default function PredictionsCache({ onLoadPrediction, embedded }: PredictionsCacheProps) {
   const [cachedPredictions, setCachedPredictions] = useState<CachedPrediction[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -56,8 +57,12 @@ export default function PredictionsCache({ onLoadPrediction }: PredictionsCacheP
     return new Date(timestamp).toLocaleDateString();
   };
 
+  const outer = embedded
+    ? { className: 'pt-3 mt-3', style: { borderTop: '1px solid var(--bg-1)' } }
+    : { className: 'card', style: {} };
+
   return (
-    <div className="card">
+    <div className={outer.className} style={outer.style}>
       <div
         className="flex items-center justify-between cursor-pointer"
         onClick={() => setIsCollapsed(!isCollapsed)}

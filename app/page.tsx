@@ -34,10 +34,8 @@ const Sidebar = dynamic(() => import('@/components/Sidebar'), { ssr: false });
 const CompanyInfo = dynamic(() => import('@/components/CompanyInfo'), { ssr: false });
 const MLPredictions = dynamic(() => import('@/components/MLPredictions'), { ssr: false });
 const PatternAnalysis = dynamic(() => import('@/components/PatternAnalysis'), { ssr: false });
-const MLSettingsPanel = dynamic(() => import('@/components/MLSettingsPanel'), { ssr: false });
 const PatternSettingsPanel = dynamic(() => import('@/components/PatternSettingsPanel'), { ssr: false });
 const CorrelationHeatmap = dynamic(() => import('@/components/CorrelationHeatmap'), { ssr: false });
-const PredictionsCache = dynamic(() => import('@/components/PredictionsCache'), { ssr: false });
 const RedditSentiment = dynamic(() => import('@/components/RedditSentiment'), { ssr: false });
 const ApeWisdomMentions = dynamic(() => import('@/components/ApeWisdomMentions'), { ssr: false });
 const InsiderTransactions = dynamic(() => import('@/components/InsiderTransactions'), { ssr: false });
@@ -1624,18 +1622,11 @@ export default function Home() {
                 fromCache={mlFromCache}
                 onRecalculate={() => fetchData(symbol, { forceRecalc: true })}
                 inlineMobile={true}
-              />
-
-              {/* ML Cache - Mobile */}
-              <PredictionsCache onLoadPrediction={handleLoadCachedPrediction} />
-
-              {/* ML Settings Panel - Mobile */}
-              <MLSettingsPanel
-                settings={mlSettings}
+                onLoadPrediction={handleLoadCachedPrediction}
+                mlSettings={mlSettings}
                 onSettingsChange={handleMlSettingsChange}
                 onPresetChange={handleMlPresetChange}
                 currentPreset={mlPreset}
-                inlineMobile={true}
               />
 
               {/* Pattern Settings Panel - Mobile */}
@@ -1760,18 +1751,8 @@ export default function Home() {
                 onRecalculate={() => {
                   fetchData(symbol, { forceRecalc: true });
                 }}
-              />
-            </div>
-
-            {/* ML Cache - Below ML Predictions */}
-            <div className="mt-4">
-              <PredictionsCache onLoadPrediction={handleLoadCachedPrediction} />
-            </div>
-
-            {/* ML Settings Panel - Below ML Cache */}
-            <div className="mt-4">
-              <MLSettingsPanel
-                settings={mlSettings}
+                onLoadPrediction={handleLoadCachedPrediction}
+                mlSettings={mlSettings}
                 onSettingsChange={handleMlSettingsChange}
                 onPresetChange={handleMlPresetChange}
                 currentPreset={mlPreset}
