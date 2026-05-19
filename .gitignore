@@ -41,6 +41,7 @@ next-env.d.ts
 *.swp
 *.swo
 *~
+.claude
 
 # Python (for old files)
 __pycache__/
