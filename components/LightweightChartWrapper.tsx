@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChartDataPoint, ChartPattern } from '@/types';
 
+type ForecastPoint = { date: string; predicted: number; upper: number; lower: number };
+
 interface Props {
   data: ChartDataPoint[];
   chartType: 'line' | 'candlestick';
@@ -10,6 +12,8 @@ interface Props {
   dataInterval?: string;
   patterns?: ChartPattern[];
   enablePatterns?: boolean;
+  forecastData?: ForecastPoint[];
+  showForecast?: boolean;
 }
 
 const isIntraday = (interval: string) =>
@@ -305,6 +309,8 @@ export default function LightweightChartWrapper({
   dataInterval = '1d',
   patterns = [],
   enablePatterns = false,
+  forecastData = [],
+  showForecast = true,
 }: Props) {
   const chartDivRef  = useRef<HTMLDivElement>(null);
   const chartObjRef  = useRef<any>(null);
@@ -407,6 +413,48 @@ export default function LightweightChartWrapper({
         })));
       }
 
+      // ── Forecast overlay ─────────────────────────────────────────────────
+      if (showForecast && forecastData.length > 0) {
+        const sortedFc = [...forecastData].sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+
+        // Bridge: start each forecast series from the last historical close
+        const lastBar = sorted[sorted.length - 1];
+        const bridge = { date: lastBar.date, predicted: lastBar.close, upper: lastBar.close, lower: lastBar.close };
+        const fcWithBridge = [bridge, ...sortedFc];
+
+        // Predicted line
+        const predSeries = chart.addSeries(LineSeries, {
+          color: 'rgba(251,191,36,0.9)',
+          lineWidth: 2,
+          lineStyle: 0,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        predSeries.setData(fcWithBridge.map(f => ({ time: toTime(f.date), value: f.predicted })));
+
+        // Upper bound (dashed)
+        const upperSeries = chart.addSeries(LineSeries, {
+          color: 'rgba(251,191,36,0.35)',
+          lineWidth: 1,
+          lineStyle: 1, // dashed
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        upperSeries.setData(fcWithBridge.map(f => ({ time: toTime(f.date), value: f.upper })));
+
+        // Lower bound (dashed)
+        const lowerSeries = chart.addSeries(LineSeries, {
+          color: 'rgba(251,191,36,0.35)',
+          lineWidth: 1,
+          lineStyle: 1,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        lowerSeries.setData(fcWithBridge.map(f => ({ time: toTime(f.date), value: f.lower })));
+      }
+
       chart.timeScale().fitContent();
       setActiveRange('all');
 
@@ -426,7 +474,7 @@ export default function LightweightChartWrapper({
       timeScaleRef.current = null;
       chart?.remove();
     };
-  }, [data, chartType, showVolume, dataInterval]);
+  }, [data, chartType, showVolume, dataInterval, forecastData, showForecast]);
 
   const handleRange = (days: number | 'all') => {
     setActiveRange(days);

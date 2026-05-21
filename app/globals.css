@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+#tv-attr-logo { display: none !important; }
+
 :root {
   /* Terminal Theme Colors */
   --text-0: oklch(19% 0 0);

@@ -1546,6 +1546,8 @@ export default function Home() {
                     dataInterval={dataInterval}
                     patterns={showPatterns ? chartPatterns : []}
                     enablePatterns={showPatterns}
+                    forecastData={useProphetForecast ? prophetForecastData : forecastData}
+                    showForecast={true}
                   />
                 ) : (
                   <StockChart
