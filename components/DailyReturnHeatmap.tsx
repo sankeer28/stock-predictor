@@ -260,13 +260,14 @@ export default function DailyReturnHeatmap({ chartData, inlineMobile }: Props) {
           {/* Win rate */}
           <div>
             <div style={{ fontSize: 9, color: 'var(--text-5)', marginBottom: 2 }}>Win Rate</div>
-            <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, color: stats.winRate >= 50 ? '#22c55e' : '#ef4444' }}>
-              {stats.winRate}%
-            </div>
-            <div style={{ fontSize: 9, color: 'var(--text-5)', marginTop: 2 }}>
-              <span style={{ color: '#22c55e' }}>{stats.up}↑</span>
-              {' · '}
-              <span style={{ color: '#ef4444' }}>{stats.down}↓</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, color: stats.winRate >= 50 ? '#22c55e' : '#ef4444' }}>
+                {stats.winRate}%
+              </span>
+              <div style={{ fontSize: 9, color: 'var(--text-5)', lineHeight: 1.4 }}>
+                <div style={{ color: '#22c55e' }}>{stats.up}↑</div>
+                <div style={{ color: '#ef4444' }}>{stats.down}↓</div>
+              </div>
             </div>
           </div>
 
@@ -278,8 +279,8 @@ export default function DailyReturnHeatmap({ chartData, inlineMobile }: Props) {
             <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
               {stats.monthlyAvgs.map(m => {
                 const pos    = (m.avg ?? 0) >= 0;
-                const barH   = m.avg !== null ? Math.max((Math.abs(m.avg) / maxMonthAbs) * 28, 2) : 0;
-                const HALF   = 28;
+                const barH   = m.avg !== null ? Math.max((Math.abs(m.avg) / maxMonthAbs) * 16, 2) : 0;
+                const HALF   = 16;
                 return (
                   <div key={m.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 8, flexShrink: 0 }}>
                     {/* Positive zone */}
@@ -322,7 +323,7 @@ export default function DailyReturnHeatmap({ chartData, inlineMobile }: Props) {
           <div style={{ height: 1, background: 'var(--bg-1)' }} />
 
           {/* Streaks + best/worst quarter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <div style={{ fontSize: 9, color: 'var(--text-5)' }}>
               Win streak <strong style={{ color: 'var(--text-3)' }}>{stats.maxWin}d</strong>
             </div>
