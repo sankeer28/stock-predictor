@@ -1,17 +1,28 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChartDataPoint } from '@/types';
 
 interface Props {
   data: ChartDataPoint[];
   chartType: 'line' | 'candlestick';
   showVolume?: boolean;
-  dataInterval?: string; // '5m', '15m', '60m', '1d', '1wk', '1mo'
+  dataInterval?: string;
 }
 
 const isIntraday = (interval: string) =>
   interval.endsWith('m') || interval === '60m' || interval === '1h' || interval === '90m';
+
+const RANGES: { label: string; days: number | 'all' }[] = [
+  { label: '5D',  days: 5 },
+  { label: '1M',  days: 30 },
+  { label: '3M',  days: 90 },
+  { label: '6M',  days: 180 },
+  { label: '1Y',  days: 365 },
+  { label: '2Y',  days: 730 },
+  { label: '3Y',  days: 1095 },
+  { label: 'ALL', days: 'all' },
+];
 
 export default function LightweightChartWrapper({
   data,
@@ -20,7 +31,10 @@ export default function LightweightChartWrapper({
   dataInterval = '1d',
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const timeScaleRef = useRef<any>(null);
+  const [activeRange, setActiveRange] = useState<number | 'all'>('all');
 
+  // Build and tear down the chart whenever data/type/interval changes
   useEffect(() => {
     if (!containerRef.current || !data.length) return;
 
@@ -47,19 +61,13 @@ export default function LightweightChartWrapper({
           borderColor: 'rgba(255,255,255,0.08)',
           timeVisible: intraday,
           secondsVisible: false,
-          tickMarkFormatter: intraday
-            ? (time: number) => {
-                const d = new Date(time * 1000);
-                const h = d.getUTCHours().toString().padStart(2, '0');
-                const m = d.getUTCMinutes().toString().padStart(2, '0');
-                return `${h}:${m}`;
-              }
-            : undefined,
         },
         rightPriceScale: {
           borderColor: 'rgba(255,255,255,0.08)',
         },
       });
+
+      timeScaleRef.current = chart.timeScale();
 
       const sorted = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       const toTime = (d: string) => Math.floor(new Date(d).getTime() / 1000) as any;
@@ -106,13 +114,54 @@ export default function LightweightChartWrapper({
       }
 
       chart.timeScale().fitContent();
+      setActiveRange('all');
     });
 
     return () => {
       mounted = false;
+      timeScaleRef.current = null;
       chart?.remove();
     };
   }, [data, chartType, showVolume, dataInterval]);
 
-  return <div ref={containerRef} style={{ height: '500px', width: '100%' }} />;
+  const handleRange = (days: number | 'all') => {
+    setActiveRange(days);
+    const ts = timeScaleRef.current;
+    if (!ts) return;
+
+    if (days === 'all') {
+      ts.fitContent();
+      return;
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000) as any;
+    const fromSec = (nowSec - days * 86400) as any;
+    ts.setVisibleRange({ from: fromSec, to: nowSec });
+  };
+
+  return (
+    <div className="w-full">
+      {/* Range buttons — same style as StockChart */}
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
+        <div className="flex gap-2 flex-wrap">
+          {RANGES.map(({ label, days }) => (
+            <button
+              key={label}
+              onClick={() => handleRange(days)}
+              className="px-3 py-1 text-xs font-medium border transition-all"
+              style={{
+                background: activeRange === days ? 'var(--accent)' : 'var(--bg-3)',
+                borderColor: activeRange === days ? 'var(--accent)' : 'var(--bg-1)',
+                color: activeRange === days ? 'var(--text-0)' : 'var(--text-3)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div ref={containerRef} style={{ height: '460px', width: '100%' }} />
+    </div>
+  );
 }
