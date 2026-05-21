@@ -1064,7 +1064,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-4" style={{ background: 'var(--bg-4)' }}>
+    <main className="min-h-screen p-2 sm:p-4" style={{ background: 'var(--bg-4)' }}>
       <div className="flex gap-4 items-start">
         {/* Main Content Area - Now Full Width */}
         <div className="flex-1 min-w-0">
@@ -1074,7 +1074,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent)' }} />
-              <h1 className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
+              <h1 className="text-lg font-bold hidden sm:block" style={{ color: 'var(--text-1)' }}>
                 Stock Predictor
               </h1>
             </div>
@@ -1094,10 +1094,10 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
               {/* Search Input */}
-              <div className="flex gap-3 items-center flex-1">
-                <div className="relative flex-1 max-w-md">
+              <div className="flex gap-2 items-center flex-1 min-w-0">
+                <div className="relative flex-1 min-w-0">
                   <input
                     type="text"
                     value={inputSymbol}
@@ -1172,24 +1172,28 @@ export default function Home() {
                   )}
                 </button>
 
+              </div>
+
+              {/* Utility row: history, screener, market status */}
+              <div className="flex items-center gap-2">
                 {/* Search History Dropdown */}
                 {searchHistory.length > 0 && (
                   <div className="relative" ref={historyRef}>
                     <button
                       onClick={() => setShowHistory(prev => !prev)}
-                      className="px-4 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
+                      className="px-3 py-2.5 font-medium transition-all cursor-pointer flex items-center gap-2 border"
                       style={{
                         background: 'var(--bg-3)',
                         borderColor: 'var(--bg-1)',
                         color: 'var(--text-3)'
                       }}
                     >
-                      <Clock className="w-5 h-5" />
-                      <span className="hidden sm:inline">History ({searchHistory.length})</span>
-                      <span className="sm:hidden">{searchHistory.length}</span>
+                      <Clock className="w-4 h-4" />
+                      <span className="hidden sm:inline text-sm">History ({searchHistory.length})</span>
+                      <span className="sm:hidden text-xs">{searchHistory.length}</span>
                     </button>
                     {showHistory && (
-                      <div className="absolute right-0 mt-2 w-64 border-2 shadow-lg z-50 max-h-96 overflow-y-auto"
+                      <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-64 border-2 shadow-lg z-50 max-h-80 overflow-y-auto"
                         style={{
                           background: 'var(--bg-2)',
                           borderColor: 'var(--bg-1)'
@@ -1247,37 +1251,35 @@ export default function Home() {
                 {/* Screener Button */}
                 <button
                   onClick={() => setShowScreener(prev => !prev)}
-                  className="px-4 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
+                  className="px-3 py-2.5 font-medium transition-all cursor-pointer flex items-center gap-2 border"
                   style={{
                     background: showScreener ? 'var(--purple-1)' : 'var(--bg-3)',
                     borderColor: showScreener ? 'var(--purple-1)' : 'var(--bg-1)',
                     color: showScreener ? 'var(--text-0)' : 'var(--text-3)',
                   }}
                 >
-                  <Filter className="w-5 h-5" />
-                  <span className="hidden sm:inline">Screener</span>
+                  <Filter className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">Screener</span>
                 </button>
-              </div>
 
-              {/* Market Status */}
-              {!loading && stockData.length > 0 && (
-                <div className="hidden md:flex items-center gap-2 px-3 py-2 border-2" style={{
-                  borderColor: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)',
-                  background: 'var(--bg-3)',
-                }}>
-                  <div className={`w-2 h-2 rounded-full ${marketState === 'REGULAR' ? 'animate-pulse' : ''}`} style={{
-                    background: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
-                  }} />
-                  <div className="flex items-center gap-2">
+                {/* Market Status */}
+                {!loading && stockData.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-2 py-2 border-2 ml-auto" style={{
+                    borderColor: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)',
+                    background: 'var(--bg-3)',
+                  }}>
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${marketState === 'REGULAR' ? 'animate-pulse' : ''}`} style={{
+                      background: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
+                    }} />
                     <span className="text-xs font-semibold" style={{
                       color: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)'
                     }}>
-                      {marketState === 'REGULAR' ? 'OPEN' : marketState === 'CLOSED' ? 'CLOSED' : marketState === 'PRE' ? 'PRE' : marketState === 'POST' ? 'POST' : 'CLOSED'}
+                      {marketState === 'REGULAR' ? 'OPEN' : marketState === 'CLOSED' ? 'CLOSED' : marketState === 'PRE' ? 'PRE' : 'POST'}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--text-4)' }}>{getETTimeString()} ET</span>
+                    <span className="text-xs hidden sm:inline" style={{ color: 'var(--text-4)' }}>{getETTimeString()} ET</span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
@@ -1343,7 +1345,7 @@ export default function Home() {
             />
 
             {/* Main Chart with Integrated Controls */}
-            <div className="card mb-6">
+            <div className="card mb-4 sm:mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="card-label">Price Chart with Forecast</span>
@@ -1375,7 +1377,8 @@ export default function Home() {
                 </div>
 
                 {/* Compact Controls */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="overflow-x-auto pb-0.5 -mb-0.5">
+                <div className="flex items-center gap-2 min-w-max">
                   {/* Finviz toggle */}
                   {finvizCharts && (
                     <>
@@ -1556,6 +1559,7 @@ export default function Home() {
                   </>
                   )}
                 </div>
+                </div>
               </div>
 
               {showFinvizChart && finvizCharts ? (
@@ -1607,7 +1611,7 @@ export default function Home() {
 
             {/* Technical Indicators Charts */}
             {showIndicators && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 <div className="card">
                   <span className="card-label">RSI (Relative Strength Index)</span>
                   <TechnicalIndicatorsChart data={chartData} indicator="rsi" />
@@ -1698,7 +1702,7 @@ export default function Home() {
             </div>
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Trading Signals */}
               {tradingSignal && (
                 <TradingSignals signal={tradingSignal} currentPrice={currentPrice} />
