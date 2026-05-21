@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles, Download } from 'lucide-react';
+import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles, Download, Filter } from 'lucide-react';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateTradingSignal } from '@/lib/tradingSignals';
@@ -51,6 +51,7 @@ const MarketMovers = dynamic(() => import('@/components/MarketMovers'), { ssr: f
 const Watchlist = dynamic(() => import('@/components/Watchlist'), { ssr: false });
 const OptionsChain = dynamic(() => import('@/components/OptionsChain'), { ssr: false });
 const PriceAlerts = dynamic(() => import('@/components/PriceAlerts'), { ssr: false });
+const StockScreener = dynamic(() => import('@/components/StockScreener'), { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -186,6 +187,7 @@ export default function Home() {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showScreener, setShowScreener] = useState(false);
   const historyRef = React.useRef<HTMLDivElement>(null);
 
   // Chart display options
@@ -1241,6 +1243,20 @@ export default function Home() {
                     )}
                   </div>
                 )}
+
+                {/* Screener Button */}
+                <button
+                  onClick={() => setShowScreener(prev => !prev)}
+                  className="px-4 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
+                  style={{
+                    background: showScreener ? 'var(--purple-1)' : 'var(--bg-3)',
+                    borderColor: showScreener ? 'var(--purple-1)' : 'var(--bg-1)',
+                    color: showScreener ? 'var(--text-0)' : 'var(--text-3)',
+                  }}
+                >
+                  <Filter className="w-5 h-5" />
+                  <span className="hidden sm:inline">Screener</span>
+                </button>
               </div>
 
               {/* Market Status */}
@@ -1264,6 +1280,19 @@ export default function Home() {
               )}
             </div>
           </div>
+
+        {/* Stock Screener Panel */}
+        {showScreener && (
+          <div className="mb-6">
+            <StockScreener
+              onSelectTicker={(ticker) => {
+                setInputSymbol(ticker);
+                setShowScreener(false);
+                fetchData(ticker);
+              }}
+            />
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-4 border-2 flex items-start gap-3" style={{
