@@ -286,7 +286,7 @@ export default function DailyReturnHeatmap({ chartData, inlineMobile }: Props) {
                     {/* Positive zone */}
                     <div style={{ height: HALF, display: 'flex', alignItems: 'flex-end' }}>
                       {pos && m.avg !== null && (
-                        <div style={{ width: '100%', width: 8, height: barH, borderRadius: '2px 2px 0 0', background: '#22c55e', opacity: 0.85 }} />
+                        <div style={{ width: 8, height: barH, borderRadius: '2px 2px 0 0', background: '#22c55e', opacity: 0.85 }} />
                       )}
                     </div>
                     {/* Zero line */}
@@ -294,7 +294,7 @@ export default function DailyReturnHeatmap({ chartData, inlineMobile }: Props) {
                     {/* Negative zone */}
                     <div style={{ height: HALF, display: 'flex', alignItems: 'flex-start' }}>
                       {!pos && m.avg !== null && (
-                        <div style={{ width: '100%', width: 8, height: barH, borderRadius: '0 0 2px 2px', background: '#ef4444', opacity: 0.85 }} />
+                        <div style={{ width: 8, height: barH, borderRadius: '0 0 2px 2px', background: '#ef4444', opacity: 0.85 }} />
                       )}
                     </div>
                     <span style={{ fontSize: 7, color: 'var(--text-5)' }}>{MONTHS_SHORT[m.month]}</span>
