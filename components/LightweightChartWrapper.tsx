@@ -9,6 +9,9 @@ interface Props {
   data: ChartDataPoint[];
   chartType: 'line' | 'candlestick';
   showVolume?: boolean;
+  showMA20?: boolean;
+  showMA50?: boolean;
+  showBB?: boolean;
   dataInterval?: string;
   patterns?: ChartPattern[];
   enablePatterns?: boolean;
@@ -306,6 +309,9 @@ export default function LightweightChartWrapper({
   data,
   chartType,
   showVolume = true,
+  showMA20 = false,
+  showMA50 = false,
+  showBB = false,
   dataInterval = '1d',
   patterns = [],
   enablePatterns = false,
@@ -378,8 +384,12 @@ export default function LightweightChartWrapper({
       chartObjRef.current  = chart;
       timeScaleRef.current = chart.timeScale();
 
-      const sorted  = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      const toTime  = (d: string) => Math.floor(new Date(d).getTime() / 1000) as any;
+      const toTime = (d: string) => Math.floor(new Date(d).getTime() / 1000) as any;
+      const ok     = (v: any): v is number => typeof v === 'number' && isFinite(v);
+
+      const sorted = [...data]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .filter(d => ok(d.open) && ok(d.high) && ok(d.low) && ok(d.close));
 
       let priceSeries: any;
       if (chartType === 'candlestick') {
@@ -400,59 +410,71 @@ export default function LightweightChartWrapper({
 
       seriesRef.current = priceSeries;
 
+      // ── Moving Averages & Bollinger Bands ──────────────────────────────────
+      const maBase = { lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false } as const;
+
+      if (showMA20) {
+        const pts = sorted.filter((d: ChartDataPoint) => ok(d.ma20)).map((d: ChartDataPoint) => ({ time: toTime(d.date), value: d.ma20! }));
+        if (pts.length) {
+          const s = chart.addSeries(LineSeries, { ...maBase, color: '#e07878', lineWidth: 1.5 });
+          s.setData(pts);
+        }
+      }
+
+      if (showMA50) {
+        const pts = sorted.filter((d: ChartDataPoint) => ok(d.ma50)).map((d: ChartDataPoint) => ({ time: toTime(d.date), value: d.ma50! }));
+        if (pts.length) {
+          const s = chart.addSeries(LineSeries, { ...maBase, color: '#c4a840', lineWidth: 1.5 });
+          s.setData(pts);
+        }
+      }
+
+      if (showBB) {
+        const bbBase = { ...maBase, lineWidth: 1, lineStyle: 1 } as const;
+        const uPts = sorted.filter((d: ChartDataPoint) => ok(d.bbUpper)).map((d: ChartDataPoint) => ({ time: toTime(d.date), value: d.bbUpper! }));
+        const mPts = sorted.filter((d: ChartDataPoint) => ok(d.bbMiddle)).map((d: ChartDataPoint) => ({ time: toTime(d.date), value: d.bbMiddle! }));
+        const lPts = sorted.filter((d: ChartDataPoint) => ok(d.bbLower)).map((d: ChartDataPoint) => ({ time: toTime(d.date), value: d.bbLower! }));
+        if (uPts.length) { const s = chart.addSeries(LineSeries, { ...bbBase, color: 'rgba(160,122,210,0.75)' }); s.setData(uPts); }
+        if (mPts.length) { const s = chart.addSeries(LineSeries, { ...maBase, color: 'rgba(160,122,210,0.45)', lineWidth: 1 }); s.setData(mPts); }
+        if (lPts.length) { const s = chart.addSeries(LineSeries, { ...bbBase, color: 'rgba(160,122,210,0.75)' }); s.setData(lPts); }
+      }
+
       if (showVolume) {
-        const vol = chart.addSeries(HistogramSeries, {
-          priceFormat: { type: 'volume' },
-          priceScaleId: 'volume',
-        });
-        chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-        vol.setData(sorted.map((d: ChartDataPoint) => ({
-          time: toTime(d.date),
-          value: d.volume,
-          color: d.close >= d.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
-        })));
+        const volPts = sorted
+          .filter((d: ChartDataPoint) => ok(d.volume) && d.volume > 0)
+          .map((d: ChartDataPoint) => ({
+            time: toTime(d.date),
+            value: d.volume,
+            color: d.close >= d.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
+          }));
+        if (volPts.length) {
+          const vol = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: 'volume' });
+          chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+          vol.setData(volPts);
+        }
       }
 
       // ── Forecast overlay ─────────────────────────────────────────────────
-      if (showForecast && forecastData.length > 0) {
-        const sortedFc = [...forecastData].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
+      if (showForecast && forecastData.length > 0 && sorted.length > 0) {
+        const sortedFc = [...forecastData]
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .filter(f => ok(f.predicted) && ok(f.upper) && ok(f.lower));
 
-        // Bridge: start each forecast series from the last historical close
-        const lastBar = sorted[sorted.length - 1];
-        const bridge = { date: lastBar.date, predicted: lastBar.close, upper: lastBar.close, lower: lastBar.close };
-        const fcWithBridge = [bridge, ...sortedFc];
+        if (sortedFc.length > 0) {
+          const lastBar = sorted[sorted.length - 1];
+          const bridge = { date: lastBar.date, predicted: lastBar.close, upper: lastBar.close, lower: lastBar.close };
+          const fcPts  = [bridge, ...sortedFc];
 
-        // Predicted line
-        const predSeries = chart.addSeries(LineSeries, {
-          color: 'rgba(251,191,36,0.9)',
-          lineWidth: 2,
-          lineStyle: 0,
-          lastValueVisible: false,
-          priceLineVisible: false,
-        });
-        predSeries.setData(fcWithBridge.map(f => ({ time: toTime(f.date), value: f.predicted })));
+          const fcBase = { lastValueVisible: false, priceLineVisible: false } as const;
+          const pred = chart.addSeries(LineSeries, { ...fcBase, color: 'rgba(251,191,36,0.9)', lineWidth: 2 });
+          pred.setData(fcPts.map(f => ({ time: toTime(f.date), value: f.predicted })));
 
-        // Upper bound (dashed)
-        const upperSeries = chart.addSeries(LineSeries, {
-          color: 'rgba(251,191,36,0.35)',
-          lineWidth: 1,
-          lineStyle: 1, // dashed
-          lastValueVisible: false,
-          priceLineVisible: false,
-        });
-        upperSeries.setData(fcWithBridge.map(f => ({ time: toTime(f.date), value: f.upper })));
+          const upper = chart.addSeries(LineSeries, { ...fcBase, color: 'rgba(251,191,36,0.35)', lineWidth: 1, lineStyle: 1 });
+          upper.setData(fcPts.map(f => ({ time: toTime(f.date), value: f.upper })));
 
-        // Lower bound (dashed)
-        const lowerSeries = chart.addSeries(LineSeries, {
-          color: 'rgba(251,191,36,0.35)',
-          lineWidth: 1,
-          lineStyle: 1,
-          lastValueVisible: false,
-          priceLineVisible: false,
-        });
-        lowerSeries.setData(fcWithBridge.map(f => ({ time: toTime(f.date), value: f.lower })));
+          const lower = chart.addSeries(LineSeries, { ...fcBase, color: 'rgba(251,191,36,0.35)', lineWidth: 1, lineStyle: 1 });
+          lower.setData(fcPts.map(f => ({ time: toTime(f.date), value: f.lower })));
+        }
       }
 
       chart.timeScale().fitContent();
@@ -474,7 +496,7 @@ export default function LightweightChartWrapper({
       timeScaleRef.current = null;
       chart?.remove();
     };
-  }, [data, chartType, showVolume, dataInterval, forecastData, showForecast]);
+  }, [data, chartType, showVolume, showMA20, showMA50, showBB, dataInterval, forecastData, showForecast]);
 
   const handleRange = (days: number | 'all') => {
     setActiveRange(days);

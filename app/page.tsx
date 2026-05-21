@@ -1543,6 +1543,9 @@ export default function Home() {
                     data={chartData}
                     chartType={chartType}
                     showVolume={showVolume}
+                    showMA20={showMA20}
+                    showMA50={showMA50}
+                    showBB={showBB}
                     dataInterval={dataInterval}
                     patterns={showPatterns ? chartPatterns : []}
                     enablePatterns={showPatterns}
