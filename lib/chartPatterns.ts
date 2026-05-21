@@ -24,6 +24,7 @@ const PATTERN_LABELS: Record<ChartPatternType, string> = {
   multiple_top: 'Multiple Top',
   multiple_bottom: 'Multiple Bottom',
   head_and_shoulders: 'Head & Shoulders',
+  inverse_head_and_shoulders: 'Inv. Head & Shoulders',
 };
 
 const PATTERN_DIRECTION: Record<ChartPatternType, ChartPattern['direction']> = {
@@ -44,12 +45,12 @@ const PATTERN_DIRECTION: Record<ChartPatternType, ChartPattern['direction']> = {
   multiple_top: 'bearish',
   multiple_bottom: 'bullish',
   head_and_shoulders: 'bearish',
+  inverse_head_and_shoulders: 'bullish',
 };
 
-// Default constants (can be overridden by settings)
 const VOLATILITY_FLOOR = 0.002;
 const VOLATILITY_CAP = 0.2;
-const MAX_PATTERN_OVERLAP = 0.7;  // Slightly increased to allow more overlapping patterns
+const MAX_PATTERN_OVERLAP = 0.7;
 
 interface LineStats {
   slope: number;
@@ -86,21 +87,19 @@ export function detectChartPatterns(
   }
 
   try {
-    // Always include full dataset as a window for detecting long-term patterns
     const fullDatasetWindow = data.length;
     const windows = Array.from(
       new Set(
         [...DETECTION_WINDOWS, fullDatasetWindow]
           .map(size => Math.min(size, data.length))
           .filter(size => size >= MIN_WINDOW)
-          .sort((a, b) => a - b) // Sort windows smallest to largest
+          .sort((a, b) => a - b)
       )
     );
 
     const patterns: ChartPattern[] = [];
-    const EARLY_EXIT_THRESHOLD = Math.ceil(MAX_PATTERNS * 1.5); // Allow some buffer for filtering
+    const EARLY_EXIT_THRESHOLD = Math.ceil(MAX_PATTERNS * 1.5);
 
-    // Window-based pattern detection with early exit
     for (const windowSize of windows) {
       if (patterns.length >= EARLY_EXIT_THRESHOLD) break;
 
@@ -119,16 +118,15 @@ export function detectChartPatterns(
       patterns.push(...detectChannels(data, windowSize, MIN_WINDOW));
     }
 
-    // Only detect these expensive patterns if we don't have enough yet
     if (patterns.length < EARLY_EXIT_THRESHOLD) {
       patterns.push(...detectDoubleTops(data, MIN_WINDOW));
       patterns.push(...detectDoubleBottoms(data, MIN_WINDOW));
       patterns.push(...detectMultipleTops(data, MIN_WINDOW));
       patterns.push(...detectMultipleBottoms(data, MIN_WINDOW));
       patterns.push(...detectHeadAndShoulders(data, MIN_WINDOW));
+      patterns.push(...detectInverseHeadAndShoulders(data, MIN_WINDOW));
     }
 
-    // Filter by minimum confidence and consolidate
     const filteredPatterns = patterns.filter(p => p.confidence >= MIN_CONFIDENCE);
     return consolidatePatterns(filteredPatterns, MAX_PATTERNS, MAX_PATTERNS_PER_TYPE);
   } catch (error) {
@@ -145,12 +143,18 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
 
   const lows = slice.map(point => getLow(point));
   const highs = slice.map(point => getHigh(point));
-
-  const lowStats = linearRegression(lows);
-  const highStats = linearRegression(highs);
   const volatilityPct = getWindowVolatilityPct(data, startIndex, data.length - 1);
-  const supportTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.2);  // More tolerant
+  const supportTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.2);
   const resistanceTolerance = getAdaptiveTolerance(0.006, volatilityPct, 1.2);
+
+  // Adaptive pivot distance: ~1 pivot per 20 bars, min 2
+  const pivotDist = Math.max(2, Math.floor(slice.length / 20));
+  const troughIdxs = findLocalExtrema(lows, pivotDist, 'min');
+  const peakIdxs = findLocalExtrema(highs, pivotDist, 'max');
+
+  // Swing-point regression: fit trendline through local extrema only
+  const lowStats = linearRegressionPoints(troughIdxs.map(i => ({ x: i, y: lows[i] })));
+  const highStats = linearRegressionPoints(peakIdxs.map(i => ({ x: i, y: highs[i] })));
 
   const patterns: ChartPattern[] = [];
   let supportCandidate: ChartPattern | null = null;
@@ -158,15 +162,15 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
 
   if (lowStats) {
     const touches = countLineTouches(lows, lowStats.slope, lowStats.intercept, supportTolerance);
-    const minTouches = Math.max(2, Math.round(slice.length * 0.15));  // Reduced minimum touches
+    const minTouches = Math.max(2, Math.round(slice.length * 0.12));
     if (
-      lowStats.slopePct >= -0.0005 &&  // Stricter: only upward or flat trends
+      lowStats.slopePct >= -0.0005 &&
       touches.touches >= minTouches &&
-      lowStats.r2 >= 0.3 &&  // Reduced R² threshold
+      lowStats.r2 >= 0.25 &&
       touches.avgDeviation <= supportTolerance * 1.2
     ) {
       const confidence = clamp(
-        0.40 +  // Higher base confidence for quality patterns
+        0.40 +
           Math.min(0.30, (touches.touches / slice.length) * 1.5) +
           Math.min(0.30, lowStats.r2 * 1.2),
         0,
@@ -189,15 +193,15 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
       highStats.intercept,
       resistanceTolerance
     );
-    const minTouches = Math.max(2, Math.round(slice.length * 0.15));  // Reduced minimum touches
+    const minTouches = Math.max(2, Math.round(slice.length * 0.12));
     if (
-      highStats.slopePct <= 0.0005 &&  // Stricter: only downward or flat trends
+      highStats.slopePct <= 0.0005 &&
       touches.touches >= minTouches &&
-      highStats.r2 >= 0.3 &&  // Reduced R² threshold
+      highStats.r2 >= 0.25 &&
       touches.avgDeviation <= resistanceTolerance * 1.2
     ) {
       const confidence = clamp(
-        0.40 +  // Higher base confidence for quality patterns
+        0.40 +
           Math.min(0.30, (touches.touches / slice.length) * 1.5) +
           Math.min(0.30, highStats.r2 * 1.2),
         0,
@@ -213,14 +217,9 @@ function detectTrendlines(data: ChartDataPoint[], windowSize: number, minWindow:
     }
   }
 
-  // Only add the strongest pattern if both exist (prevent duplicate trendlines)
-  if (supportCandidate && resistanceCandidate) {
-    // Choose the one with higher confidence
-    patterns.push(supportCandidate.confidence >= resistanceCandidate.confidence ? supportCandidate : resistanceCandidate);
-  } else {
-    if (supportCandidate) patterns.push(supportCandidate);
-    if (resistanceCandidate) patterns.push(resistanceCandidate);
-  }
+  // Emit both — consolidation handles de-duplication across windows
+  if (supportCandidate) patterns.push(supportCandidate);
+  if (resistanceCandidate) patterns.push(resistanceCandidate);
 
   return patterns;
 }
@@ -233,16 +232,16 @@ function detectHorizontalSR(data: ChartDataPoint[], windowSize: number, minWindo
   const highs = slice.map(point => getHigh(point));
   const lows = slice.map(point => getLow(point));
   const volatilityPct = getWindowVolatilityPct(data, startIndex, startIndex + slice.length - 1);
-  const clusterTolerance = getAdaptiveTolerance(0.008, volatilityPct, 1.5);  // More tolerant clustering
+  const clusterTolerance = getAdaptiveTolerance(0.008, volatilityPct, 1.5);
 
-  const highPeaks = findLocalExtrema(highs, 2, 'max');  // Reduced distance for more peaks
-  const lowTroughs = findLocalExtrema(lows, 2, 'min');  // Reduced distance for more troughs
+  const highPeaks = findLocalExtrema(highs, 2, 'max');
+  const lowTroughs = findLocalExtrema(lows, 2, 'min');
 
   const highClusters = clusterLevels(highs, highPeaks, clusterTolerance);
   const lowClusters = clusterLevels(lows, lowTroughs, clusterTolerance);
 
-  const topCluster = highClusters.find(cluster => cluster.indexes.length >= 2);  // Reduced from 3
-  const bottomCluster = lowClusters.find(cluster => cluster.indexes.length >= 2);  // Reduced from 3
+  const topCluster = highClusters.find(cluster => cluster.indexes.length >= 2);
+  const bottomCluster = lowClusters.find(cluster => cluster.indexes.length >= 2);
 
   if (!topCluster || !bottomCluster) {
     return [];
@@ -536,12 +535,14 @@ function detectChannels(data: ChartDataPoint[], windowSize: number, minWindow: n
 }
 
 function detectDoubleTops(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
+  const highs = data.map(point => getHigh(point));
   const closes = data.map(point => getClose(point));
-  const peaks = findLocalExtrema(closes, 2, 'max');  // Reduced from 3 for more peaks
+  const volumes = data.map(point => getVolume(point));
+  const pivotDist = Math.max(3, Math.floor(data.length / 25));
+  const peaks = findLocalExtrema(highs, pivotDist, 'max');
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const baseTolerance = 0.015;  // Increased tolerance
-  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.05);  // More tolerant
-  const minSeparation = 3;  // Reduced from 5 for earlier detection
+  const tolerance = clamp(volatilityPct * 2, 0.015, 0.05);
+  const minSeparation = Math.max(3, pivotDist * 2);
   const results: ChartPattern[] = [];
 
   for (let i = peaks.length - 1; i >= 1; i--) {
@@ -549,21 +550,29 @@ function detectDoubleTops(data: ChartDataPoint[], minWindow: number): ChartPatte
     for (let j = i - 1; j >= 0; j--) {
       const first = peaks[j];
       const separation = second - first;
-      if (separation < minSeparation || separation > 180) continue;  // Extended range
+      if (separation < minSeparation || separation > 200) continue;
 
-      const firstVal = closes[first];
-      const secondVal = closes[second];
+      const firstVal = highs[first];
+      const secondVal = highs[second];
       if (!isFinite(firstVal) || !isFinite(secondVal)) continue;
 
       const diff = Math.abs(firstVal - secondVal) / ((firstVal + secondVal) / 2);
       if (diff > tolerance) continue;
 
+      // Declining volume at second top confirms distribution
+      const firstVol = volumes[first];
+      const secondVol = volumes[second];
+      const volScore =
+        isFinite(firstVol) && isFinite(secondVol) && firstVol > 0 && secondVol < firstVol
+          ? Math.min(0.15, ((firstVol - secondVol) / firstVol) * 0.5)
+          : 0;
+
       const postIndex = Math.min(data.length - 1, second + 5);
       const postMove = (closes[postIndex] - secondVal) / (secondVal || 1);
-      const dropScore = postMove < 0 ? Math.min(0.25, Math.abs(postMove) * 3) : 0;
+      const dropScore = postMove < 0 ? Math.min(0.15, Math.abs(postMove) * 3) : 0;
 
       const confidence = clamp(
-        0.55 + Math.min(0.25, (tolerance - diff) * 12) + Math.min(0.15, dropScore),
+        0.55 + Math.min(0.20, (tolerance - diff) * 12) + dropScore + volScore,
         0,
         0.95
       );
@@ -576,9 +585,7 @@ function detectDoubleTops(data: ChartDataPoint[], minWindow: number): ChartPatte
           touches: 2,
         })
       );
-      if (results.length >= 3) {
-        return results;
-      }
+      if (results.length >= 3) return results;
     }
   }
 
@@ -586,12 +593,14 @@ function detectDoubleTops(data: ChartDataPoint[], minWindow: number): ChartPatte
 }
 
 function detectDoubleBottoms(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
+  const lows = data.map(point => getLow(point));
   const closes = data.map(point => getClose(point));
-  const troughs = findLocalExtrema(closes, 2, 'min');  // Reduced from 3 for more troughs
+  const volumes = data.map(point => getVolume(point));
+  const pivotDist = Math.max(3, Math.floor(data.length / 25));
+  const troughs = findLocalExtrema(lows, pivotDist, 'min');
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const baseTolerance = 0.015;  // Increased tolerance
-  const tolerance = clamp(volatilityPct * 2, baseTolerance, 0.05);  // More tolerant
-  const minSeparation = 3;  // Reduced from 5 for earlier detection
+  const tolerance = clamp(volatilityPct * 2, 0.015, 0.05);
+  const minSeparation = Math.max(3, pivotDist * 2);
   const results: ChartPattern[] = [];
 
   for (let i = troughs.length - 1; i >= 1; i--) {
@@ -599,21 +608,29 @@ function detectDoubleBottoms(data: ChartDataPoint[], minWindow: number): ChartPa
     for (let j = i - 1; j >= 0; j--) {
       const first = troughs[j];
       const separation = second - first;
-      if (separation < minSeparation || separation > 180) continue;  // Extended range
+      if (separation < minSeparation || separation > 200) continue;
 
-      const firstVal = closes[first];
-      const secondVal = closes[second];
+      const firstVal = lows[first];
+      const secondVal = lows[second];
       if (!isFinite(firstVal) || !isFinite(secondVal)) continue;
 
       const diff = Math.abs(firstVal - secondVal) / ((firstVal + secondVal) / 2);
       if (diff > tolerance) continue;
 
+      // Declining volume at second trough confirms capitulation easing
+      const firstVol = volumes[first];
+      const secondVol = volumes[second];
+      const volScore =
+        isFinite(firstVol) && isFinite(secondVol) && firstVol > 0 && secondVol < firstVol
+          ? Math.min(0.15, ((firstVol - secondVol) / firstVol) * 0.5)
+          : 0;
+
       const postIndex = Math.min(data.length - 1, second + 5);
       const postMove = (closes[postIndex] - secondVal) / (secondVal || 1);
-      const bounceScore = postMove > 0 ? Math.min(0.25, postMove * 3) : 0;
+      const bounceScore = postMove > 0 ? Math.min(0.15, postMove * 3) : 0;
 
       const confidence = clamp(
-        0.55 + Math.min(0.25, (tolerance - diff) * 12) + Math.min(0.15, bounceScore),
+        0.55 + Math.min(0.20, (tolerance - diff) * 12) + bounceScore + volScore,
         0,
         0.95
       );
@@ -626,9 +643,7 @@ function detectDoubleBottoms(data: ChartDataPoint[], minWindow: number): ChartPa
           touches: 2,
         })
       );
-      if (results.length >= 3) {
-        return results;
-      }
+      if (results.length >= 3) return results;
     }
   }
 
@@ -636,13 +651,14 @@ function detectDoubleBottoms(data: ChartDataPoint[], minWindow: number): ChartPa
 }
 
 function detectMultipleTops(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
-  const closes = data.map(point => getClose(point));
-  const peaks = findLocalExtrema(closes, 2, 'max').filter(index => index >= closes.length - 250);  // More history, smaller distance
+  const highs = data.map(point => getHigh(point));
+  const pivotDist = Math.max(2, Math.floor(data.length / 25));
+  const peaks = findLocalExtrema(highs, pivotDist, 'max').filter(index => index >= highs.length - 250);
   if (peaks.length < 3) return [];
 
-  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, closes.length - 250), closes.length - 1);
-  const clusterTolerance = getAdaptiveTolerance(0.015, volatilityPct, 1.6);  // More tolerant
-  const clusters = clusterLevels(closes, peaks, clusterTolerance);
+  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, highs.length - 250), highs.length - 1);
+  const clusterTolerance = getAdaptiveTolerance(0.015, volatilityPct, 1.6);
+  const clusters = clusterLevels(highs, peaks, clusterTolerance);
   const cluster = clusters.find(c => c.indexes.length >= 3);
   if (!cluster) return [];
 
@@ -668,13 +684,14 @@ function detectMultipleTops(data: ChartDataPoint[], minWindow: number): ChartPat
 }
 
 function detectMultipleBottoms(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
-  const closes = data.map(point => getClose(point));
-  const troughs = findLocalExtrema(closes, 2, 'min').filter(index => index >= closes.length - 250);  // More history, smaller distance
+  const lows = data.map(point => getLow(point));
+  const pivotDist = Math.max(2, Math.floor(data.length / 25));
+  const troughs = findLocalExtrema(lows, pivotDist, 'min').filter(index => index >= lows.length - 250);
   if (troughs.length < 3) return [];
 
-  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, closes.length - 250), closes.length - 1);
-  const clusterTolerance = getAdaptiveTolerance(0.015, volatilityPct, 1.6);  // More tolerant
-  const clusters = clusterLevels(closes, troughs, clusterTolerance);
+  const volatilityPct = getWindowVolatilityPct(data, Math.max(0, lows.length - 250), lows.length - 1);
+  const clusterTolerance = getAdaptiveTolerance(0.015, volatilityPct, 1.6);
+  const clusters = clusterLevels(lows, troughs, clusterTolerance);
   const cluster = clusters.find(c => c.indexes.length >= 3);
   if (!cluster) return [];
 
@@ -700,11 +717,13 @@ function detectMultipleBottoms(data: ChartDataPoint[], minWindow: number): Chart
 }
 
 function detectHeadAndShoulders(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
-  const closes = data.map(point => getClose(point));
-  const peaks = findLocalExtrema(closes, 3, 'max');  // Reduced from 4 for more peaks
+  const highs = data.map(point => getHigh(point));
+  const lows = data.map(point => getLow(point));
+  const pivotDist = Math.max(3, Math.floor(data.length / 20));
+  const peaks = findLocalExtrema(highs, pivotDist, 'max');
   if (peaks.length < 3) return [];
   const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
-  const patternTolerance = getAdaptiveTolerance(0.025, volatilityPct, 4.5);  // More tolerant
+  const patternTolerance = getAdaptiveTolerance(0.025, volatilityPct, 4.5);
   const results: ChartPattern[] = [];
 
   for (let i = peaks.length - 3; i >= 0; i--) {
@@ -712,12 +731,12 @@ function detectHeadAndShoulders(data: ChartDataPoint[], minWindow: number): Char
     const head = peaks[i + 1];
     const right = peaks[i + 2];
 
-    if (head - left < 3 || right - head < 3) continue;  // Reduced from 5
-    if (right - left > 250) continue;  // Extended range
+    if (head - left < pivotDist * 2 || right - head < pivotDist * 2) continue;
+    if (right - left > 250) continue;
 
-    const leftVal = closes[left];
-    const headVal = closes[head];
-    const rightVal = closes[right];
+    const leftVal = highs[left];
+    const headVal = highs[head];
+    const rightVal = highs[right];
 
     if (!isFinite(leftVal) || !isFinite(headVal) || !isFinite(rightVal)) continue;
 
@@ -725,14 +744,14 @@ function detectHeadAndShoulders(data: ChartDataPoint[], minWindow: number): Char
     if (headPremium < Math.max(0.02, patternTolerance)) continue;
 
     const shoulderDiff = Math.abs(leftVal - rightVal) / ((leftVal + rightVal) / 2);
-    if (shoulderDiff > Math.max(0.03, patternTolerance * 1.4)) continue;
+    if (shoulderDiff > Math.max(0.04, patternTolerance * 1.4)) continue;
 
-    const leftNeckline = findRangeMin(closes, left, head);
-    const rightNeckline = findRangeMin(closes, head, right);
+    const leftNeckline = findRangeMin(lows, left, head);
+    const rightNeckline = findRangeMin(lows, head, right);
     const necklineDiff =
       Math.abs(leftNeckline.value - rightNeckline.value) /
       (((leftNeckline.value + rightNeckline.value) / 2) || 1);
-    if (necklineDiff > Math.max(0.035, patternTolerance * 1.5)) continue;
+    if (necklineDiff > Math.max(0.04, patternTolerance * 1.5)) continue;
 
     const confidence = clamp(
       0.60 +
@@ -753,9 +772,71 @@ function detectHeadAndShoulders(data: ChartDataPoint[], minWindow: number): Char
         neckline: (leftNeckline.value + rightNeckline.value) / 2,
       })
     );
-    if (results.length >= 2) {
-      break;
-    }
+    if (results.length >= 2) break;
+  }
+
+  return results;
+}
+
+function detectInverseHeadAndShoulders(data: ChartDataPoint[], minWindow: number): ChartPattern[] {
+  const lows = data.map(point => getLow(point));
+  const highs = data.map(point => getHigh(point));
+  const pivotDist = Math.max(3, Math.floor(data.length / 20));
+  const troughs = findLocalExtrema(lows, pivotDist, 'min');
+  if (troughs.length < 3) return [];
+  const volatilityPct = getWindowVolatilityPct(data, 0, data.length - 1);
+  const patternTolerance = getAdaptiveTolerance(0.025, volatilityPct, 4.5);
+  const results: ChartPattern[] = [];
+
+  for (let i = troughs.length - 3; i >= 0; i--) {
+    const left = troughs[i];
+    const head = troughs[i + 1];
+    const right = troughs[i + 2];
+
+    if (head - left < pivotDist * 2 || right - head < pivotDist * 2) continue;
+    if (right - left > 250) continue;
+
+    const leftVal = lows[left];
+    const headVal = lows[head];
+    const rightVal = lows[right];
+
+    if (!isFinite(leftVal) || !isFinite(headVal) || !isFinite(rightVal)) continue;
+
+    // Head must be below both shoulders
+    const headDiscount = ((leftVal + rightVal) / 2) / headVal - 1;
+    if (headDiscount < Math.max(0.02, patternTolerance)) continue;
+
+    const shoulderDiff = Math.abs(leftVal - rightVal) / ((leftVal + rightVal) / 2);
+    if (shoulderDiff > Math.max(0.04, patternTolerance * 1.4)) continue;
+
+    // Neckline connects the peaks between each pair of troughs
+    const leftNeckline = findRangeMax(highs, left, head);
+    const rightNeckline = findRangeMax(highs, head, right);
+    const necklineDiff =
+      Math.abs(leftNeckline.value - rightNeckline.value) /
+      (((leftNeckline.value + rightNeckline.value) / 2) || 1);
+    if (necklineDiff > Math.max(0.04, patternTolerance * 1.5)) continue;
+
+    const confidence = clamp(
+      0.60 +
+        Math.min(0.20, headDiscount * 4) +
+        Math.min(0.15, (0.04 - necklineDiff) * 4),
+      0,
+      0.95
+    );
+
+    const start = Math.max(0, left - 5);
+    const end = Math.min(data.length - 1, right + 5);
+
+    results.push(
+      buildPattern(data, 'inverse_head_and_shoulders', start, end, confidence, {
+        leftShoulder: leftVal,
+        head: headVal,
+        rightShoulder: rightVal,
+        neckline: (leftNeckline.value + rightNeckline.value) / 2,
+      })
+    );
+    if (results.length >= 2) break;
   }
 
   return results;
@@ -982,6 +1063,37 @@ function linearRegression(values: number[]): LineStats | null {
   return { slope, intercept, r2, avg, slopePct };
 }
 
+function linearRegressionPoints(points: Array<{ x: number; y: number }>): LineStats | null {
+  const n = points.length;
+  if (n < 2) return null;
+
+  const xMean = points.reduce((s, p) => s + p.x, 0) / n;
+  const yMean = points.reduce((s, p) => s + p.y, 0) / n;
+
+  let num = 0;
+  let den = 0;
+  for (const p of points) {
+    num += (p.x - xMean) * (p.y - yMean);
+    den += (p.x - xMean) ** 2;
+  }
+  if (den === 0) return null;
+
+  const slope = num / den;
+  const intercept = yMean - slope * xMean;
+
+  let ssTot = 0;
+  let ssRes = 0;
+  for (const p of points) {
+    ssTot += (p.y - yMean) ** 2;
+    ssRes += (p.y - (slope * p.x + intercept)) ** 2;
+  }
+
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  const slopePct = yMean === 0 ? 0 : slope / yMean;
+
+  return { slope, intercept, r2, avg: yMean, slopePct };
+}
+
 function average(values: number[]): number {
   if (!values.length) return 0;
   const sum = values.reduce((acc, val) => acc + (isFinite(val) ? val : 0), 0);
@@ -1099,6 +1211,10 @@ function getLow(point: ChartDataPoint): number {
   return ensureNumber(point.low, fallback);
 }
 
+function getVolume(point: ChartDataPoint): number {
+  return ensureNumber(point.volume, 0);
+}
+
 function findRangeMin(values: number[], start: number, end: number) {
   const s = Math.min(start, end);
   const e = Math.max(start, end);
@@ -1115,3 +1231,18 @@ function findRangeMin(values: number[], start: number, end: number) {
   return { index: minIndex, value: minValue };
 }
 
+function findRangeMax(values: number[], start: number, end: number) {
+  const s = Math.min(start, end);
+  const e = Math.max(start, end);
+  let maxIndex = s;
+  let maxValue = values[s];
+
+  for (let i = s; i <= e; i++) {
+    if (values[i] > maxValue) {
+      maxValue = values[i];
+      maxIndex = i;
+    }
+  }
+
+  return { index: maxIndex, value: maxValue };
+}

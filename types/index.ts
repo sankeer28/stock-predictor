@@ -91,7 +91,8 @@ export type ChartPatternType =
   | 'double_bottom'
   | 'multiple_top'
   | 'multiple_bottom'
-  | 'head_and_shoulders';
+  | 'head_and_shoulders'
+  | 'inverse_head_and_shoulders';
 
 export type ChartPatternMeta = Record<string, number | string | boolean | undefined>;
 
