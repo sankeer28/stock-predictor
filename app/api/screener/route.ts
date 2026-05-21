@@ -29,12 +29,10 @@ const HEADERS = ['Ticker', 'Company', 'Price', 'Change', 'Volume', 'Mkt Cap', 'F
 export async function GET(request: NextRequest) {
   const sp    = request.nextUrl.searchParams;
   const scrId = (sp.get('scrId') || 'most_actives').trim();
-  const page  = Math.max(1, parseInt(sp.get('page') || '1'));
-  const count = 20;
-  const offset = (page - 1) * count;
+  const count = 250;
 
   try {
-    const url = `${YF_URL}?scrIds=${encodeURIComponent(scrId)}&count=${count}&offset=${offset}&lang=en-US&region=US`;
+    const url = `${YF_URL}?scrIds=${encodeURIComponent(scrId)}&count=${count}&offset=0&lang=en-US&region=US`;
 
     const res = await fetch(url, {
       headers: {
@@ -69,9 +67,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        scrId, page, pageSize: count,
-        total,
-        totalPages: total > 0 ? Math.ceil(total / count) : rows.length > 0 ? 1 : 0,
+        scrId,
+        total: rows.length,
         headers: HEADERS,
         rows,
       },

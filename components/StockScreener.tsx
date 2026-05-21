@@ -131,12 +131,12 @@ const PRESETS: Preset[] = [
 // Types
 // ────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 20;
+
 interface ScreenerResult {
   headers: string[];
   rows: Record<string, string>[];
   total: number;
-  totalPages: number;
-  page: number;
 }
 
 interface Props {
@@ -165,18 +165,18 @@ export default function StockScreener({ onSelectTicker }: Props) {
   const [result, setResult] = useState<ScreenerResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [displayPage, setDisplayPage] = useState(1);
   const [sortCol, setSortCol] = useState<string>('');
   const [sortAsc, setSortAsc] = useState(true);
 
-  const runScreener = useCallback(async (preset: Preset | null, page = 1) => {
+  const runScreener = useCallback(async (preset: Preset | null) => {
     if (!preset) return;
     setLoading(true);
     setError(null);
-    setCurrentPage(page);
+    setDisplayPage(1);
 
     try {
-      const params = new URLSearchParams({ scrId: preset.scrId, page: String(page) });
+      const params = new URLSearchParams({ scrId: preset.scrId });
       const res = await fetch(`/api/screener?${params}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Screener failed');
@@ -184,8 +184,6 @@ export default function StockScreener({ onSelectTicker }: Props) {
         headers: data.headers,
         rows: data.rows,
         total: data.total,
-        totalPages: data.totalPages,
-        page: data.page,
       });
     } catch (e: any) {
       setError(e.message);
@@ -197,7 +195,7 @@ export default function StockScreener({ onSelectTicker }: Props) {
   const handlePreset = (preset: Preset) => {
     const next = activePreset?.id === preset.id ? null : preset;
     setActivePreset(next);
-    if (next) runScreener(next, 1);
+    if (next) runScreener(next);
   };
 
   const handleReset = () => {
@@ -209,9 +207,10 @@ export default function StockScreener({ onSelectTicker }: Props) {
   const handleSort = (col: string) => {
     if (sortCol === col) setSortAsc(a => !a);
     else { setSortCol(col); setSortAsc(true); }
+    setDisplayPage(1);
   };
 
-  const displayRows = result
+  const sortedRows = result
     ? sortCol
       ? [...result.rows].sort((a, b) => {
           const av = parseFloat((a[sortCol] || '').replace(/[^0-9.-]/g, '')) || 0;
@@ -221,6 +220,8 @@ export default function StockScreener({ onSelectTicker }: Props) {
       : result.rows
     : [];
 
+  const pageCount = Math.ceil(sortedRows.length / PAGE_SIZE);
+  const displayRows = sortedRows.slice((displayPage - 1) * PAGE_SIZE, displayPage * PAGE_SIZE);
   const TABLE_COLS = result ? DISPLAY_COLS.filter(col => result.headers.includes(col)) : [];
 
   return (
@@ -276,7 +277,7 @@ export default function StockScreener({ onSelectTicker }: Props) {
           </button>
         )}
         <button
-          onClick={() => runScreener(activePreset, 1)}
+          onClick={() => runScreener(activePreset)}
           disabled={loading || !activePreset}
           className="flex items-center gap-2 px-4 py-1.5 border transition-all text-xs font-semibold disabled:opacity-50 ml-auto"
           style={{ background: 'var(--accent)', borderColor: 'var(--accent)', color: 'var(--text-0)' }}
@@ -315,42 +316,37 @@ export default function StockScreener({ onSelectTicker }: Props) {
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>
-                {result.total > 0
-                  ? `${result.total.toLocaleString()} stocks found`
-                  : result.rows.length > 0
-                  ? `${result.rows.length} stocks found`
-                  : 'No results'}
+                {result.total > 0 ? `${result.total.toLocaleString()} stocks found` : 'No results'}
               </span>
-              {result.total > 0 && result.totalPages > 1 && (
+              {pageCount > 1 && (
                 <span className="text-xs" style={{ color: 'var(--text-5)' }}>
-                  page {result.page} of {result.totalPages}
+                  page {displayPage} of {pageCount}
                 </span>
               )}
             </div>
 
             {/* Pagination controls */}
-            {result.totalPages > 1 && (
+            {pageCount > 1 && (
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => runScreener(activePreset, Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1 || loading}
+                  onClick={() => setDisplayPage(p => Math.max(1, p - 1))}
+                  disabled={displayPage <= 1}
                   className="p-1.5 border transition-all disabled:opacity-40"
                   style={{ borderColor: 'var(--bg-1)', color: 'var(--text-4)', background: 'var(--bg-4)' }}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                {Array.from({ length: Math.min(5, result.totalPages) }, (_, i) => {
-                  const pg = Math.max(1, Math.min(result.totalPages - 4, currentPage - 2)) + i;
+                {Array.from({ length: Math.min(5, pageCount) }, (_, i) => {
+                  const pg = Math.max(1, Math.min(pageCount - 4, displayPage - 2)) + i;
                   return (
                     <button
                       key={pg}
-                      onClick={() => runScreener(activePreset, pg)}
-                      disabled={loading}
+                      onClick={() => setDisplayPage(pg)}
                       className="min-w-[28px] px-1.5 py-1 border text-xs transition-all"
                       style={{
-                        borderColor: pg === currentPage ? 'var(--accent)' : 'var(--bg-1)',
-                        background: pg === currentPage ? 'var(--accent)' : 'var(--bg-4)',
-                        color: pg === currentPage ? 'var(--text-0)' : 'var(--text-4)',
+                        borderColor: pg === displayPage ? 'var(--accent)' : 'var(--bg-1)',
+                        background: pg === displayPage ? 'var(--accent)' : 'var(--bg-4)',
+                        color: pg === displayPage ? 'var(--text-0)' : 'var(--text-4)',
                       }}
                     >
                       {pg}
@@ -358,8 +354,8 @@ export default function StockScreener({ onSelectTicker }: Props) {
                   );
                 })}
                 <button
-                  onClick={() => runScreener(activePreset, Math.min(result.totalPages, currentPage + 1))}
-                  disabled={currentPage >= result.totalPages || loading}
+                  onClick={() => setDisplayPage(p => Math.min(pageCount, p + 1))}
+                  disabled={displayPage >= pageCount}
                   className="p-1.5 border transition-all disabled:opacity-40"
                   style={{ borderColor: 'var(--bg-1)', color: 'var(--text-4)', background: 'var(--bg-4)' }}
                 >
