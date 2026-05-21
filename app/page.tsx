@@ -34,8 +34,7 @@ const TradingSignals = dynamic(() => import('@/components/TradingSignals'), { ss
 const Sidebar = dynamic(() => import('@/components/Sidebar'), { ssr: false });
 const CompanyInfo = dynamic(() => import('@/components/CompanyInfo'), { ssr: false });
 const MLPredictions = dynamic(() => import('@/components/MLPredictions'), { ssr: false });
-const PatternAnalysis = dynamic(() => import('@/components/PatternAnalysis'), { ssr: false });
-const PatternSettingsPanel = dynamic(() => import('@/components/PatternSettingsPanel'), { ssr: false });
+const PatternPanel = dynamic(() => import('@/components/PatternPanel'), { ssr: false });
 const CorrelationHeatmap = dynamic(() => import('@/components/CorrelationHeatmap'), { ssr: false });
 const RedditSentiment = dynamic(() => import('@/components/RedditSentiment'), { ssr: false });
 const ApeWisdomMentions = dynamic(() => import('@/components/ApeWisdomMentions'), { ssr: false });
@@ -1745,28 +1744,19 @@ export default function Home() {
                 currentPreset={mlPreset}
               />
 
-              {/* Pattern Settings Panel - Mobile */}
+              {/* Pattern Panel - Mobile */}
               {showPatterns && (
-                <PatternSettingsPanel
+                <PatternPanel
+                  patterns={chartPatterns}
+                  startDate={visibleDateRange?.startDate}
+                  endDate={visibleDateRange?.endDate}
+                  onRefreshPatterns={detectPatterns}
+                  isDetecting={patternDetecting}
                   settings={patternSettings}
                   onSettingsChange={handlePatternSettingsChange}
                   onPresetChange={handlePatternPresetChange}
                   currentPreset={patternPreset}
                   inlineMobile={true}
-                  patternCount={chartPatterns.length}
-                  isDetecting={patternDetecting}
-                />
-              )}
-
-              {/* Pattern Analysis - Mobile */}
-              {showPatterns && chartPatterns.length > 0 && (
-                <PatternAnalysis
-                  patterns={chartPatterns}
-                  startDate={visibleDateRange?.startDate}
-                  endDate={visibleDateRange?.endDate}
-                  inlineMobile={true}
-                  onRefreshPatterns={detectPatterns}
-                  isDetecting={patternDetecting}
                 />
               )}
 
@@ -1875,29 +1865,19 @@ export default function Home() {
               />
             </div>
 
-            {/* Pattern Settings Panel - Below ML Settings */}
+            {/* Pattern Panel - Combined settings + analysis */}
             {showPatterns && (
               <div className="mt-4">
-                <PatternSettingsPanel
-                  settings={patternSettings}
-                  onSettingsChange={handlePatternSettingsChange}
-                  onPresetChange={handlePatternPresetChange}
-                  currentPreset={patternPreset}
-                  patternCount={chartPatterns.length}
-                  isDetecting={patternDetecting}
-                />
-              </div>
-            )}
-
-            {/* Pattern Analysis - Below Pattern Settings */}
-            {showPatterns && chartPatterns.length > 0 && (
-              <div className="mt-4">
-                <PatternAnalysis
+                <PatternPanel
                   patterns={chartPatterns}
                   startDate={visibleDateRange?.startDate}
                   endDate={visibleDateRange?.endDate}
                   onRefreshPatterns={detectPatterns}
                   isDetecting={patternDetecting}
+                  settings={patternSettings}
+                  onSettingsChange={handlePatternSettingsChange}
+                  onPresetChange={handlePatternPresetChange}
+                  currentPreset={patternPreset}
                 />
               </div>
             )}
