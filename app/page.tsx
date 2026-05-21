@@ -1116,8 +1116,6 @@ export default function Home() {
                     style={{
                       background: 'var(--bg-3)',
                       borderColor: 'var(--bg-1)',
-                      borderLeftColor: 'var(--accent)',
-                      borderLeftWidth: '3px',
                       color: 'var(--text-2)',
                       outline: 'none'
                     }}
@@ -1180,7 +1178,7 @@ export default function Home() {
                   <div className="relative" ref={historyRef}>
                     <button
                       onClick={() => setShowHistory(prev => !prev)}
-                      className="px-3 py-2.5 font-medium transition-all cursor-pointer flex items-center gap-2 border"
+                      className="px-3 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
                       style={{
                         background: 'var(--bg-3)',
                         borderColor: 'var(--bg-1)',
@@ -1250,7 +1248,7 @@ export default function Home() {
                 {/* Screener Button */}
                 <button
                   onClick={() => setShowScreener(prev => !prev)}
-                  className="px-3 py-2.5 font-medium transition-all cursor-pointer flex items-center gap-2 border"
+                  className="px-3 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
                   style={{
                     background: showScreener ? 'var(--purple-1)' : 'var(--bg-3)',
                     borderColor: showScreener ? 'var(--purple-1)' : 'var(--bg-1)',
@@ -1263,7 +1261,7 @@ export default function Home() {
 
                 {/* Market Status */}
                 {!loading && stockData.length > 0 && (
-                  <div className="flex items-center gap-1.5 px-2 py-2 border-2 ml-auto" style={{
+                  <div className="flex items-center gap-1.5 px-2 py-3 border-2 ml-auto" style={{
                     borderColor: marketState === 'REGULAR' ? 'var(--success)' : 'var(--text-4)',
                     background: 'var(--bg-3)',
                   }}>
