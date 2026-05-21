@@ -60,8 +60,10 @@ function buildPatternSvg(
     const x2 = toX(pattern.endDate);
     // Allow one end to be off-screen but not both
     if (x1 === null && x2 === null) return;
-    const px1 = x1 ?? (x2! - 1);
-    const px2 = x2 ?? (x1! + 1);
+    // If one end is off-screen, extend well past the edge so shapes render correctly
+    // and let the SVG clip-path handle the boundary
+    const px1 = x1 ?? -9999;
+    const px2 = x2 ??  9999;
 
     const col = PAT_COLORS[pattern.direction];
     const label = `${pattern.label} ${(pattern.confidence * 100).toFixed(0)}%`;
@@ -531,7 +533,7 @@ export default function LightweightChartWrapper({
       </div>
 
       {/* Chart + SVG pattern overlay */}
-      <div className="relative" style={{ height: CHART_HEIGHT }}>
+      <div className="relative" style={{ height: CHART_HEIGHT, overflow: 'hidden' }}>
         <div ref={chartDivRef} style={{ height: '100%', width: '100%' }} />
 
         {enablePatterns && patternElems.length > 0 && (
@@ -539,7 +541,7 @@ export default function LightweightChartWrapper({
             style={{
               position: 'absolute', top: 0, left: 0,
               width: '100%', height: '100%',
-              pointerEvents: 'none', overflow: 'visible',
+              pointerEvents: 'none', overflow: 'hidden',
             }}
           >
             {patternElems}
