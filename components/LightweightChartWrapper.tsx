@@ -17,6 +17,11 @@ interface Props {
   enablePatterns?: boolean;
   forecastData?: ForecastPoint[];
   showForecast?: boolean;
+  showFibonacci?: boolean;
+  freqOptions?: { id: string; label: string; description?: string }[];
+  activeFreqId?: string;
+  onFreqChange?: (id: string) => void;
+  freqLoading?: boolean;
 }
 
 const isIntraday = (interval: string) =>
@@ -307,6 +312,53 @@ function buildPatternSvg(
   return elems;
 }
 
+const FIB_LEVELS = [
+  { ratio: 0,     label: '0%',    color: 'rgba(239,83,80,0.85)' },
+  { ratio: 0.236, label: '23.6%', color: 'rgba(251,191,36,0.85)' },
+  { ratio: 0.382, label: '38.2%', color: 'rgba(167,139,250,0.85)' },
+  { ratio: 0.5,   label: '50%',   color: 'rgba(200,200,200,0.7)' },
+  { ratio: 0.618, label: '61.8%', color: 'rgba(74,222,128,0.85)' },
+  { ratio: 0.786, label: '78.6%', color: 'rgba(34,197,94,0.85)' },
+  { ratio: 1,     label: '100%',  color: 'rgba(38,166,154,0.85)' },
+];
+
+function buildFibSvg(series: any, data: ChartDataPoint[]): React.ReactNode[] {
+  if (!data.length || !series) return [];
+
+  // Use last 200 bars to detect the relevant swing range
+  const recent = data.slice(-200);
+  const highs  = recent.map(d => d.high  || d.close);
+  const lows   = recent.map(d => d.low   || d.close);
+
+  const highIdx  = highs.indexOf(Math.max(...highs));
+  const lowIdx   = lows.indexOf(Math.min(...lows));
+  const swingH   = Math.max(...highs);
+  const swingL   = Math.min(...lows);
+  const range    = swingH - swingL;
+  if (range <= 0) return [];
+
+  // Uptrend: low came before high → retrace from high down
+  const uptrend = lowIdx < highIdx;
+
+  return FIB_LEVELS.map(({ ratio, label, color }) => {
+    const price = uptrend ? swingH - range * ratio : swingL + range * ratio;
+    const y = series.priceToCoordinate(price);
+    if (y === null) return null;
+    const txt = `${label}  $${price.toFixed(2)}`;
+    return (
+      <g key={label}>
+        <line x1={0} y1={y} x2={9999} y2={y}
+          stroke={color} strokeWidth={1} strokeDasharray="5 4" opacity={0.7} />
+        <rect x={4} y={y - 10} width={txt.length * 5.6 + 6} height={13}
+          fill="rgba(0,0,0,0.55)" rx={2} />
+        <text x={7} y={y - 3} fill={color} fontSize={9} fontWeight={600} fontFamily={FONT} dominantBaseline="middle">
+          {txt}
+        </text>
+      </g>
+    );
+  }).filter(Boolean) as React.ReactNode[];
+}
+
 export default function LightweightChartWrapper({
   data,
   chartType,
@@ -319,6 +371,11 @@ export default function LightweightChartWrapper({
   enablePatterns = false,
   forecastData = [],
   showForecast = true,
+  showFibonacci = false,
+  freqOptions,
+  activeFreqId,
+  onFreqChange,
+  freqLoading = false,
 }: Props) {
   const chartDivRef  = useRef<HTMLDivElement>(null);
   const chartObjRef  = useRef<any>(null);
@@ -329,22 +386,31 @@ export default function LightweightChartWrapper({
 
   const [activeRange,  setActiveRange]  = useState<number | 'all'>(180);
   const [patternElems, setPatternElems] = useState<React.ReactNode[]>([]);
+  const [fibElems,     setFibElems]     = useState<React.ReactNode[]>([]);
 
-  // ── Pattern re-render (called on zoom/pan AND when patterns/data changes) ──
+  // ── Overlay re-render (patterns + fibonacci, called on zoom/pan AND when deps change) ──
   useEffect(() => {
     renderRef.current = () => {
       const chart  = chartObjRef.current;
       const series = seriesRef.current;
+
+      // Patterns
       if (!chart || !series || !enablePatterns || !patterns.length) {
         setPatternElems([]);
-        return;
+      } else {
+        setPatternElems(buildPatternSvg(chart, series, patterns, data));
       }
-      setPatternElems(buildPatternSvg(chart, series, patterns, data));
+
+      // Fibonacci
+      if (!series || !showFibonacci || !data.length) {
+        setFibElems([]);
+      } else {
+        setFibElems(buildFibSvg(series, data));
+      }
     };
 
-    // Re-render immediately whenever patterns or data changes
     renderRef.current();
-  }, [patterns, enablePatterns, data]);
+  }, [patterns, enablePatterns, data, showFibonacci]);
 
   // ── Chart setup ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -514,31 +580,53 @@ export default function LightweightChartWrapper({
 
   return (
     <div className="w-full">
-      {/* Range buttons */}
-      <div className="flex gap-2 mb-4 flex-wrap items-center">
-        <div className="flex gap-2 flex-wrap">
-          {RANGES.map(({ label, days }) => (
-            <button
-              key={label}
-              onClick={() => handleRange(days)}
-              className="px-3 py-1 text-xs font-medium border transition-all"
-              style={{
-                background:   activeRange === days ? 'var(--accent)' : 'var(--bg-3)',
-                borderColor:  activeRange === days ? 'var(--accent)' : 'var(--bg-1)',
-                color:        activeRange === days ? 'var(--text-0)' : 'var(--text-3)',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Range + Freq buttons on same row */}
+      <div className="flex gap-1 mb-4 flex-wrap items-center">
+        {RANGES.map(({ label, days }) => (
+          <button
+            key={label}
+            onClick={() => handleRange(days)}
+            className="px-3 py-1 text-xs font-medium border transition-all"
+            style={{
+              background:  activeRange === days ? 'var(--accent)' : 'var(--bg-3)',
+              borderColor: activeRange === days ? 'var(--accent)' : 'var(--bg-1)',
+              color:       activeRange === days ? 'var(--text-0)' : 'var(--text-3)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+
+        {freqOptions && freqOptions.length > 0 && (
+          <>
+            <div className="h-4 w-px mx-1" style={{ background: 'var(--bg-1)' }} />
+            <span className="text-[10px] font-semibold" style={{ color: 'var(--text-4)' }}>FREQ:</span>
+            {freqOptions.map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => onFreqChange?.(opt.id)}
+                disabled={freqLoading && opt.id === activeFreqId}
+                title={opt.description}
+                className="px-3 py-1 text-xs font-medium border transition-all"
+                style={{
+                  background:  activeFreqId === opt.id ? 'var(--accent)' : 'var(--bg-3)',
+                  borderColor: activeFreqId === opt.id ? 'var(--accent)' : 'var(--bg-1)',
+                  color:       activeFreqId === opt.id ? 'var(--text-0)' : 'var(--text-3)',
+                  opacity:     freqLoading && opt.id === activeFreqId ? 0.7 : 1,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Chart + SVG pattern overlay */}
       <div className="relative" style={{ height: CHART_HEIGHT, overflow: 'hidden' }}>
         <div ref={chartDivRef} style={{ height: '100%', width: '100%' }} />
 
-        {enablePatterns && patternElems.length > 0 && (
+        {(enablePatterns && patternElems.length > 0) || (showFibonacci && fibElems.length > 0) ? (
           <svg
             style={{
               position: 'absolute', top: 0, left: 0,
@@ -546,9 +634,10 @@ export default function LightweightChartWrapper({
               pointerEvents: 'none', overflow: 'hidden',
             }}
           >
-            {patternElems}
+            {showFibonacci && fibElems}
+            {enablePatterns && patternElems}
           </svg>
-        )}
+        ) : null}
       </div>
     </div>
   );

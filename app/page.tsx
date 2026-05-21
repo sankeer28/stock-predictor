@@ -50,7 +50,10 @@ const MarketMovers = dynamic(() => import('@/components/MarketMovers'), { ssr: f
 const Watchlist = dynamic(() => import('@/components/Watchlist'), { ssr: false });
 const OptionsChain = dynamic(() => import('@/components/OptionsChain'), { ssr: false });
 const PriceAlerts = dynamic(() => import('@/components/PriceAlerts'), { ssr: false });
-const StockScreener = dynamic(() => import('@/components/StockScreener'), { ssr: false });
+const StockScreener       = dynamic(() => import('@/components/StockScreener'),       { ssr: false });
+const DailyReturnHeatmap  = dynamic(() => import('@/components/DailyReturnHeatmap'),  { ssr: false });
+const VolumeProfile       = dynamic(() => import('@/components/VolumeProfile'),       { ssr: false });
+const EarningsHistory     = dynamic(() => import('@/components/EarningsHistory'),     { ssr: false });
 
 // Lazy load heavy ML libraries only when needed
 const loadMLLibraries = async () => {
@@ -198,7 +201,8 @@ export default function Home() {
   const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
   const [useLightweightChart, setUseLightweightChart] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
-  const [showPatterns, setShowPatterns] = useState(true);
+  const [showPatterns,   setShowPatterns]   = useState(true);
+  const [showFibonacci,  setShowFibonacci]  = useState(false);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
   const [dataInterval, setDataInterval] = useState<string>(DEFAULT_FREQUENCY_OPTION.interval);
   const [visibleDateRange, setVisibleDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
@@ -1354,6 +1358,7 @@ export default function Home() {
                       { label: 'Volume', checked: showVolume, set: setShowVolume },
                       { label: 'RSI/MACD', checked: showIndicators, set: setShowIndicators },
                       { label: 'Patterns', checked: showPatterns, set: setShowPatterns },
+                      { label: 'Fibonacci', checked: showFibonacci, set: setShowFibonacci },
                     ] as const).map(({ label, checked, set }) => (
                       <label key={label} className="flex items-center gap-1 cursor-pointer px-2 py-1 border transition-all" style={{
                         background: checked ? 'var(--bg-3)' : 'var(--bg-4)',
@@ -1373,9 +1378,8 @@ export default function Home() {
                   </div>}
                 </div>
 
-                {/* Compact Controls */}
-                <div className="overflow-x-auto pb-0.5 -mb-0.5">
-                <div className="flex items-center gap-2 min-w-max">
+                {/* Compact Controls - Row 1: chart type, forecast, days, CSV */}
+                <div className="flex items-center gap-2 flex-wrap">
                   {/* Finviz toggle */}
                   {finvizCharts && (
                     <>
@@ -1511,30 +1515,6 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
-
-                  {/* Frequency */}
-                  <span className="text-[10px] font-semibold" style={{ color: 'var(--text-4)' }}>FREQ:</span>
-                  {DATA_FREQUENCY_OPTIONS.map(option => {
-                    const isActive = option.id === dataFrequencyId;
-                    return (
-                      <button
-                        key={option.id}
-                        onClick={() => handleFrequencyChange(option.id)}
-                        className="px-2 py-1 text-[10px] font-semibold border transition-all"
-                        style={{
-                          background: isActive ? 'var(--accent)' : 'var(--bg-4)',
-                          borderColor: isActive ? 'var(--accent)' : 'var(--bg-1)',
-                          color: isActive ? 'var(--text-0)' : 'var(--text-3)',
-                          opacity: loading && isActive ? 0.7 : 1,
-                        }}
-                        disabled={loading && isActive}
-                        title={option.description}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
                   {/* Export CSV */}
                   {chartData.length > 0 && (
                     <>
@@ -1556,7 +1536,7 @@ export default function Home() {
                   </>
                   )}
                 </div>
-                </div>
+
               </div>
 
               {showFinvizChart && finvizCharts ? (
@@ -1581,6 +1561,11 @@ export default function Home() {
                     enablePatterns={showPatterns}
                     forecastData={useProphetForecast ? prophetForecastData : forecastData}
                     showForecast={true}
+                    showFibonacci={showFibonacci}
+                    freqOptions={DATA_FREQUENCY_OPTIONS.map(o => ({ id: o.id, label: o.label, description: o.description }))}
+                    activeFreqId={dataFrequencyId}
+                    onFreqChange={(id) => handleFrequencyChange(id as typeof dataFrequencyId)}
+                    freqLoading={loading}
                   />
                 ) : (
                   <StockChart
@@ -1619,6 +1604,12 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Volume Profile + Daily Return Heatmap */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+              <VolumeProfile chartData={chartData} currentPrice={currentPrice} />
+              <DailyReturnHeatmap chartData={chartData} />
+            </div>
 
             {/* Forecast Insights */}
             {forecastInsights && (
@@ -1781,6 +1772,8 @@ export default function Home() {
 
               <EarningsCalendar symbol={symbol} inlineMobile={true} />
 
+              <EarningsHistory symbol={symbol} inlineMobile={true} />
+
               <AnalystRecommendations symbol={symbol} inlineMobile={true} finvizTargets={finvizAnalystTargets} />
 
               <PeerStocks
@@ -1907,6 +1900,10 @@ export default function Home() {
 
             <div className="mt-4">
               <EarningsCalendar symbol={symbol} />
+            </div>
+
+            <div className="mt-4">
+              <EarningsHistory symbol={symbol} />
             </div>
 
             <div className="mt-4">
