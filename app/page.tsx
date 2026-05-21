@@ -195,7 +195,7 @@ export default function Home() {
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
   const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
-  const [useLightweightChart, setUseLightweightChart] = useState(false);
+  const [useLightweightChart, setUseLightweightChart] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
   const [showPatterns, setShowPatterns] = useState(false);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
@@ -981,12 +981,12 @@ export default function Home() {
     fetchData(symbol, { chartOnly: true, frequencyId: nextId });
   };
 
-  const handleVisibleRangeChange = (startDate: string, endDate: string) => {
+  const handleVisibleRangeChange = React.useCallback((startDate: string, endDate: string) => {
     // Only update visible range if patterns are enabled
     if (showPatterns) {
       setVisibleDateRange({ startDate, endDate });
     }
-  };
+  }, [showPatterns]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

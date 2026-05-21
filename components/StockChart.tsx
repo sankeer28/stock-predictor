@@ -581,7 +581,7 @@ interface StockChartProps {
 }
 
 
-export default function StockChart({
+function StockChart({
   data,
   showMA20 = true,
   showMA50 = true,
@@ -649,6 +649,7 @@ export default function StockChart({
     return { min, max };
   }, [data]);
 
+  const brushRafRef = React.useRef<number | null>(null);
   const [brushKey, setBrushKey] = useState(0);
   const [brushRange, setBrushRange] = useState<{ startIndex: number; endIndex: number }>({
     startIndex: Math.max(0, historicalDataLength - 30), // Initial placeholder; updated via effect below
@@ -1379,13 +1380,12 @@ export default function StockChart({
             startIndex={brushRange.startIndex}
             endIndex={brushRange.endIndex}
             onChange={(range) => {
-              // Update brush range when manually dragging
               if (range && range.startIndex !== undefined && range.endIndex !== undefined) {
-                setBrushRange({
-                  startIndex: range.startIndex,
-                  endIndex: range.endIndex,
+                if (brushRafRef.current !== null) cancelAnimationFrame(brushRafRef.current);
+                brushRafRef.current = requestAnimationFrame(() => {
+                  setBrushRange({ startIndex: range.startIndex, endIndex: range.endIndex });
+                  setActiveRange(null);
                 });
-                setActiveRange(null); // Clear preset selection
               }
             }}
             travellerWidth={10}
@@ -1400,6 +1400,7 @@ export default function StockChart({
               fill="oklch(70% 0.12 170)"
               opacity={0.3}
               name="Volume"
+              isAnimationActive={false}
             />
           )}
 
@@ -1450,6 +1451,8 @@ export default function StockChart({
                 fillOpacity={0.1}
                 name="BB Upper"
                 strokeDasharray="3 3"
+                isAnimationActive={false}
+                dot={false}
               />
               <Area
                 yAxisId="price"
@@ -1460,6 +1463,8 @@ export default function StockChart({
                 fillOpacity={0.1}
                 name="BB Lower"
                 strokeDasharray="3 3"
+                isAnimationActive={false}
+                dot={false}
               />
             </>
           )}
@@ -1473,6 +1478,7 @@ export default function StockChart({
               stroke="oklch(75% 0.12 90)"
               strokeWidth={2}
               dot={false}
+              isAnimationActive={false}
               name="MA 50"
             />
           )}
@@ -1484,6 +1490,7 @@ export default function StockChart({
               stroke="oklch(70% 0.13 0)"
               strokeWidth={2}
               dot={false}
+              isAnimationActive={false}
               name="MA 20"
             />
           )}
@@ -1497,6 +1504,7 @@ export default function StockChart({
               stroke="oklch(70% 0.11 215)"
               strokeWidth={3}
               dot={false}
+              isAnimationActive={false}
               name="Close Price"
             />
           ) : (
@@ -1619,6 +1627,8 @@ export default function StockChart({
                 fill="oklch(70% 0.13 0)"
                 fillOpacity={0.15}
                 name="Confidence Interval"
+                isAnimationActive={false}
+                dot={false}
               />
               <Area
                 yAxisId="price"
@@ -1627,6 +1637,8 @@ export default function StockChart({
                 stroke="none"
                 fill="var(--bg-4)"
                 fillOpacity={1}
+                isAnimationActive={false}
+                dot={false}
               />
 
               {/* Upper and Lower Bounds - dotted lines */}
@@ -1639,6 +1651,7 @@ export default function StockChart({
                 strokeDasharray="3 3"
                 strokeOpacity={0.7}
                 dot={false}
+                isAnimationActive={false}
                 name="Upper Bound"
               />
               <Line
@@ -1650,6 +1663,7 @@ export default function StockChart({
                 strokeDasharray="3 3"
                 strokeOpacity={0.7}
                 dot={false}
+                isAnimationActive={false}
                 name="Lower Bound"
               />
 
@@ -1662,6 +1676,7 @@ export default function StockChart({
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={false}
+                isAnimationActive={false}
                 name="Forecast"
               />
             </>
@@ -1672,3 +1687,5 @@ export default function StockChart({
     </div>
   );
 }
+
+export default React.memo(StockChart);
