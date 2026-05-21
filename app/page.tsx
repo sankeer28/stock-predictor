@@ -1544,6 +1544,8 @@ export default function Home() {
                     chartType={chartType}
                     showVolume={showVolume}
                     dataInterval={dataInterval}
+                    patterns={showPatterns ? chartPatterns : []}
+                    enablePatterns={showPatterns}
                   />
                 ) : (
                   <StockChart
