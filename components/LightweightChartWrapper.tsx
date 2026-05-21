@@ -327,7 +327,7 @@ export default function LightweightChartWrapper({
   // Stable ref so subscriptions always call the latest render
   const renderRef    = useRef<() => void>(() => {});
 
-  const [activeRange,  setActiveRange]  = useState<number | 'all'>('all');
+  const [activeRange,  setActiveRange]  = useState<number | 'all'>(180);
   const [patternElems, setPatternElems] = useState<React.ReactNode[]>([]);
 
   // ── Pattern re-render (called on zoom/pan AND when patterns/data changes) ──
@@ -479,8 +479,10 @@ export default function LightweightChartWrapper({
         }
       }
 
-      chart.timeScale().fitContent();
-      setActiveRange('all');
+      const nowTs  = Math.floor(Date.now() / 1000) as any;
+      const fromTs = (nowTs - 180 * 86400) as any;
+      chart.timeScale().setVisibleRange({ from: fromTs, to: nowTs });
+      setActiveRange(180);
 
       // Re-render pattern overlay whenever the user zooms or pans
       const onUpdate = () => renderRef.current();

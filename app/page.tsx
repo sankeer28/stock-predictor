@@ -137,7 +137,7 @@ const DATA_FREQUENCY_OPTIONS = [
 type DataFrequencyOption = typeof DATA_FREQUENCY_OPTIONS[number];
 type DataFrequencyId = DataFrequencyOption['id'];
 
-const DEFAULT_DATA_FREQUENCY_ID: DataFrequencyId = '1h';
+const DEFAULT_DATA_FREQUENCY_ID: DataFrequencyId = '1d';
 const DEFAULT_FREQUENCY_OPTION =
   DATA_FREQUENCY_OPTIONS.find(option => option.id === DEFAULT_DATA_FREQUENCY_ID)!;
 
@@ -199,7 +199,7 @@ export default function Home() {
   const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
   const [useLightweightChart, setUseLightweightChart] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
-  const [showPatterns, setShowPatterns] = useState(false);
+  const [showPatterns, setShowPatterns] = useState(true);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
   const [dataInterval, setDataInterval] = useState<string>(DEFAULT_FREQUENCY_OPTION.interval);
   const [visibleDateRange, setVisibleDateRange] = useState<{ startDate: string; endDate: string } | null>(null);
