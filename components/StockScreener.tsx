@@ -20,6 +20,7 @@ import {
   Wallet,
   Shield,
   Flame,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -154,7 +155,11 @@ function changeColor(val: string) {
   return n > 0 ? 'var(--green-1)' : n < 0 ? 'var(--red-1)' : 'var(--text-4)';
 }
 
-const DISPLAY_COLS = ['Ticker', 'Company', 'Price', 'Change', 'Volume', 'Mkt Cap', 'Fwd P/E', '52W Chg'];
+const ALL_COLS = [
+  'Ticker', 'Price', 'Change', 'Volume', 'P/E', 'P/B', 'EPS', 'Div Yield', '52W High', '52W Low', '52W Chg',
+];
+
+const DEFAULT_VISIBLE = new Set(ALL_COLS);
 
 // ────────────────────────────────────────────────────────────
 // Main Component
@@ -168,6 +173,8 @@ export default function StockScreener({ onSelectTicker }: Props) {
   const [displayPage, setDisplayPage] = useState(1);
   const [sortCol, setSortCol] = useState<string>('');
   const [sortAsc, setSortAsc] = useState(true);
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set(DEFAULT_VISIBLE));
+  const [showColPicker, setShowColPicker] = useState(false);
 
   const runScreener = useCallback(async (preset: Preset | null) => {
     if (!preset) return;
@@ -210,6 +217,15 @@ export default function StockScreener({ onSelectTicker }: Props) {
     setDisplayPage(1);
   };
 
+  const toggleCol = (col: string) => {
+    setVisibleCols(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col);
+      else next.add(col);
+      return next;
+    });
+  };
+
   const sortedRows = result
     ? sortCol
       ? [...result.rows].sort((a, b) => {
@@ -222,7 +238,9 @@ export default function StockScreener({ onSelectTicker }: Props) {
 
   const pageCount = Math.ceil(sortedRows.length / PAGE_SIZE);
   const displayRows = sortedRows.slice((displayPage - 1) * PAGE_SIZE, displayPage * PAGE_SIZE);
-  const TABLE_COLS = result ? DISPLAY_COLS.filter(col => result.headers.includes(col)) : [];
+  const TABLE_COLS = result
+    ? ALL_COLS.filter(col => result.headers.includes(col) && visibleCols.has(col))
+    : [];
 
   return (
     <div className="card" style={{ position: 'relative' }}>
@@ -277,6 +295,24 @@ export default function StockScreener({ onSelectTicker }: Props) {
           </button>
         )}
         <button
+          onClick={() => setShowColPicker(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 border text-xs transition-all"
+          style={{
+            background: showColPicker ? 'var(--bg-2)' : 'var(--bg-4)',
+            borderColor: showColPicker ? 'var(--accent)' : 'var(--bg-1)',
+            color: showColPicker ? 'var(--accent)' : 'var(--text-4)',
+          }}
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          Columns
+          <span
+            className="px-1.5 py-0.5 text-[9px] font-bold rounded-full"
+            style={{ background: 'var(--bg-1)', color: 'var(--text-5)' }}
+          >
+            {visibleCols.size - 1}
+          </span>
+        </button>
+        <button
           onClick={() => runScreener(activePreset)}
           disabled={loading || !activePreset}
           className="flex items-center gap-2 px-4 py-1.5 border transition-all text-xs font-semibold disabled:opacity-50 ml-auto"
@@ -298,6 +334,34 @@ export default function StockScreener({ onSelectTicker }: Props) {
           )}
         </button>
       </div>
+
+      {/* ── Column picker ────────────────────────────────── */}
+      {showColPicker && (
+        <div className="mb-3 p-3 border" style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)' }}>
+          <div className="text-[10px] uppercase tracking-widest mb-2" style={{ color: 'var(--text-5)' }}>
+            Visible Columns
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {ALL_COLS.filter(c => c !== 'Ticker').map(col => {
+              const on = visibleCols.has(col);
+              return (
+                <button
+                  key={col}
+                  onClick={() => toggleCol(col)}
+                  className="px-2.5 py-1 border text-[10px] transition-all"
+                  style={{
+                    background: on ? 'rgba(100,200,100,0.12)' : 'var(--bg-4)',
+                    borderColor: on ? 'var(--accent)' : 'var(--bg-1)',
+                    color: on ? 'var(--accent)' : 'var(--text-5)',
+                  }}
+                >
+                  {col}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Error ────────────────────────────────────── */}
       {error && (
@@ -441,18 +505,6 @@ export default function StockScreener({ onSelectTicker }: Props) {
                                 style={{ color: changeColor(val), fontVariantNumeric: 'tabular-nums' }}
                               >
                                 {val}
-                              </td>
-                            );
-                          }
-
-                          if (col === 'Company') {
-                            return (
-                              <td
-                                key={col}
-                                className="px-3 py-2 max-w-[180px]"
-                                style={{ color: 'var(--text-3)' }}
-                              >
-                                <span className="truncate block" title={val}>{val}</span>
                               </td>
                             );
                           }

@@ -13,18 +13,14 @@ function fmtVolume(v: number): string {
   return String(v);
 }
 
-function fmtCap(v: number): string {
-  if (v >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
-  if (v >= 1e9)  return '$' + (v / 1e9).toFixed(1)  + 'B';
-  if (v >= 1e6)  return '$' + (v / 1e6).toFixed(0)  + 'M';
-  return '$' + v;
-}
 
 function fmtPct(v: number): string {
   return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
 }
 
-const HEADERS = ['Ticker', 'Company', 'Price', 'Change', 'Volume', 'Mkt Cap', 'Fwd P/E', '52W Chg'];
+const HEADERS = [
+  'Ticker', 'Price', 'Change', 'Volume', 'P/E', 'P/B', 'EPS', 'Div Yield', '52W High', '52W Low', '52W Chg',
+];
 
 export async function GET(request: NextRequest) {
   const sp    = request.nextUrl.searchParams;
@@ -54,14 +50,17 @@ export async function GET(request: NextRequest) {
     const quotes: any[] = result.quotes ?? [];
 
     const rows = quotes.map((q: any) => ({
-      Ticker:    q.symbol     || '',
-      Company:   q.shortName  || q.displayName || q.longName || '',
-      Price:     q.regularMarketPrice          != null ? `$${Number(q.regularMarketPrice).toFixed(2)}`       : '-',
-      Change:    q.regularMarketChangePercent  != null ? fmtPct(q.regularMarketChangePercent)                : '-',
-      Volume:    q.regularMarketVolume         != null ? fmtVolume(q.regularMarketVolume)                    : '-',
-      'Mkt Cap': q.marketCap                  != null ? fmtCap(q.marketCap)                                 : '-',
-      'Fwd P/E': q.forwardPE                  != null ? Number(q.forwardPE).toFixed(1)                      : '-',
-      '52W Chg': q.fiftyTwoWeekChangePercent  != null ? fmtPct(q.fiftyTwoWeekChangePercent)                 : '-',
+      Ticker:      q.symbol || '',
+      Price:       q.regularMarketPrice          != null ? `$${Number(q.regularMarketPrice).toFixed(2)}`          : '-',
+      Change:      q.regularMarketChangePercent  != null ? fmtPct(q.regularMarketChangePercent)                   : '-',
+      Volume:      q.regularMarketVolume         != null ? fmtVolume(q.regularMarketVolume)                       : '-',
+      'P/E':       q.trailingPE                 != null ? Number(q.trailingPE).toFixed(1)                        : '-',
+      'P/B':       q.priceToBook                != null ? Number(q.priceToBook).toFixed(2)                       : '-',
+      'EPS':       q.epsTrailingTwelveMonths    != null ? `$${Number(q.epsTrailingTwelveMonths).toFixed(2)}`     : '-',
+      'Div Yield': q.trailingAnnualDividendYield != null ? (Number(q.trailingAnnualDividendYield) * 100).toFixed(2) + '%' : '-',
+      '52W High':  q.fiftyTwoWeekHigh           != null ? `$${Number(q.fiftyTwoWeekHigh).toFixed(2)}`           : '-',
+      '52W Low':   q.fiftyTwoWeekLow            != null ? `$${Number(q.fiftyTwoWeekLow).toFixed(2)}`            : '-',
+      '52W Chg':   q.fiftyTwoWeekChangePercent  != null ? fmtPct(q.fiftyTwoWeekChangePercent)                   : '-',
     }));
 
     return NextResponse.json(
