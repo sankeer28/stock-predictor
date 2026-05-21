@@ -14,6 +14,7 @@ import type { SearchHistoryItem } from '@/components/Sidebar';
 import { exportToCSV } from '@/lib/exportData';
 
 // Lazy load heavy components with dynamic imports
+const LightweightChartWrapper = dynamic(() => import('@/components/LightweightChartWrapper'), { ssr: false });
 const StockChart = dynamic(() => import('@/components/StockChart'), {
   loading: () => <div className="h-96 flex items-center justify-center" style={{ background: 'var(--bg-3)' }}>
     <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
@@ -194,6 +195,7 @@ export default function Home() {
   const [showIndicators, setShowIndicators] = useState(true);
   const [forecastHorizon, setForecastHorizon] = useState(30);
   const [chartType, setChartType] = useState<'line' | 'candlestick'>('candlestick');
+  const [useLightweightChart, setUseLightweightChart] = useState(false);
   const [showVolume, setShowVolume] = useState(true);
   const [showPatterns, setShowPatterns] = useState(false);
   const [dataFrequencyId, setDataFrequencyId] = useState<DataFrequencyId>(DEFAULT_DATA_FREQUENCY_ID);
@@ -1413,6 +1415,18 @@ export default function Home() {
                     >
                       <div className="flex items-center gap-1.5"><BarChart2 className="w-3.5 h-3.5" /> CANDLE</div>
                     </button>
+                    <button
+                      onClick={() => setUseLightweightChart(v => !v)}
+                      className="px-2 py-1 text-[10px] font-semibold border transition-all"
+                      style={{
+                        background: useLightweightChart ? 'var(--info)' : 'var(--bg-4)',
+                        borderColor: useLightweightChart ? 'var(--info)' : 'var(--bg-1)',
+                        color: useLightweightChart ? 'var(--text-0)' : 'var(--text-3)',
+                      }}
+                      title="Toggle TradingView lightweight-charts renderer"
+                    >
+                      <div className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> TW</div>
+                    </button>
                   </div>
 
                   <div className="h-4 w-px" style={{ background: 'var(--bg-1)' }} />
@@ -1524,19 +1538,28 @@ export default function Home() {
                 />
               ) : (
               <div className="relative">
-                <StockChart
-                  data={chartData}
-                  showMA20={showMA20}
-                  showMA50={showMA50}
-                  showBB={showBB}
-                  forecastData={useProphetForecast ? prophetForecastData : forecastData}
-                  chartType={chartType}
-                  showVolume={showVolume}
-                  patterns={showPatterns ? chartPatterns : []}
-                  enablePatterns={showPatterns}
-                  dataInterval={dataInterval}
-                  onVisibleRangeChange={handleVisibleRangeChange}
-                />
+                {useLightweightChart ? (
+                  <LightweightChartWrapper
+                    data={chartData}
+                    chartType={chartType}
+                    showVolume={showVolume}
+                    dataInterval={dataInterval}
+                  />
+                ) : (
+                  <StockChart
+                    data={chartData}
+                    showMA20={showMA20}
+                    showMA50={showMA50}
+                    showBB={showBB}
+                    forecastData={useProphetForecast ? prophetForecastData : forecastData}
+                    chartType={chartType}
+                    showVolume={showVolume}
+                    patterns={showPatterns ? chartPatterns : []}
+                    enablePatterns={showPatterns}
+                    dataInterval={dataInterval}
+                    onVisibleRangeChange={handleVisibleRangeChange}
+                  />
+                )}
                 {chartRefreshing && (
                   <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.25)', zIndex: 10 }}>
                     <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
