@@ -175,13 +175,25 @@ export default function PortfolioPage() {
   const [posOverrides, setPosOverrides] = useState<Record<string, { ratePct: string; contrib: string; includeDivs: boolean }>>({});
   const [mktConverted, setMktConverted] = useState<Record<string, boolean>>({});
   const [fxRate,       setFxRate]       = useState(1.36); // 1 USD = fxRate CAD
+  const [isShared,     setIsShared]     = useState(false);
+  const [shareMsg,     setShareMsg]     = useState('');
 
   const [form,      setForm]      = useState({ symbol: '', quantity: '', avgPrice: '' });
   const [formErr,   setFormErr]   = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm,  setEditForm]  = useState({ symbol: '', quantity: '', avgPrice: '' });
 
-  useEffect(() => { setHoldings(loadHoldings()); }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareParam = params.get('share');
+    if (shareParam) {
+      try {
+        const decoded = JSON.parse(atob(shareParam));
+        if (Array.isArray(decoded)) { setHoldings(decoded); setIsShared(true); return; }
+      } catch {}
+    }
+    setHoldings(loadHoldings());
+  }, []);
 
   useEffect(() => {
     fetch('/api/portfolio-quote?symbols=USDCAD%3DX')
@@ -323,7 +335,27 @@ export default function PortfolioPage() {
           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Portfolio Tracker
           </span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            {isShared && (
+              <span style={{ fontSize: 11, color: 'var(--yellow-2)', border: '1px solid var(--yellow-2)', padding: '4px 10px', letterSpacing: '0.06em' }}>
+                READ-ONLY VIEW
+              </span>
+            )}
+            {!isShared && holdings.length > 0 && (
+              <button
+                className="btn-secondary"
+                style={{ padding: '6px 14px', fontSize: 12 }}
+                onClick={async () => {
+                  const encoded = btoa(JSON.stringify(holdings));
+                  const url = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+                  try { await navigator.clipboard.writeText(url); } catch { prompt('Copy this link:', url); }
+                  setShareMsg('Link copied!');
+                  setTimeout(() => setShareMsg(''), 2500);
+                }}
+              >
+                {shareMsg || 'Share Portfolio'}
+              </button>
+            )}
             <button
               className="btn-secondary"
               style={{ padding: '6px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
@@ -357,7 +389,7 @@ export default function PortfolioPage() {
           <span className="card-label">Holdings</span>
 
           {/* Add row form */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
+          {!isShared && <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Ticker</span>
               <TickerInput
@@ -416,7 +448,7 @@ export default function PortfolioPage() {
               </button>
             </div>
             {formErr && <span style={{ fontSize: 11, color: 'var(--red-2)', alignSelf: 'center' }}>{formErr}</span>}
-          </div>
+          </div>}
 
           {holdings.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-5)', fontSize: 13 }}>
@@ -565,7 +597,7 @@ export default function PortfolioPage() {
                         {glPct != null ? pct(glPct) : '—'}
                       </td>
                       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                        {!isShared && <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                           <button
                             onClick={() => startEdit(h)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', padding: 2, lineHeight: 1 }}
@@ -578,7 +610,7 @@ export default function PortfolioPage() {
                           >
                             <Trash2 size={12} />
                           </button>
-                        </div>
+                        </div>}
                       </td>
                     </tr>
                   )})}
