@@ -406,6 +406,65 @@ input:focus::placeholder {
   }
 }
 
+/* ── Portfolio page: no hover animations or glows ── */
+.portfolio-page .card,
+.portfolio-page .card:hover {
+  transition: none;
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.portfolio-page .card:hover .card-label,
+.portfolio-page .card .card-label {
+  transition: none;
+  color: var(--accent);
+}
+
+.portfolio-page .btn-primary,
+.portfolio-page .btn-primary:hover,
+.portfolio-page .btn-primary:active {
+  transition: none;
+  transform: none;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.portfolio-page .btn-primary::before {
+  display: none;
+}
+
+.portfolio-page .btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.portfolio-page .btn-secondary,
+.portfolio-page .btn-secondary:hover,
+.portfolio-page .btn-secondary:active {
+  transition: none;
+  transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.portfolio-page .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: var(--accent);
+  color: var(--text-2);
+}
+
+.portfolio-page input[type="text"]:focus,
+.portfolio-page input[type="number"]:focus {
+  transition: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.portfolio-page input[type="text"],
+.portfolio-page input[type="number"],
+.portfolio-page input[type="text"]:hover:not(:focus),
+.portfolio-page input[type="number"]:hover:not(:focus) {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

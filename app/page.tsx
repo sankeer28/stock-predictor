@@ -1082,14 +1082,6 @@ export default function Home() {
                 Stock Predictor
               </h1>
             </div>
-            <Link
-              href="/portfolio"
-              className="flex items-center gap-2 transition-colors px-3 py-1 border"
-              style={{ color: 'var(--text-3)', borderColor: 'var(--bg-1)', background: 'var(--bg-2)', textDecoration: 'none' }}
-            >
-              <Briefcase className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm">Portfolio</span>
-            </Link>
             <a
               href="https://github.com/sankeer28/stock-predictor"
               target="_blank"
@@ -1271,6 +1263,16 @@ export default function Home() {
                   <Filter className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">Screener</span>
                 </button>
+
+                {/* Portfolio */}
+                <Link
+                  href="/portfolio"
+                  className="px-3 py-3 font-medium transition-all cursor-pointer flex items-center gap-2 border"
+                  style={{ background: 'var(--bg-3)', borderColor: 'var(--bg-1)', color: 'var(--text-3)', textDecoration: 'none' }}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">Portfolio</span>
+                </Link>
 
                 {/* Market Status */}
                 {!loading && stockData.length > 0 && (

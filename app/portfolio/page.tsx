@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Trash2, RefreshCw, TrendingUp, Pencil, Check, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, RefreshCw, Pencil, Check, X } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,10 @@ function usd(v: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 }
 function pct(v: number) { return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; }
-function project(value: number, cagr: number, years: number) { return value * Math.pow(1 + cagr, years); }
+function projectFV(value: number, rate: number, years: number, contrib = 0) {
+  if (Math.abs(rate) < 1e-10) return value + contrib * years;
+  return value * Math.pow(1 + rate, years) + contrib * (Math.pow(1 + rate, years) - 1) / rate;
+}
 
 // ─── Ticker autocomplete input ────────────────────────────────────────────────
 
@@ -167,7 +170,8 @@ export default function PortfolioPage() {
   const [projections,  setProjections]  = useState<Record<string, Projection>>({});
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [projLoading,  setProjLoading]  = useState(false);
-  const [showProj,     setShowProj]     = useState(false);
+  const [horizons,     setHorizons]     = useState<number[]>([1, 5, 10]);
+  const [posOverrides, setPosOverrides] = useState<Record<string, { ratePct: string; contrib: string; includeDivs: boolean }>>({});
 
   const [form,      setForm]      = useState({ symbol: '', quantity: '', avgPrice: '' });
   const [formErr,   setFormErr]   = useState('');
@@ -188,10 +192,38 @@ export default function PortfolioPage() {
     } finally { setQuoteLoading(false); }
   }, []);
 
+  const loadProjections = useCallback(async (syms: string[]) => {
+    if (!syms.length) return;
+    setProjLoading(true);
+    const init: Record<string, Projection> = {};
+    syms.forEach(s => { init[s] = { cagr: null, loading: true }; });
+    setProjections(init);
+    await Promise.allSettled(syms.map(async (sym) => {
+      try {
+        const res  = await fetch(`/api/stock?symbol=${sym}&days=1825&interval=1mo`);
+        const data = await res.json();
+        const pts  = (data.data ?? []) as { close: number }[];
+        if (pts.length >= 6) {
+          const years = (pts.length - 1) / 12;
+          const cagr  = Math.pow(pts[pts.length - 1].close / pts[0].close, 1 / years) - 1;
+          setProjections(prev => ({ ...prev, [sym]: { cagr, loading: false } }));
+        } else {
+          setProjections(prev => ({ ...prev, [sym]: { cagr: null, loading: false } }));
+        }
+      } catch {
+        setProjections(prev => ({ ...prev, [sym]: { cagr: null, loading: false } }));
+      }
+    }));
+    setProjLoading(false);
+  }, []);
+
   useEffect(() => {
     const syms = Array.from(new Set(holdings.map(h => h.symbol)));
-    if (syms.length) fetchQuotes(syms);
-  }, [holdings, fetchQuotes]);
+    if (syms.length) {
+      fetchQuotes(syms);
+      loadProjections(syms);
+    }
+  }, [holdings, fetchQuotes, loadProjections]);
 
   function addHolding() {
     const sym   = form.symbol.trim().toUpperCase();
@@ -230,34 +262,9 @@ export default function PortfolioPage() {
     setHoldings(next);
     saveHoldings(next);
     setEditingId(null);
-    fetchQuotes(Array.from(new Set(next.map(h => h.symbol))));
-  }
-
-  async function loadProjections() {
-    const syms = Array.from(new Set(holdings.map(h => h.symbol)));
-    if (!syms.length) return;
-    setProjLoading(true);
-    setShowProj(true);
-    const init: Record<string, Projection> = {};
-    syms.forEach(s => { init[s] = { cagr: null, loading: true }; });
-    setProjections(init);
-    await Promise.allSettled(syms.map(async (sym) => {
-      try {
-        const res  = await fetch(`/api/stock?symbol=${sym}&days=1825&interval=1mo`);
-        const data = await res.json();
-        const pts  = (data.data ?? []) as { close: number }[];
-        if (pts.length >= 6) {
-          const years = pts.length / 12;
-          const cagr  = Math.pow(pts[pts.length - 1].close / pts[0].close, 1 / years) - 1;
-          setProjections(prev => ({ ...prev, [sym]: { cagr, loading: false } }));
-        } else {
-          setProjections(prev => ({ ...prev, [sym]: { cagr: null, loading: false } }));
-        }
-      } catch {
-        setProjections(prev => ({ ...prev, [sym]: { cagr: null, loading: false } }));
-      }
-    }));
-    setProjLoading(false);
+    const syms = Array.from(new Set(next.map(h => h.symbol)));
+    fetchQuotes(syms);
+    loadProjections(syms);
   }
 
   // Derived rows
@@ -282,7 +289,7 @@ export default function PortfolioPage() {
   const glColor = (v: number | null) => v == null ? 'var(--text-3)' : v >= 0 ? 'var(--green-2)' : 'var(--red-2)';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-4)', color: 'var(--text-2)', fontFamily: 'inherit' }}>
+    <div className="portfolio-page" style={{ minHeight: '100vh', background: 'var(--bg-4)', color: 'var(--text-2)', fontFamily: 'inherit' }}>
       <div style={{ padding: '16px 24px' }}>
 
         {/* ── Nav ── */}
@@ -366,9 +373,30 @@ export default function PortfolioPage() {
                 style={{ width: 110 }}
               />
             </div>
-            <button className="btn-primary" style={{ padding: '10px 18px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }} onClick={addHolding}>
-              <Plus size={13} /> Add Position
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 10, color: 'transparent', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Add</span>
+              <button
+                onClick={addHolding}
+                style={{
+                  padding: '12px 18px',
+                  fontSize: 'inherit',
+                  fontFamily: 'inherit',
+                  lineHeight: 'inherit',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'var(--accent)',
+                  color: 'var(--text-0)',
+                  border: '2px solid var(--accent)',
+                  boxShadow: 'none',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Plus size={13} /> Add Position
+              </button>
+            </div>
             {formErr && <span style={{ fontSize: 11, color: 'var(--red-2)', alignSelf: 'center' }}>{formErr}</span>}
           </div>
 
@@ -527,110 +555,254 @@ export default function PortfolioPage() {
 
         {/* ── Dividends + Projections (only if holdings exist) ── */}
         {holdings.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: totalAnnDiv > 0 ? '1fr 2fr' : '1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
 
-            {/* Dividends */}
-            {totalAnnDiv > 0 && (
-              <div className="card">
+            {/* Dividends — always shown */}
+            <div className="card">
                 <span className="card-label">Estimated Dividends</span>
-                <div style={{ display: 'flex', gap: 24, marginTop: 6 }}>
+
+                {/* Totals */}
+                <div style={{ display: 'flex', gap: 20, marginTop: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--bg-1)' }}>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Monthly</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--green-2)' }}>{usd(totalAnnDiv / 12)}</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Monthly</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: totalAnnDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                      {totalAnnDiv > 0 ? usd(totalAnnDiv / 12) : '—'}
+                    </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Yearly</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--green-2)' }}>{usd(totalAnnDiv)}</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Yearly</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: totalAnnDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                      {totalAnnDiv > 0 ? usd(totalAnnDiv) : '—'}
+                    </div>
                   </div>
                 </div>
-                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {rows.filter(r => r.annDiv && r.annDiv > 0).map(({ h, annDiv }) => (
-                    <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-4)' }}>
-                      <span style={{ color: 'var(--accent)' }}>{h.symbol}</span>
-                      <span style={{ color: 'var(--green-2)' }}>{usd(annDiv!)} / yr</span>
+
+                {/* Column header */}
+                <div style={{ display: 'flex', gap: 8, padding: '0 4px', marginBottom: 4 }}>
+                  {['Ticker', 'Yield', 'Monthly', 'Yearly'].map((label, i) => (
+                    <div key={label} style={{
+                      flex: i === 0 ? '0 0 52px' : 1,
+                      fontSize: 9, color: 'var(--text-5)',
+                      textTransform: 'uppercase', letterSpacing: '0.08em',
+                      textAlign: i === 0 ? 'left' : 'right',
+                    }}>{label}</div>
+                  ))}
+                </div>
+
+                {/* Per-position rows — all holdings */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {rows.map(({ h, q, annDiv }) => (
+                    <div key={h.id} style={{ display: 'flex', gap: 8, padding: '5px 4px', background: 'var(--bg-3)', alignItems: 'center' }}>
+                      <div style={{ flex: '0 0 52px', fontWeight: 700, fontSize: 12, color: 'var(--accent)', letterSpacing: '0.04em' }}>{h.symbol}</div>
+                      <div style={{ flex: 1, textAlign: 'right', fontSize: 11, color: 'var(--text-4)' }}>
+                        {q?.dividendYield != null && q.dividendYield > 0 ? `${(q.dividendYield * 100).toFixed(2)}%` : <span style={{ color: 'var(--text-5)' }}>—</span>}
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'right', fontSize: 11, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                        {annDiv && annDiv > 0 ? usd(annDiv / 12) : '—'}
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'right', fontSize: 11, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                        {annDiv && annDiv > 0 ? usd(annDiv) : '—'}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
 
             {/* Projections */}
             <div className="card">
-              <span className="card-label">Projections (Experimental)</span>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, marginTop: 6 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-5)' }}>Based on 5yr historical CAGR per position</span>
-                <button
-                  className="btn-secondary"
-                  style={{ padding: '5px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}
-                  onClick={loadProjections}
-                  disabled={projLoading}
-                >
-                  <TrendingUp size={12} /> {projLoading ? 'Loading…' : showProj ? 'Recalculate' : 'Calculate'}
-                </button>
+              <span className="card-label">Projections</span>
+
+              {/* ── Horizons + loading ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Show</span>
+                {[1, 3, 5, 10, 20, 30].map(yr => {
+                  const active = horizons.includes(yr);
+                  return (
+                    <label key={yr} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: active ? 'var(--accent)' : 'var(--text-4)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={e => setHorizons(prev =>
+                          e.target.checked ? [...prev, yr].sort((a, b) => a - b) : prev.filter(h => h !== yr)
+                        )}
+                        style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                      />
+                      {yr}Y
+                    </label>
+                  );
+                })}
+                {projLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--text-5)', marginLeft: 'auto' }}>
+                    <RefreshCw size={10} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />
+                    Fetching CAGR…
+                  </div>
+                )}
               </div>
 
-              {showProj && (
-                <>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        {['Position', 'CAGR (5yr)', '1 Year', '5 Years', '10 Years'].map((h, i) => (
-                          <th key={h} style={{
-                            padding: '6px 10px', fontSize: 10, fontWeight: 600,
-                            letterSpacing: '0.08em', textTransform: 'uppercase',
-                            color: 'var(--text-5)', textAlign: i === 0 ? 'left' : 'right',
-                            borderBottom: '1px solid var(--bg-1)', whiteSpace: 'nowrap',
-                          }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(({ h, mktValue, costBasis }) => {
-                        const proj  = projections[h.symbol];
-                        const val   = mktValue ?? costBasis;
-                        const cagr  = proj?.cagr ?? null;
-                        const isLoading = proj?.loading ?? true;
-                        return (
-                          <tr key={h.id} style={{ borderBottom: '1px solid var(--bg-3)' }}>
-                            <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--accent)' }}>{h.symbol}</td>
-                            <td style={{ padding: '8px 10px', textAlign: 'right', color: cagr != null ? (cagr >= 0 ? 'var(--green-2)' : 'var(--red-2)') : 'var(--text-5)', fontWeight: 600 }}>
-                              {isLoading ? '…' : cagr != null ? pct(cagr * 100) : 'N/A'}
-                            </td>
-                            {[1, 5, 10].map(yr => (
-                              <td key={yr} style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--text-2)' }}>
-                                {isLoading ? '…' : cagr != null ? usd(project(val, cagr, yr)) : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-
-                      {/* Total */}
-                      {rows.every(r => projections[r.h.symbol] && !projections[r.h.symbol].loading) && (() => {
-                        const totals = [1, 5, 10].map(yr =>
-                          rows.reduce((s, { h, mktValue, costBasis }) => {
-                            const cagr = projections[h.symbol]?.cagr;
-                            const val  = mktValue ?? costBasis;
-                            return s + (cagr != null ? project(val, cagr, yr) : val);
-                          }, 0)
-                        );
-                        return (
-                          <tr style={{ background: 'rgba(0,0,0,0.25)', borderTop: '2px solid var(--bg-1)' }}>
-                            <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Total</td>
-                            <td />
-                            {totals.map((t, i) => (
-                              <td key={i} style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--text-1)' }}>{usd(t)}</td>
-                            ))}
-                          </tr>
-                        );
-                      })()}
-                    </tbody>
-                  </table>
-                  <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-5)', lineHeight: 1.5 }}>
-                    ⚠ Estimates only. Past performance does not guarantee future results. Not financial advice.
-                  </div>
-                </>
+              {/* ── Column header ── */}
+              {horizons.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', marginBottom: 4 }}>
+                  <div style={{ minWidth: 70 }} />
+                  <div style={{ width: 85, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Price</div>
+                  <div style={{ width: 130, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Rate % / yr</div>
+                  <div style={{ width: 100, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Contrib $ / yr</div>
+                  {horizons.map(yr => (
+                    <div key={yr} style={{ flex: 1, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 0 }}>{yr}Y</div>
+                  ))}
+                </div>
               )}
+
+              {/* ── Per-position rows ── */}
+              {(() => {
+                const allLoaded = rows.every(r => projections[r.h.symbol] && !projections[r.h.symbol].loading);
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {rows.map(({ h, price, mktValue, costBasis, annDiv }) => {
+                      const proj      = projections[h.symbol];
+                      const val       = mktValue ?? costBasis;
+                      const histCagr  = proj?.cagr ?? null;
+                      const isLoading = proj?.loading ?? true;
+                      const ov        = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
+                      const isCustom  = ov.ratePct !== '';
+                      const rate      = parseFloat(ov.ratePct) / 100;
+                      const manualContrib = parseFloat(ov.contrib) || 0;
+                      const divContrib    = ov.includeDivs ? (annDiv ?? 0) : 0;
+                      const contrib       = manualContrib + divContrib;
+                      const effectiveRate = isCustom ? (isNaN(rate) ? null : rate) : histCagr;
+                      const rateColor = effectiveRate != null
+                        ? (effectiveRate >= 0 ? 'var(--green-2)' : 'var(--red-2)')
+                        : 'var(--text-5)';
+
+                      const setOv = (patch: Partial<{ ratePct: string; contrib: string; includeDivs: boolean }>) =>
+                        setPosOverrides(prev => ({ ...prev, [h.symbol]: { ...ov, ...patch } }));
+
+                      const toggleStyle = (active: boolean): React.CSSProperties => ({
+                        padding: '2px 7px', fontSize: 9, border: 'none', cursor: 'pointer',
+                        background: active ? 'var(--accent)' : 'var(--bg-1)',
+                        color: active ? 'var(--text-0)' : 'var(--text-5)',
+                        fontFamily: 'inherit',
+                      });
+
+                      return (
+                        <div key={h.id} style={{ background: 'var(--bg-3)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {/* Symbol */}
+                          <div style={{ minWidth: 70 }}>
+                            <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 12, letterSpacing: '0.04em' }}>{h.symbol}</span>
+                          </div>
+
+                          {/* Current price */}
+                          <div style={{ width: 85, fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
+                            {price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}
+                          </div>
+
+                          {/* Rate — toggle + value/input */}
+                          <div style={{ width: 130, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <div style={{ display: 'flex', border: '1px solid var(--bg-1)', width: 'fit-content' }}>
+                              <button style={toggleStyle(!isCustom)} onClick={() => setOv({ ratePct: '' })}>CAGR</button>
+                              <button style={toggleStyle(isCustom)} onClick={() => {
+                                if (!isCustom) setOv({ ratePct: histCagr != null ? (histCagr * 100).toFixed(2) : '' });
+                              }}>Custom</button>
+                            </div>
+                            {isCustom ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <input
+                                  type="number"
+                                  value={ov.ratePct}
+                                  onChange={e => setOv({ ratePct: e.target.value })}
+                                  style={{ width: 60, padding: '3px 6px', fontSize: 11, color: rateColor }}
+                                  step="0.5"
+                                />
+                                <span style={{ fontSize: 10, color: 'var(--text-5)' }}>%</span>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 11, color: rateColor, fontWeight: 600 }}>
+                                {isLoading ? '…' : histCagr != null ? pct(histCagr * 100) : '—'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Contribution input */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: 100 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                              <span style={{ fontSize: 10, color: 'var(--text-5)' }}>$</span>
+                              <input
+                                type="number"
+                                value={ov.contrib}
+                                onChange={e => setOv({ contrib: e.target.value })}
+                                placeholder="0"
+                                style={{ width: 78, padding: '3px 6px', fontSize: 11 }}
+                                min="0"
+                                step="100"
+                              />
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: annDiv ? 'pointer' : 'default', opacity: annDiv ? 1 : 0.4 }}>
+                              <input
+                                type="checkbox"
+                                checked={ov.includeDivs}
+                                onChange={e => annDiv && setOv({ includeDivs: e.target.checked })}
+                                disabled={!annDiv}
+                                style={{ accentColor: 'var(--accent)', cursor: annDiv ? 'pointer' : 'default' }}
+                              />
+                              <span style={{ fontSize: 9, color: ov.includeDivs && annDiv ? 'var(--green-2)' : 'var(--text-5)', letterSpacing: '0.04em' }}>
+                                {annDiv && annDiv > 0 ? `+${usd(annDiv / 12)}/mo div` : 'no div data'}
+                              </span>
+                            </label>
+                          </div>
+
+                          {/* Horizon columns */}
+                          {horizons.map(yr => {
+                            const fv   = effectiveRate != null ? projectFV(val, effectiveRate, yr, contrib) : null;
+                            const gain = fv != null ? (fv / val - 1) * 100 : null;
+                            return (
+                              <div key={yr} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>
+                                  {fv != null ? usd(fv) : isLoading ? '…' : '—'}
+                                </span>
+                                {gain != null && (
+                                  <span style={{ fontSize: 10, color: gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+
+                    {/* Portfolio total */}
+                    {allLoaded && horizons.length > 0 && (
+                      <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid var(--bg-1)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                        <div style={{ minWidth: 70 }}>
+                          <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Total</span>
+                        </div>
+                        <div style={{ width: 85 }} />
+                        <div style={{ width: 130 }} />
+                        <div style={{ width: 100 }} />
+                        {horizons.map(yr => {
+                          const total = rows.reduce((s, { h, mktValue, costBasis, annDiv }) => {
+                            const val  = mktValue ?? costBasis;
+                            const ov   = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
+                            const r    = parseFloat(ov.ratePct) / 100;
+                            const rate = ov.ratePct !== '' ? (isNaN(r) ? null : r) : (projections[h.symbol]?.cagr ?? null);
+                            const contrib = (parseFloat(ov.contrib) || 0) + (ov.includeDivs ? (annDiv ?? 0) : 0);
+                            return s + (rate != null ? projectFV(val, rate, yr, contrib) : val);
+                          }, 0);
+                          const gain = totalValue > 0 ? (total / totalValue - 1) * 100 : 0;
+                          return (
+                            <div key={yr} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{usd(total)}</span>
+                              <span style={{ fontSize: 10, color: gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-5)', lineHeight: 1.5 }}>
+                ⚠ Estimates only. Past performance does not guarantee future results. Not financial advice.
+              </div>
             </div>
           </div>
         )}
