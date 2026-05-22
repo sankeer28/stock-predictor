@@ -23,6 +23,7 @@ interface Quote {
 
 interface Projection {
   cagr: number | null;
+  dataYears: number | null;
   loading: boolean;
 }
 
@@ -715,9 +716,16 @@ export default function PortfolioPage() {
                                 <span style={{ fontSize: 10, color: 'var(--text-5)' }}>%</span>
                               </div>
                             ) : (
-                              <span style={{ fontSize: 11, color: rateColor, fontWeight: 600 }}>
-                                {isLoading ? '…' : histCagr != null ? pct(histCagr * 100) : '—'}
-                              </span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <span style={{ fontSize: 11, color: rateColor, fontWeight: 600 }}>
+                                  {isLoading ? '…' : histCagr != null ? pct(histCagr * 100) : '—'}
+                                </span>
+                                {!isLoading && histCagr != null && histCagr > 0.30 && (
+                                  <span style={{ fontSize: 9, color: 'var(--yellow-2)', lineHeight: 1.3 }}>
+                                    ⚠ Based on recent history. Use Custom for realistic projections.
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
 
@@ -750,20 +758,23 @@ export default function PortfolioPage() {
                           </div>
 
                           {/* Horizon columns */}
-                          {horizons.map(yr => {
-                            const fv   = effectiveRate != null ? projectFV(val, effectiveRate, yr, contrib) : null;
-                            const gain = fv != null ? (fv / val - 1) * 100 : null;
-                            return (
-                              <div key={yr} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>
-                                  {fv != null ? usd(fv) : isLoading ? '…' : '—'}
-                                </span>
-                                {gain != null && (
-                                  <span style={{ fontSize: 10, color: gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
-                                )}
-                              </div>
-                            );
-                          })}
+                          {(() => {
+                            const unrealistic = !isCustom && histCagr != null && histCagr > 0.30;
+                            return horizons.map(yr => {
+                              const fv   = effectiveRate != null ? projectFV(val, effectiveRate, yr, contrib) : null;
+                              const gain = fv != null ? (fv / val - 1) * 100 : null;
+                              return (
+                                <div key={yr} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: unrealistic ? 'var(--yellow-2)' : 'var(--text-1)', whiteSpace: 'nowrap' }}>
+                                    {fv != null ? usd(fv) : isLoading ? '…' : '—'}
+                                  </span>
+                                  {gain != null && (
+                                    <span style={{ fontSize: 10, color: unrealistic ? 'var(--yellow-2)' : gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                                  )}
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       );
                     })}
