@@ -522,28 +522,28 @@ export default function LivePredictionChart({ symbol }: Props) {
       const data = await res.json();
       if (typeof data.price !== 'number') return;
 
-      // Freeze chart when market is not in a regular session
-      // Yahoo returns the same last-known price on every poll when closed — don't append it
-      const isRegular = data.marketState === 'REGULAR';
       setMarketState(data.marketState || 'CLOSED');
-      if (!isRegular) {
-        setLoading(false);
-        return;
+      setLoading(false); setError('');
+
+      const now  = Date.now();
+      const prevP = pricesRef.current.length > 0
+        ? pricesRef.current[pricesRef.current.length - 1].price : null;
+
+      // Reject obvious data errors (>15% jump)
+      if (prevP !== null && Math.abs(data.price - prevP) / prevP > 0.15) return;
+
+      // Only append a new point when the price actually changed — avoids a flat
+      // line of duplicate ticks when the market is closed (same price every poll)
+      let newPrices = pricesRef.current;
+      if (data.price !== prevP) {
+        const pt: PricePoint = { time: now, price: data.price, volume: data.volume ?? undefined };
+        newPrices = [...pricesRef.current, pt].slice(-h.maxPts);
+        pricesRef.current = newPrices;
+        pricesCacheRef.current[h.id] = newPrices;
+        setPrices([...newPrices]);
       }
 
-      // Reject obvious data errors (>15% jump in one tick)
-      const prevP = pricesRef.current.length > 0
-        ? pricesRef.current[pricesRef.current.length - 1].price : data.price;
-      if (Math.abs(data.price - prevP) / prevP > 0.15) return;
-
-      setLoading(false); setError(''); setMarketState(data.marketState || '');
-
-      const now = Date.now();
-      const pt: PricePoint = { time: now, price: data.price, volume: data.volume ?? undefined };
-      const newPrices = [...pricesRef.current, pt].slice(-h.maxPts);
-      pricesRef.current = newPrices;
-      pricesCacheRef.current[h.id] = newPrices; // persist per-horizon so switching tabs restores data
-      setPrices([...newPrices]);
+      if (newPrices.length === 0) return;
 
       // Compute live VWAP from tracked PricePoints
       const vwap = computeVWAP(newPrices);
@@ -832,27 +832,6 @@ export default function LivePredictionChart({ symbol }: Props) {
         Predicts {horizonId === '1m' ? '1 min' : horizonId === '5m' ? '5 min' : horizonId === '15m' ? '15 min' : horizonId === '30m' ? '30 min' : '1 h'} ahead.
       </div>
 
-      {/* ── Market closed banner ── */}
-      {marketState && marketState !== 'REGULAR' && (
-        <div className="mb-3 px-3 py-3 border-2 flex flex-col gap-1"
-          style={{ background: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.55)' }}>
-          <div className="flex items-center gap-2">
-            <span className="text-sm">⚠️</span>
-            <span className="text-xs font-bold" style={{ color: 'rgba(234,179,8,1)' }}>
-              Market is {
-                marketState === 'PRE'     ? 'in pre-market hours' :
-                marketState === 'POST'    ? 'in after-hours trading' :
-                marketState === 'PREPRE'  ? 'in early pre-market' :
-                marketState === 'POSTPOST'? 'in extended after-hours' :
-                'closed'
-              }
-            </span>
-          </div>
-          <span className="text-[10px]" style={{ color: 'rgba(234,179,8,0.75)' }}>
-            Live predictions are paused. Chart shows last session data. Predictions resume when the market opens.
-          </span>
-        </div>
-      )}
 
       {preTraining ? (
         <div className="flex flex-col items-center justify-center py-10 gap-3">
