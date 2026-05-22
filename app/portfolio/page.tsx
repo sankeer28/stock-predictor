@@ -49,10 +49,11 @@ function projectFV(value: number, rate: number, years: number, contrib = 0) {
 
 interface SearchResult { symbol: string; shortname?: string; longname?: string; typeDisp?: string; }
 
-function TickerInput({ value, onChange, onSelect }: {
+function TickerInput({ value, onChange, onSelect, inputWidth }: {
   value: string;
   onChange: (v: string) => void;
   onSelect: (symbol: string, name: string) => void;
+  inputWidth?: number | string;
 }) {
   const [results,  setResults]  = useState<SearchResult[]>([]);
   const [open,     setOpen]     = useState(false);
@@ -91,7 +92,6 @@ function TickerInput({ value, onChange, onSelect }: {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [value]);
 
-  // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
@@ -115,7 +115,7 @@ function TickerInput({ value, onChange, onSelect }: {
   }
 
   return (
-    <div ref={wrapRef}>
+    <div ref={wrapRef} style={{ width: inputWidth ?? 180 }}>
       <input
         ref={inputRef}
         type="text"
@@ -124,7 +124,7 @@ function TickerInput({ value, onChange, onSelect }: {
         onChange={e => onChange(e.target.value.toUpperCase())}
         onFocus={() => results.length > 0 && setOpen(true)}
         onKeyDown={handleKey}
-        style={{ width: 180 }}
+        style={{ width: '100%' }}
         autoComplete="off"
       />
       {open && (
@@ -174,14 +174,22 @@ export default function PortfolioPage() {
   const [horizons,     setHorizons]     = useState<number[]>([1, 5, 10]);
   const [posOverrides, setPosOverrides] = useState<Record<string, { ratePct: string; contrib: string; includeDivs: boolean }>>({});
   const [mktConverted, setMktConverted] = useState<Record<string, boolean>>({});
-  const [fxRate,       setFxRate]       = useState(1.36); // 1 USD = fxRate CAD
+  const [fxRate,       setFxRate]       = useState(1.36);
   const [isShared,     setIsShared]     = useState(false);
   const [shareMsg,     setShareMsg]     = useState('');
+  const [isMobile,     setIsMobile]     = useState(false);
 
   const [form,      setForm]      = useState({ symbol: '', quantity: '', avgPrice: '' });
   const [formErr,   setFormErr]   = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm,  setEditForm]  = useState({ symbol: '', quantity: '', avgPrice: '' });
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -292,7 +300,6 @@ export default function PortfolioPage() {
     loadProjections(syms);
   }
 
-  // Derived rows
   const rows = holdings.map(h => {
     const q         = quotes[h.symbol];
     const price     = q?.price ?? null;
@@ -318,24 +325,68 @@ export default function PortfolioPage() {
 
   const glColor = (v: number | null) => v == null ? 'var(--text-3)' : v >= 0 ? 'var(--green-2)' : 'var(--red-2)';
 
+  // ── Shared currency toggle cell renderer ─────────────────────────────────
+  function renderMktVal(h: Holding, mktValue: number | null, costBasis: number) {
+    const native  = h.symbol.endsWith('.TO') ? 'CAD' : 'USD';
+    const other   = native === 'USD' ? 'CAD' : 'USD';
+    const raw     = mktValue ?? costBasis;
+    const conv    = mktConverted[h.id];
+    const display = conv ? (native === 'USD' ? raw * fxRate : raw / fxRate) : raw;
+    const cur     = conv ? other : native;
+    const formatted = new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: cur, minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(display);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ fontWeight: 600 }}>{formatted}</span>
+        <button
+          onClick={() => setMktConverted(prev => ({ ...prev, [h.id]: !prev[h.id] }))}
+          title={`Show in ${conv ? native : other}`}
+          style={{
+            fontSize: 8, padding: '1px 4px', border: '1px solid var(--bg-1)',
+            background: conv ? 'var(--accent)' : 'transparent',
+            color: conv ? 'var(--text-0)' : 'var(--text-5)',
+            cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4, flexShrink: 0,
+          }}
+        >{conv ? other : `→${other}`}</button>
+      </div>
+    );
+  }
+
+  function renderGL(h: Holding, gl: number | null) {
+    if (gl == null) return <span style={{ color: 'var(--text-5)' }}>—</span>;
+    const conv   = mktConverted[h.id];
+    const native = h.symbol.endsWith('.TO') ? 'CAD' : 'USD';
+    const other  = native === 'USD' ? 'CAD' : 'USD';
+    const cur    = conv ? other : native;
+    const display = convertedMktVal(h, gl);
+    return (
+      <span style={{ color: glColor(gl), fontWeight: 600 }}>
+        {(gl >= 0 ? '+' : '') + new Intl.NumberFormat('en-US', {
+          style: 'currency', currency: cur, minimumFractionDigits: 2, maximumFractionDigits: 2,
+        }).format(display)}
+      </span>
+    );
+  }
+
   return (
     <div className="portfolio-page" style={{ minHeight: '100vh', background: 'var(--bg-4)', color: 'var(--text-2)', fontFamily: 'inherit' }}>
-      <div style={{ padding: '16px 24px' }}>
+      <div style={{ padding: isMobile ? '12px 14px' : '16px 24px' }}>
 
         {/* ── Nav ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: isMobile ? 8 : 16, marginBottom: 20 }}>
           <Link href="/" style={{
             display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
             color: 'var(--text-4)', textDecoration: 'none',
             border: '2px solid var(--bg-1)', padding: '6px 12px',
-            background: 'rgba(0,0,0,0.2)', transition: 'border-color 0.2s',
+            background: 'rgba(0,0,0,0.2)',
           }}>
             <ArrowLeft size={13} /> Back
           </Link>
           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Portfolio Tracker
           </span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ marginLeft: isMobile ? 0 : 'auto', width: isMobile ? '100%' : 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             {isShared && (
               <span style={{ fontSize: 11, color: 'var(--yellow-2)', border: '1px solid var(--yellow-2)', padding: '4px 10px', letterSpacing: '0.06em' }}>
                 READ-ONLY VIEW
@@ -368,16 +419,16 @@ export default function PortfolioPage() {
         </div>
 
         {/* ── Summary cards ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 12, marginBottom: 16 }}>
           {[
             { label: 'Total Invested',  value: usd(totalInvested), color: 'var(--text-1)' },
             { label: 'Current Value',   value: usd(totalValue),    color: 'var(--text-1)' },
             { label: 'Total Gain/Loss', value: (totalGL >= 0 ? '+' : '') + usd(totalGL), color: glColor(totalGL) },
             { label: 'Return',          value: pct(totalGLPct), color: glColor(totalGLPct) },
           ].map(c => (
-            <div key={c.label} className="card" style={{ padding: '18px 20px' }}>
+            <div key={c.label} className="card" style={{ padding: isMobile ? '14px 12px' : '18px 20px' }}>
               <span className="card-label">{c.label}</span>
-              <div style={{ fontSize: 22, fontWeight: 700, color: c.color, lineHeight: 1.2, marginTop: 6 }}>
+              <div style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, color: c.color, lineHeight: 1.2, marginTop: 6 }}>
                 {c.value}
               </div>
             </div>
@@ -388,67 +439,60 @@ export default function PortfolioPage() {
         <div className="card" style={{ marginBottom: 16 }}>
           <span className="card-label">Holdings</span>
 
-          {/* Add row form */}
-          {!isShared && <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Ticker</span>
-              <TickerInput
-                value={form.symbol}
-                onChange={v => setForm(f => ({ ...f, symbol: v }))}
-                onSelect={(sym) => setForm(f => ({ ...f, symbol: sym }))}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Shares</span>
-              <input
-                type="number"
-                placeholder="10"
-                min="0"
-                value={form.quantity}
-                onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && addHolding()}
-                style={{ width: 90 }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Avg Cost ($)</span>
-              <input
-                type="number"
-                placeholder="180.00"
-                min="0"
-                step="0.01"
-                value={form.avgPrice}
-                onChange={e => setForm(f => ({ ...f, avgPrice: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && addHolding()}
-                style={{ width: 110 }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 10, color: 'transparent', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Add</span>
+          {/* Add form */}
+          {!isShared && (
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 8, alignItems: isMobile ? 'stretch' : 'flex-end', marginBottom: 20 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Ticker</span>
+                <TickerInput
+                  value={form.symbol}
+                  onChange={v => setForm(f => ({ ...f, symbol: v }))}
+                  onSelect={(sym) => setForm(f => ({ ...f, symbol: sym }))}
+                  inputWidth={isMobile ? '100%' : 180}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: isMobile ? 1 : 'none' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Shares</span>
+                  <input
+                    type="number"
+                    placeholder="10"
+                    min="0"
+                    value={form.quantity}
+                    onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && addHolding()}
+                    style={{ width: isMobile ? '100%' : 90 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: isMobile ? 1 : 'none' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Avg Cost ($)</span>
+                  <input
+                    type="number"
+                    placeholder="180.00"
+                    min="0"
+                    step="0.01"
+                    value={form.avgPrice}
+                    onChange={e => setForm(f => ({ ...f, avgPrice: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && addHolding()}
+                    style={{ width: isMobile ? '100%' : 110 }}
+                  />
+                </div>
+              </div>
               <button
                 onClick={addHolding}
                 style={{
-                  padding: '12px 18px',
-                  fontSize: 'inherit',
-                  fontFamily: 'inherit',
-                  lineHeight: 'inherit',
-                  fontWeight: 500,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: 'var(--accent)',
-                  color: 'var(--text-0)',
-                  border: '2px solid var(--accent)',
-                  boxShadow: 'none',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
+                  padding: '12px 18px', fontFamily: 'inherit', fontWeight: 500,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  background: 'var(--accent)', color: 'var(--text-0)',
+                  border: '2px solid var(--accent)', cursor: 'pointer',
+                  width: isMobile ? '100%' : 'auto',
                 }}
               >
                 <Plus size={13} /> Add Position
               </button>
+              {formErr && <span style={{ fontSize: 11, color: 'var(--red-2)' }}>{formErr}</span>}
             </div>
-            {formErr && <span style={{ fontSize: 11, color: 'var(--red-2)', alignSelf: 'center' }}>{formErr}</span>}
-          </div>}
+          )}
 
           {holdings.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-5)', fontSize: 13 }}>
@@ -459,7 +503,134 @@ export default function PortfolioPage() {
               <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />
               Fetching prices…
             </div>
+          ) : isMobile ? (
+
+            /* ── MOBILE: card-per-holding ── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {rows.map(({ h, q, price, costBasis, mktValue, gl, glPct }) => {
+                const isEditing = editingId === h.id;
+
+                if (isEditing) return (
+                  <div key={h.id} style={{ background: 'var(--bg-3)', padding: 14, border: '1px solid var(--accent)' }}>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-5)', textTransform: 'uppercase', marginBottom: 4 }}>Ticker</div>
+                      <TickerInput
+                        value={editForm.symbol}
+                        onChange={v => setEditForm(f => ({ ...f, symbol: v }))}
+                        onSelect={sym => setEditForm(f => ({ ...f, symbol: sym }))}
+                        inputWidth="100%"
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-5)', textTransform: 'uppercase', marginBottom: 4 }}>Shares</div>
+                        <input
+                          type="number"
+                          value={editForm.quantity}
+                          onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                          style={{ width: '100%', padding: '6px 8px', fontSize: 13 }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-5)', textTransform: 'uppercase', marginBottom: 4 }}>Avg Cost ($)</div>
+                        <input
+                          type="number"
+                          value={editForm.avgPrice}
+                          onChange={e => setEditForm(f => ({ ...f, avgPrice: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                          style={{ width: '100%', padding: '6px 8px', fontSize: 13 }}
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={saveEdit} style={{ flex: 1, padding: '8px', background: 'var(--green-2)', color: 'var(--text-0)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 12 }}>
+                        <Check size={13} /> Save
+                      </button>
+                      <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: '8px', background: 'var(--bg-1)', color: 'var(--text-3)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 12 }}>
+                        <X size={13} /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+
+                return (
+                  <div key={h.id} style={{ background: 'var(--bg-3)', padding: '12px 14px', borderLeft: '2px solid var(--accent)' }}>
+                    {/* Header: symbol + name + actions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 15, letterSpacing: '0.04em' }}>{h.symbol}</div>
+                        {q?.name && <div style={{ fontSize: 11, color: 'var(--text-5)', marginTop: 1 }}>{q.name}</div>}
+                      </div>
+                      {!isShared && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => startEdit(h)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 4 }}>
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => removeHolding(h.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-4)', padding: 4 }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Stats grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Shares</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{h.quantity.toLocaleString()}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Avg Cost</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{usd(h.avgPrice)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Price</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Mkt Value</div>
+                        <div style={{ fontSize: 13 }}>{renderMktVal(h, mktValue, costBasis)}</div>
+                      </div>
+                    </div>
+
+                    {/* Gain/loss full-width */}
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--bg-1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gain / Loss</span>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 14 }}>{renderGL(h, gl)}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: glColor(glPct) }}>{glPct != null ? pct(glPct) : '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Mobile totals */}
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px 14px', borderTop: '2px solid var(--bg-1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Invested</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-2)' }}>{usd(totalInvested)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Value</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{usd(totalValue)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Gain / Loss</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: glColor(totalGL) }}>{(totalGL >= 0 ? '+' : '') + usd(totalGL)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Return</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: glColor(totalGLPct) }}>{pct(totalGLPct)}</div>
+                </div>
+              </div>
+            </div>
+
           ) : (
+
+            /* ── DESKTOP: table ── */
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
@@ -483,7 +654,6 @@ export default function PortfolioPage() {
                     const isEditing = editingId === h.id;
                     if (isEditing) return (
                       <tr key={h.id} style={{ borderBottom: '1px solid var(--bg-3)', background: 'rgba(0,0,0,0.2)' }}>
-                        {/* Editable ticker with autocomplete */}
                         <td style={{ padding: '6px 8px' }}>
                           <TickerInput
                             value={editForm.symbol}
@@ -491,149 +661,53 @@ export default function PortfolioPage() {
                             onSelect={sym => setEditForm(f => ({ ...f, symbol: sym }))}
                           />
                         </td>
-                        {/* Name (read-only in edit mode) */}
-                        <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-5)' }}>
-                          {q?.name ?? '—'}
-                        </td>
-                        {/* Editable shares */}
+                        <td style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-5)' }}>{q?.name ?? '—'}</td>
                         <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                          <input
-                            type="number"
-                            value={editForm.quantity}
-                            onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))}
-                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
-                            style={{ width: 80, padding: '4px 8px', fontSize: 12, textAlign: 'right' }}
-                          />
+                          <input type="number" value={editForm.quantity} onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }} style={{ width: 80, padding: '4px 8px', fontSize: 12, textAlign: 'right' }} />
                         </td>
-                        {/* Editable avg cost */}
                         <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                          <input
-                            type="number"
-                            value={editForm.avgPrice}
-                            onChange={e => setEditForm(f => ({ ...f, avgPrice: e.target.value }))}
-                            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
-                            style={{ width: 90, padding: '4px 8px', fontSize: 12, textAlign: 'right' }}
-                            step="0.01"
-                          />
+                          <input type="number" value={editForm.avgPrice} onChange={e => setEditForm(f => ({ ...f, avgPrice: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }} style={{ width: 90, padding: '4px 8px', fontSize: 12, textAlign: 'right' }} step="0.01" />
                         </td>
-                        {/* Remaining cols empty while editing */}
                         <td /><td /><td /><td />
-                        {/* Save / Cancel */}
                         <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                            <button onClick={saveEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green-2)', padding: 2 }}>
-                              <Check size={14} />
-                            </button>
-                            <button onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-2)', padding: 2 }}>
-                              <X size={14} />
-                            </button>
+                            <button onClick={saveEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--green-2)', padding: 2 }}><Check size={14} /></button>
+                            <button onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-2)', padding: 2 }}><X size={14} /></button>
                           </div>
                         </td>
                       </tr>
                     );
                     return (
-                    <tr key={h.id} style={{ borderBottom: '1px solid var(--bg-3)' }}>
-                      <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em' }}>
-                        {h.symbol}
-                      </td>
-                      <td style={{ padding: '10px 12px', color: 'var(--text-4)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {q?.name ?? '—'}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-2)' }}>
-                        {h.quantity.toLocaleString()}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-3)' }}>
-                        {usd(h.avgPrice)}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-2)' }}>
-                        {price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-1)' }}>
-                        {(() => {
-                          const native  = h.symbol.endsWith('.TO') ? 'CAD' : 'USD';
-                          const other   = native === 'USD' ? 'CAD' : 'USD';
-                          const raw     = mktValue ?? costBasis;
-                          const conv    = mktConverted[h.id];
-                          const display = conv
-                            ? (native === 'USD' ? raw * fxRate : raw / fxRate)
-                            : raw;
-                          const cur     = conv ? other : native;
-                          const formatted = new Intl.NumberFormat('en-US', {
-                            style: 'currency', currency: cur,
-                            minimumFractionDigits: 2, maximumFractionDigits: 2,
-                          }).format(display);
-                          return (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
-                              <span>{formatted}</span>
-                              <button
-                                onClick={() => setMktConverted(prev => ({ ...prev, [h.id]: !prev[h.id] }))}
-                                title={`Show in ${conv ? native : other}`}
-                                style={{
-                                  fontSize: 8, padding: '1px 4px', border: '1px solid var(--bg-1)',
-                                  background: conv ? 'var(--accent)' : 'transparent',
-                                  color: conv ? 'var(--text-0)' : 'var(--text-5)',
-                                  cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4,
-                                }}
-                              >{conv ? other : `→${other}`}</button>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: glColor(gl) }}>
-                        {gl != null ? (() => {
-                          const conv    = mktConverted[h.id];
-                          const native  = h.symbol.endsWith('.TO') ? 'CAD' : 'USD';
-                          const other   = native === 'USD' ? 'CAD' : 'USD';
-                          const display = convertedMktVal(h, gl);
-                          const cur     = conv ? other : native;
-                          const sign    = gl >= 0 ? '+' : '';
-                          return sign + new Intl.NumberFormat('en-US', {
-                            style: 'currency', currency: cur,
-                            minimumFractionDigits: 2, maximumFractionDigits: 2,
-                          }).format(display);
-                        })() : '—'}
-                      </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(glPct) }}>
-                        {glPct != null ? pct(glPct) : '—'}
-                      </td>
-                      <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                        {!isShared && <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          <button
-                            onClick={() => startEdit(h)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', padding: 2, lineHeight: 1 }}
-                          >
-                            <Pencil size={12} />
-                          </button>
-                          <button
-                            onClick={() => removeHolding(h.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', padding: 2, lineHeight: 1 }}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>}
-                      </td>
-                    </tr>
-                  )})}
-
-                  {/* Totals row */}
+                      <tr key={h.id} style={{ borderBottom: '1px solid var(--bg-3)' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em' }}>{h.symbol}</td>
+                        <td style={{ padding: '10px 12px', color: 'var(--text-4)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q?.name ?? '—'}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-2)' }}>{h.quantity.toLocaleString()}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-3)' }}>{usd(h.avgPrice)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-2)' }}>{price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                            {renderMktVal(h, mktValue, costBasis)}
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>{renderGL(h, gl)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(glPct) }}>{glPct != null ? pct(glPct) : '—'}</td>
+                        <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                          {!isShared && <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            <button onClick={() => startEdit(h)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', padding: 2 }}><Pencil size={12} /></button>
+                            <button onClick={() => removeHolding(h.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-5)', padding: 2 }}><Trash2 size={12} /></button>
+                          </div>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   <tr style={{ background: 'rgba(0,0,0,0.25)', borderTop: '2px solid var(--bg-1)' }}>
-                    <td colSpan={2} style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>
-                      Total
-                    </td>
+                    <td colSpan={2} style={{ padding: '10px 12px', fontWeight: 700, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Total</td>
                     <td style={{ padding: '10px 12px' }} />
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-3)' }}>
-                      {usd(totalInvested)}
-                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-3)' }}>{usd(totalInvested)}</td>
                     <td style={{ padding: '10px 12px' }} />
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-1)' }}>
-                      {usd(totalValue)}
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(totalGL) }}>
-                      {(totalGL >= 0 ? '+' : '') + usd(totalGL)}
-                    </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(totalGLPct) }}>
-                      {pct(totalGLPct)}
-                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-1)' }}>{usd(totalValue)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(totalGL) }}>{(totalGL >= 0 ? '+' : '') + usd(totalGL)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(totalGLPct) }}>{pct(totalGLPct)}</td>
                     <td />
                   </tr>
                 </tbody>
@@ -642,66 +716,90 @@ export default function PortfolioPage() {
           )}
         </div>
 
-        {/* ── Dividends + Projections (only if holdings exist) ── */}
+        {/* ── Dividends + Projections ── */}
         {holdings.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 2fr', gap: 12 }}>
 
-            {/* Dividends — always shown */}
+            {/* Dividends */}
             <div className="card">
-                <span className="card-label">Estimated Dividends</span>
+              <span className="card-label">Estimated Dividends</span>
 
-                {/* Totals */}
-                <div style={{ display: 'flex', gap: 20, marginTop: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--bg-1)' }}>
-                  <div>
-                    <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Monthly</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: totalAnnDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
-                      {totalAnnDiv > 0 ? usd(totalAnnDiv / 12) : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Yearly</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: totalAnnDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
-                      {totalAnnDiv > 0 ? usd(totalAnnDiv) : '—'}
-                    </div>
+              {/* Totals summary */}
+              <div style={{ display: 'flex', gap: 20, marginTop: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--bg-1)' }}>
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Monthly</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: totalAnnDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                    {totalAnnDiv > 0 ? usd(totalAnnDiv / 12) : '—'}
                   </div>
                 </div>
-
-                {/* Column header */}
-                <div style={{ display: 'flex', gap: 8, padding: '0 4px', marginBottom: 4 }}>
-                  {['Ticker', 'Yield', 'Monthly', 'Yearly'].map((label, i) => (
-                    <div key={label} style={{
-                      flex: i === 0 ? '0 0 52px' : 1,
-                      fontSize: 9, color: 'var(--text-5)',
-                      textTransform: 'uppercase', letterSpacing: '0.08em',
-                      textAlign: i === 0 ? 'left' : 'right',
-                    }}>{label}</div>
-                  ))}
-                </div>
-
-                {/* Per-position rows — all holdings */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {rows.map(({ h, q, annDiv }) => (
-                    <div key={h.id} style={{ display: 'flex', gap: 8, padding: '5px 4px', background: 'var(--bg-3)', alignItems: 'center' }}>
-                      <div style={{ flex: '0 0 52px', fontWeight: 700, fontSize: 12, color: 'var(--accent)', letterSpacing: '0.04em' }}>{h.symbol}</div>
-                      <div style={{ flex: 1, textAlign: 'right', fontSize: 11, color: 'var(--text-4)' }}>
-                        {q?.dividendYield != null && q.dividendYield > 0 ? `${(q.dividendYield * 100).toFixed(2)}%` : <span style={{ color: 'var(--text-5)' }}>—</span>}
-                      </div>
-                      <div style={{ flex: 1, textAlign: 'right', fontSize: 11, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
-                        {annDiv && annDiv > 0 ? usd(annDiv / 12) : '—'}
-                      </div>
-                      <div style={{ flex: 1, textAlign: 'right', fontSize: 11, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
-                        {annDiv && annDiv > 0 ? usd(annDiv) : '—'}
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Yearly</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: totalAnnDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                    {totalAnnDiv > 0 ? usd(totalAnnDiv) : '—'}
+                  </div>
                 </div>
               </div>
+
+              {isMobile ? (
+                /* ── MOBILE: per-position rows ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {rows.map(({ h, q, annDiv }) => (
+                    <div key={h.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--bg-3)' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 13 }}>{h.symbol}</div>
+                        {q?.dividendYield != null && q.dividendYield > 0 && (
+                          <div style={{ fontSize: 10, color: 'var(--text-5)', marginTop: 2 }}>{(q.dividendYield * 100).toFixed(2)}% yield</div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                          {annDiv && annDiv > 0 ? `${usd(annDiv / 12)}/mo` : '—'}
+                        </div>
+                        {annDiv && annDiv > 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1 }}>{usd(annDiv)}/yr</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* ── DESKTOP: column layout ── */
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ display: 'flex', gap: 8, padding: '0 4px', marginBottom: 4, minWidth: 'max-content' }}>
+                    {['Ticker', 'Yield', 'Monthly', 'Yearly'].map((label, i) => (
+                      <div key={label} style={{
+                        flex: i === 0 ? '0 0 52px' : '0 0 80px',
+                        fontSize: 9, color: 'var(--text-5)',
+                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                        textAlign: i === 0 ? 'left' : 'right',
+                      }}>{label}</div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {rows.map(({ h, q, annDiv }) => (
+                      <div key={h.id} style={{ display: 'flex', gap: 8, padding: '5px 4px', background: 'var(--bg-3)', alignItems: 'center', minWidth: 'max-content' }}>
+                        <div style={{ flex: '0 0 52px', fontWeight: 700, fontSize: 12, color: 'var(--accent)', letterSpacing: '0.04em' }}>{h.symbol}</div>
+                        <div style={{ flex: '0 0 80px', textAlign: 'right', fontSize: 11, color: 'var(--text-4)' }}>
+                          {q?.dividendYield != null && q.dividendYield > 0 ? `${(q.dividendYield * 100).toFixed(2)}%` : <span style={{ color: 'var(--text-5)' }}>—</span>}
+                        </div>
+                        <div style={{ flex: '0 0 80px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                          {annDiv && annDiv > 0 ? usd(annDiv / 12) : '—'}
+                        </div>
+                        <div style={{ flex: '0 0 80px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: annDiv && annDiv > 0 ? 'var(--green-2)' : 'var(--text-5)' }}>
+                          {annDiv && annDiv > 0 ? usd(annDiv) : '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Projections */}
             <div className="card">
               <span className="card-label">Projections</span>
 
-              {/* ── Horizons + loading ── */}
+              {/* Horizon selector */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Show</span>
                 {[1, 3, 5, 10, 20, 30].map(yr => {
@@ -728,179 +826,259 @@ export default function PortfolioPage() {
                 )}
               </div>
 
-              {/* ── Column header ── */}
-              {horizons.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', marginBottom: 4 }}>
-                  <div style={{ minWidth: 70 }} />
-                  <div style={{ width: 85, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Price</div>
-                  <div style={{ width: 130, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Rate % / yr</div>
-                  <div style={{ width: 100, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Contrib $ / yr</div>
-                  {horizons.map(yr => (
-                    <div key={yr} style={{ flex: 1, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 0 }}>{yr}Y</div>
-                  ))}
-                </div>
-              )}
+              {isMobile ? (
+                /* ── MOBILE: per-position projection cards ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {rows.map(({ h, price, mktValue, costBasis, annDiv }) => {
+                    const proj      = projections[h.symbol];
+                    const val       = convertedMktVal(h, mktValue ?? costBasis);
+                    const histCagr  = proj?.cagr ?? null;
+                    const isLoading = proj?.loading ?? true;
+                    const ov        = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
+                    const isCustom  = ov.ratePct !== '';
+                    const rate      = parseFloat(ov.ratePct) / 100;
+                    const manualContrib = parseFloat(ov.contrib) || 0;
+                    const divContrib    = ov.includeDivs ? (annDiv ?? 0) : 0;
+                    const contrib       = manualContrib + divContrib;
+                    const effectiveRate = isCustom ? (isNaN(rate) ? null : rate) : histCagr;
+                    const rateColor = effectiveRate != null ? (effectiveRate >= 0 ? 'var(--green-2)' : 'var(--red-2)') : 'var(--text-5)';
+                    const unrealistic = !isCustom && histCagr != null && histCagr > 0.30;
 
-              {/* ── Per-position rows ── */}
-              {(() => {
-                const allLoaded = rows.every(r => projections[r.h.symbol] && !projections[r.h.symbol].loading);
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {rows.map(({ h, price, mktValue, costBasis, annDiv }) => {
-                      const proj      = projections[h.symbol];
-                      const val       = convertedMktVal(h, mktValue ?? costBasis);
-                      const histCagr  = proj?.cagr ?? null;
-                      const isLoading = proj?.loading ?? true;
-                      const ov        = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
-                      const isCustom  = ov.ratePct !== '';
-                      const rate      = parseFloat(ov.ratePct) / 100;
-                      const manualContrib = parseFloat(ov.contrib) || 0;
-                      const divContrib    = ov.includeDivs ? (annDiv ?? 0) : 0;
-                      const contrib       = manualContrib + divContrib;
-                      const effectiveRate = isCustom ? (isNaN(rate) ? null : rate) : histCagr;
-                      const rateColor = effectiveRate != null
-                        ? (effectiveRate >= 0 ? 'var(--green-2)' : 'var(--red-2)')
-                        : 'var(--text-5)';
+                    const setOv = (patch: Partial<{ ratePct: string; contrib: string; includeDivs: boolean }>) =>
+                      setPosOverrides(prev => ({ ...prev, [h.symbol]: { ...ov, ...patch } }));
 
-                      const setOv = (patch: Partial<{ ratePct: string; contrib: string; includeDivs: boolean }>) =>
-                        setPosOverrides(prev => ({ ...prev, [h.symbol]: { ...ov, ...patch } }));
+                    const toggleStyle = (active: boolean): React.CSSProperties => ({
+                      padding: '3px 8px', fontSize: 10, border: 'none', cursor: 'pointer',
+                      background: active ? 'var(--accent)' : 'var(--bg-1)',
+                      color: active ? 'var(--text-0)' : 'var(--text-5)',
+                      fontFamily: 'inherit',
+                    });
 
-                      const toggleStyle = (active: boolean): React.CSSProperties => ({
-                        padding: '2px 7px', fontSize: 9, border: 'none', cursor: 'pointer',
-                        background: active ? 'var(--accent)' : 'var(--bg-1)',
-                        color: active ? 'var(--text-0)' : 'var(--text-5)',
-                        fontFamily: 'inherit',
-                      });
+                    return (
+                      <div key={h.id} style={{ background: 'var(--bg-3)', padding: '12px 14px', borderLeft: '2px solid var(--bg-1)' }}>
+                        {/* Symbol + price */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{h.symbol}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>{price != null ? usd(price) : '—'}</span>
+                        </div>
 
-                      return (
-                        <div key={h.id} style={{ background: 'var(--bg-3)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {/* Symbol */}
-                          <div style={{ minWidth: 70 }}>
-                            <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 12, letterSpacing: '0.04em' }}>{h.symbol}</span>
+                        {/* Rate row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', border: '1px solid var(--bg-1)' }}>
+                            <button style={toggleStyle(!isCustom)} onClick={() => setOv({ ratePct: '' })}>CAGR</button>
+                            <button style={toggleStyle(isCustom)} onClick={() => { if (!isCustom) setOv({ ratePct: histCagr != null ? (histCagr * 100).toFixed(2) : '' }); }}>Custom</button>
                           </div>
-
-                          {/* Current price */}
-                          <div style={{ width: 85, fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
-                            {price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}
-                          </div>
-
-                          {/* Rate — toggle + value/input */}
-                          <div style={{ width: 130, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <div style={{ display: 'flex', border: '1px solid var(--bg-1)', width: 'fit-content' }}>
-                              <button style={toggleStyle(!isCustom)} onClick={() => setOv({ ratePct: '' })}>CAGR</button>
-                              <button style={toggleStyle(isCustom)} onClick={() => {
-                                if (!isCustom) setOv({ ratePct: histCagr != null ? (histCagr * 100).toFixed(2) : '' });
-                              }}>Custom</button>
-                            </div>
-                            {isCustom ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                <input
-                                  type="number"
-                                  value={ov.ratePct}
-                                  onChange={e => setOv({ ratePct: e.target.value })}
-                                  style={{ width: 60, padding: '3px 6px', fontSize: 11, color: rateColor }}
-                                  step="0.5"
-                                />
-                                <span style={{ fontSize: 10, color: 'var(--text-5)' }}>%</span>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <span style={{ fontSize: 11, color: rateColor, fontWeight: 600 }}>
-                                  {isLoading ? '…' : histCagr != null ? pct(histCagr * 100) : '—'}
-                                </span>
-                                {!isLoading && histCagr != null && histCagr > 0.30 && (
-                                  <span style={{ fontSize: 9, color: 'var(--yellow-2)', lineHeight: 1.3 }}>
-                                    ⚠ Based on recent history. Use Custom for realistic projections.
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Contribution input */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: 100 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <span style={{ fontSize: 10, color: 'var(--text-5)' }}>$</span>
+                          {isCustom ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <input
                                 type="number"
-                                value={ov.contrib}
-                                onChange={e => setOv({ contrib: e.target.value })}
-                                placeholder="0"
-                                style={{ width: 78, padding: '3px 6px', fontSize: 11 }}
-                                min="0"
-                                step="100"
+                                value={ov.ratePct}
+                                onChange={e => setOv({ ratePct: e.target.value })}
+                                style={{ width: 70, padding: '4px 8px', fontSize: 13, color: rateColor }}
+                                step="0.5"
                               />
+                              <span style={{ fontSize: 11, color: 'var(--text-5)' }}>%</span>
                             </div>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: annDiv ? 'pointer' : 'default', opacity: annDiv ? 1 : 0.4 }}>
-                              <input
-                                type="checkbox"
-                                checked={ov.includeDivs}
-                                onChange={e => annDiv && setOv({ includeDivs: e.target.checked })}
-                                disabled={!annDiv}
-                                style={{ accentColor: 'var(--accent)', cursor: annDiv ? 'pointer' : 'default' }}
-                              />
-                              <span style={{ fontSize: 9, color: ov.includeDivs && annDiv ? 'var(--green-2)' : 'var(--text-5)', letterSpacing: '0.04em' }}>
-                                {annDiv && annDiv > 0 ? `+${usd(annDiv / 12)}/mo div` : 'no div data'}
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 13, color: rateColor, fontWeight: 600 }}>
+                                {isLoading ? '…' : histCagr != null ? pct(histCagr * 100) : '—'}
                               </span>
-                            </label>
-                          </div>
+                              {unrealistic && <span style={{ fontSize: 9, color: 'var(--yellow-2)' }}>⚠ high CAGR</span>}
+                            </div>
+                          )}
+                        </div>
 
-                          {/* Horizon columns */}
-                          {(() => {
-                            const unrealistic = !isCustom && histCagr != null && histCagr > 0.30;
-                            return horizons.map(yr => {
+                        {/* Contrib + divs row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 10, color: 'var(--text-5)' }}>Contrib/yr $</span>
+                            <input
+                              type="number"
+                              value={ov.contrib}
+                              onChange={e => setOv({ contrib: e.target.value })}
+                              placeholder="0"
+                              style={{ width: 80, padding: '4px 8px', fontSize: 12 }}
+                              min="0"
+                              step="100"
+                            />
+                          </div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: annDiv ? 'pointer' : 'default', opacity: annDiv ? 1 : 0.4 }}>
+                            <input
+                              type="checkbox"
+                              checked={ov.includeDivs}
+                              onChange={e => annDiv && setOv({ includeDivs: e.target.checked })}
+                              disabled={!annDiv}
+                              style={{ accentColor: 'var(--accent)' }}
+                            />
+                            <span style={{ fontSize: 10, color: ov.includeDivs && annDiv ? 'var(--green-2)' : 'var(--text-5)' }}>
+                              {annDiv && annDiv > 0 ? `+divs (${usd(annDiv / 12)}/mo)` : 'no div data'}
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Horizon results grid */}
+                        {horizons.length > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(horizons.length, 3)}, 1fr)`, gap: 6 }}>
+                            {horizons.map(yr => {
                               const fv   = effectiveRate != null ? projectFV(val, effectiveRate, yr, contrib) : null;
                               const gain = fv != null ? (fv / val - 1) * 100 : null;
                               return (
-                                <div key={yr} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: unrealistic ? 'var(--yellow-2)' : 'var(--text-1)', whiteSpace: 'nowrap' }}>
+                                <div key={yr} style={{ background: 'rgba(0,0,0,0.25)', padding: '8px 10px', textAlign: 'center' }}>
+                                  <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{yr}Y</div>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: unrealistic ? 'var(--yellow-2)' : 'var(--text-1)', whiteSpace: 'nowrap' }}>
                                     {fv != null ? usd(fv) : isLoading ? '…' : '—'}
-                                  </span>
+                                  </div>
                                   {gain != null && (
-                                    <span style={{ fontSize: 10, color: unrealistic ? 'var(--yellow-2)' : gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                                    <div style={{ fontSize: 10, marginTop: 2, color: unrealistic ? 'var(--yellow-2)' : gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</div>
                                   )}
                                 </div>
                               );
-                            });
-                          })()}
-                        </div>
-                      );
-                    })}
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* ── DESKTOP: horizontal flex rows ── */
+                <div style={{ overflowX: 'auto' }}>
+                  {horizons.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', marginBottom: 4, minWidth: 'max-content' }}>
+                      <div style={{ minWidth: 70 }} />
+                      <div style={{ width: 85, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Price</div>
+                      <div style={{ width: 130, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Rate % / yr</div>
+                      <div style={{ width: 100, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Contrib $ / yr</div>
+                      {horizons.map(yr => (
+                        <div key={yr} style={{ minWidth: 80, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{yr}Y</div>
+                      ))}
+                    </div>
+                  )}
+                  {(() => {
+                    const allLoaded = rows.every(r => projections[r.h.symbol] && !projections[r.h.symbol].loading);
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {rows.map(({ h, price, mktValue, costBasis, annDiv }) => {
+                          const proj      = projections[h.symbol];
+                          const val       = convertedMktVal(h, mktValue ?? costBasis);
+                          const histCagr  = proj?.cagr ?? null;
+                          const isLoading = proj?.loading ?? true;
+                          const ov        = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
+                          const isCustom  = ov.ratePct !== '';
+                          const rate      = parseFloat(ov.ratePct) / 100;
+                          const manualContrib = parseFloat(ov.contrib) || 0;
+                          const divContrib    = ov.includeDivs ? (annDiv ?? 0) : 0;
+                          const contrib       = manualContrib + divContrib;
+                          const effectiveRate = isCustom ? (isNaN(rate) ? null : rate) : histCagr;
+                          const rateColor = effectiveRate != null ? (effectiveRate >= 0 ? 'var(--green-2)' : 'var(--red-2)') : 'var(--text-5)';
 
-                    {/* Portfolio total */}
-                    {allLoaded && horizons.length > 0 && (
-                      <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid var(--bg-1)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-                        <div style={{ minWidth: 70 }}>
-                          <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Total</span>
-                        </div>
-                        <div style={{ width: 85 }} />
-                        <div style={{ width: 130 }} />
-                        <div style={{ width: 100 }} />
-                        {horizons.map(yr => {
-                          const total = rows.reduce((s, { h, mktValue, costBasis, annDiv }) => {
-                            const val  = convertedMktVal(h, mktValue ?? costBasis);
-                            const ov   = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
-                            const r    = parseFloat(ov.ratePct) / 100;
-                            const rate = ov.ratePct !== '' ? (isNaN(r) ? null : r) : (projections[h.symbol]?.cagr ?? null);
-                            const contrib = (parseFloat(ov.contrib) || 0) + (ov.includeDivs ? (annDiv ?? 0) : 0);
-                            return s + (rate != null ? projectFV(val, rate, yr, contrib) : val);
-                          }, 0);
-                          const gain = totalValue > 0 ? (total / totalValue - 1) * 100 : 0;
+                          const setOv = (patch: Partial<{ ratePct: string; contrib: string; includeDivs: boolean }>) =>
+                            setPosOverrides(prev => ({ ...prev, [h.symbol]: { ...ov, ...patch } }));
+
+                          const toggleStyle = (active: boolean): React.CSSProperties => ({
+                            padding: '2px 7px', fontSize: 9, border: 'none', cursor: 'pointer',
+                            background: active ? 'var(--accent)' : 'var(--bg-1)',
+                            color: active ? 'var(--text-0)' : 'var(--text-5)',
+                            fontFamily: 'inherit',
+                          });
+
                           return (
-                            <div key={yr} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0 }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{usd(total)}</span>
-                              <span style={{ fontSize: 10, color: gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                            <div key={h.id} style={{ background: 'var(--bg-3)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 'max-content' }}>
+                              <div style={{ minWidth: 70 }}>
+                                <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 12, letterSpacing: '0.04em' }}>{h.symbol}</span>
+                              </div>
+                              <div style={{ width: 85, fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
+                                {price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}
+                              </div>
+                              <div style={{ width: 130, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div style={{ display: 'flex', border: '1px solid var(--bg-1)', width: 'fit-content' }}>
+                                  <button style={toggleStyle(!isCustom)} onClick={() => setOv({ ratePct: '' })}>CAGR</button>
+                                  <button style={toggleStyle(isCustom)} onClick={() => { if (!isCustom) setOv({ ratePct: histCagr != null ? (histCagr * 100).toFixed(2) : '' }); }}>Custom</button>
+                                </div>
+                                {isCustom ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <input type="number" value={ov.ratePct} onChange={e => setOv({ ratePct: e.target.value })} style={{ width: 60, padding: '3px 6px', fontSize: 11, color: rateColor }} step="0.5" />
+                                    <span style={{ fontSize: 10, color: 'var(--text-5)' }}>%</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <span style={{ fontSize: 11, color: rateColor, fontWeight: 600 }}>
+                                      {isLoading ? '…' : histCagr != null ? pct(histCagr * 100) : '—'}
+                                    </span>
+                                    {!isLoading && histCagr != null && histCagr > 0.30 && (
+                                      <span style={{ fontSize: 9, color: 'var(--yellow-2)', lineHeight: 1.3 }}>⚠ Based on recent history. Use Custom for realistic projections.</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: 100 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                  <span style={{ fontSize: 10, color: 'var(--text-5)' }}>$</span>
+                                  <input type="number" value={ov.contrib} onChange={e => setOv({ contrib: e.target.value })} placeholder="0" style={{ width: 78, padding: '3px 6px', fontSize: 11 }} min="0" step="100" />
+                                </div>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: annDiv ? 'pointer' : 'default', opacity: annDiv ? 1 : 0.4 }}>
+                                  <input type="checkbox" checked={ov.includeDivs} onChange={e => annDiv && setOv({ includeDivs: e.target.checked })} disabled={!annDiv} style={{ accentColor: 'var(--accent)', cursor: annDiv ? 'pointer' : 'default' }} />
+                                  <span style={{ fontSize: 9, color: ov.includeDivs && annDiv ? 'var(--green-2)' : 'var(--text-5)', letterSpacing: '0.04em' }}>
+                                    {annDiv && annDiv > 0 ? `+${usd(annDiv / 12)}/mo div` : 'no div data'}
+                                  </span>
+                                </label>
+                              </div>
+                              {(() => {
+                                const unrealistic = !isCustom && histCagr != null && histCagr > 0.30;
+                                return horizons.map(yr => {
+                                  const fv   = effectiveRate != null ? projectFV(val, effectiveRate, yr, contrib) : null;
+                                  const gain = fv != null ? (fv / val - 1) * 100 : null;
+                                  return (
+                                    <div key={yr} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: unrealistic ? 'var(--yellow-2)' : 'var(--text-1)', whiteSpace: 'nowrap' }}>
+                                        {fv != null ? usd(fv) : isLoading ? '…' : '—'}
+                                      </span>
+                                      {gain != null && (
+                                        <span style={{ fontSize: 10, color: unrealistic ? 'var(--yellow-2)' : gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
                             </div>
                           );
                         })}
+                        {allLoaded && horizons.length > 0 && (
+                          <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid var(--bg-1)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2, minWidth: 'max-content' }}>
+                            <div style={{ minWidth: 70 }}>
+                              <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Total</span>
+                            </div>
+                            <div style={{ width: 85 }} />
+                            <div style={{ width: 130 }} />
+                            <div style={{ width: 100 }} />
+                            {horizons.map(yr => {
+                              const total = rows.reduce((s, { h, mktValue, costBasis, annDiv }) => {
+                                const val  = convertedMktVal(h, mktValue ?? costBasis);
+                                const ov   = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
+                                const r    = parseFloat(ov.ratePct) / 100;
+                                const rate = ov.ratePct !== '' ? (isNaN(r) ? null : r) : (projections[h.symbol]?.cagr ?? null);
+                                const contrib = (parseFloat(ov.contrib) || 0) + (ov.includeDivs ? (annDiv ?? 0) : 0);
+                                return s + (rate != null ? projectFV(val, rate, yr, contrib) : val);
+                              }, 0);
+                              const gain = totalValue > 0 ? (total / totalValue - 1) * 100 : 0;
+                              return (
+                                <div key={yr} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{usd(total)}</span>
+                                  <span style={{ fontSize: 10, color: gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
+                    );
+                  })()}
+                </div>
+              )}
 
               <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-5)', lineHeight: 1.5 }}>
-                ⚠ Estimates only. Past performance does not guarantee future results. Not financial advice.
+                Estimates only. Past performance does not guarantee future results. Not financial advice.
               </div>
             </div>
           </div>
