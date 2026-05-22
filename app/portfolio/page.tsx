@@ -173,9 +173,10 @@ export default function PortfolioPage() {
   const [projLoading,  setProjLoading]  = useState(false);
   const [horizons,     setHorizons]     = useState<number[]>([1, 5, 10]);
   const [posOverrides, setPosOverrides] = useState<Record<string, { ratePct: string; contrib: string; includeDivs: boolean }>>({});
-  const [mktConverted, setMktConverted] = useState<Record<string, boolean>>({});
-  const [fxRate,       setFxRate]       = useState(1.36);
-  const [isShared,     setIsShared]     = useState(false);
+  const [mktConverted,  setMktConverted]  = useState<Record<string, boolean>>({});
+  const [projExcluded,  setProjExcluded]  = useState<Set<string>>(new Set());
+  const [fxRate,        setFxRate]        = useState(1.36);
+  const [isShared,      setIsShared]      = useState(false);
   const [shareMsg,     setShareMsg]     = useState('');
   const [isMobile,     setIsMobile]     = useState(false);
 
@@ -324,6 +325,14 @@ export default function PortfolioPage() {
   const totalAnnDiv   = rows.reduce((s, r) => s + (r.annDiv ?? 0), 0);
 
   const glColor = (v: number | null) => v == null ? 'var(--text-3)' : v >= 0 ? 'var(--green-2)' : 'var(--red-2)';
+
+  function toggleProjExclude(sym: string) {
+    setProjExcluded(prev => {
+      const s = new Set(prev);
+      s.has(sym) ? s.delete(sym) : s.add(sym);
+      return s;
+    });
+  }
 
   // ── Shared currency toggle cell renderer ─────────────────────────────────
   function renderMktVal(h: Holding, mktValue: number | null, costBasis: number) {
@@ -854,11 +863,18 @@ export default function PortfolioPage() {
                       fontFamily: 'inherit',
                     });
 
+                    const excluded = projExcluded.has(h.symbol);
                     return (
-                      <div key={h.id} style={{ background: 'var(--bg-3)', padding: '12px 14px', borderLeft: '2px solid var(--bg-1)' }}>
+                      <div key={h.id} style={{ background: 'var(--bg-3)', padding: '12px 14px', borderLeft: `2px solid ${excluded ? 'var(--bg-1)' : 'var(--bg-1)'}`, opacity: excluded ? 0.45 : 1 }}>
                         {/* Symbol + price */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                          <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>{h.symbol}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 700, color: excluded ? 'var(--text-4)' : 'var(--accent)', fontSize: 14 }}>{h.symbol}</span>
+                            <button
+                              onClick={() => toggleProjExclude(h.symbol)}
+                              style={{ fontSize: 9, padding: '2px 6px', border: `1px solid ${excluded ? 'var(--red-2)' : 'var(--bg-1)'}`, background: 'transparent', color: excluded ? 'var(--red-2)' : 'var(--text-5)', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4 }}
+                            >{excluded ? 'excluded' : 'exclude'}</button>
+                          </div>
                           <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>{price != null ? usd(price) : '—'}</span>
                         </div>
 
@@ -945,13 +961,14 @@ export default function PortfolioPage() {
                 /* ── DESKTOP: horizontal flex rows ── */
                 <div style={{ overflowX: 'auto' }}>
                   {horizons.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', marginBottom: 4, minWidth: 'max-content' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 14px', marginBottom: 4, minWidth: 'max-content' }}>
+                      <div style={{ width: 20 }} />
                       <div style={{ minWidth: 70 }} />
                       <div style={{ width: 85, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Price</div>
                       <div style={{ width: 130, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Rate % / yr</div>
                       <div style={{ width: 100, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Contrib $ / yr</div>
                       {horizons.map(yr => (
-                        <div key={yr} style={{ minWidth: 80, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{yr}Y</div>
+                        <div key={yr} style={{ width: 110, flexShrink: 0, fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{yr}Y</div>
                       ))}
                     </div>
                   )}
@@ -983,10 +1000,20 @@ export default function PortfolioPage() {
                             fontFamily: 'inherit',
                           });
 
+                          const excluded = projExcluded.has(h.symbol);
                           return (
-                            <div key={h.id} style={{ background: 'var(--bg-3)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 'max-content' }}>
+                            <div key={h.id} style={{ background: 'var(--bg-3)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 16, minWidth: 'max-content', opacity: excluded ? 0.45 : 1 }}>
+                              <div style={{ width: 20, display: 'flex', alignItems: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!excluded}
+                                  onChange={() => toggleProjExclude(h.symbol)}
+                                  title={excluded ? `Include ${h.symbol} in total` : `Exclude ${h.symbol} from total`}
+                                  style={{ accentColor: 'var(--accent)', cursor: 'pointer', width: 13, height: 13 }}
+                                />
+                              </div>
                               <div style={{ minWidth: 70 }}>
-                                <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 12, letterSpacing: '0.04em' }}>{h.symbol}</span>
+                                <span style={{ fontWeight: 700, color: excluded ? 'var(--text-4)' : 'var(--accent)', fontSize: 12, letterSpacing: '0.04em' }}>{h.symbol}</span>
                               </div>
                               <div style={{ width: 85, fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
                                 {price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}
@@ -1030,7 +1057,7 @@ export default function PortfolioPage() {
                                   const fv   = effectiveRate != null ? projectFV(val, effectiveRate, yr, contrib) : null;
                                   const gain = fv != null ? (fv / val - 1) * 100 : null;
                                   return (
-                                    <div key={yr} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                    <div key={yr} style={{ width: 110, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
                                       <span style={{ fontSize: 12, fontWeight: 600, color: unrealistic ? 'var(--yellow-2)' : 'var(--text-1)', whiteSpace: 'nowrap' }}>
                                         {fv != null ? usd(fv) : isLoading ? '…' : '—'}
                                       </span>
@@ -1045,15 +1072,18 @@ export default function PortfolioPage() {
                           );
                         })}
                         {allLoaded && horizons.length > 0 && (
-                          <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid var(--bg-1)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2, minWidth: 'max-content' }}>
+                          <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '2px solid var(--bg-1)', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 16, marginTop: 2, minWidth: 'max-content' }}>
+                            <div style={{ width: 20 }} />
                             <div style={{ minWidth: 70 }}>
-                              <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>Total</span>
+                              <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>
+                                Total{projExcluded.size > 0 && <span style={{ color: 'var(--text-5)', fontWeight: 400 }}> (excl. {[...projExcluded].join(', ')})</span>}
+                              </span>
                             </div>
                             <div style={{ width: 85 }} />
                             <div style={{ width: 130 }} />
                             <div style={{ width: 100 }} />
                             {horizons.map(yr => {
-                              const total = rows.reduce((s, { h, mktValue, costBasis, annDiv }) => {
+                              const total = rows.filter(({ h }) => !projExcluded.has(h.symbol)).reduce((s, { h, mktValue, costBasis, annDiv }) => {
                                 const val  = convertedMktVal(h, mktValue ?? costBasis);
                                 const ov   = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
                                 const r    = parseFloat(ov.ratePct) / 100;
@@ -1061,9 +1091,10 @@ export default function PortfolioPage() {
                                 const contrib = (parseFloat(ov.contrib) || 0) + (ov.includeDivs ? (annDiv ?? 0) : 0);
                                 return s + (rate != null ? projectFV(val, rate, yr, contrib) : val);
                               }, 0);
-                              const gain = totalValue > 0 ? (total / totalValue - 1) * 100 : 0;
+                              const includedValue = rows.filter(({ h }) => !projExcluded.has(h.symbol)).reduce((s, r) => s + convertedMktVal(r.h, r.mktValue ?? r.costBasis), 0);
+                              const gain = includedValue > 0 ? (total / includedValue - 1) * 100 : 0;
                               return (
-                                <div key={yr} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                <div key={yr} style={{ width: 110, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
                                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{usd(total)}</span>
                                   <span style={{ fontSize: 10, color: gain >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>{pct(gain)}</span>
                                 </div>

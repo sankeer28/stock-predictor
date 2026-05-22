@@ -1067,6 +1067,10 @@ export default function Home() {
     }
   };
 
+  const fadeIn = (delay: number): React.CSSProperties => ({
+    animation: `fadeSlideIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) ${delay}ms both`,
+  });
+
   return (
     <main className="min-h-screen p-2 sm:p-4" style={{ background: 'var(--bg-4)' }}>
       <div className="flex gap-4 items-start">
@@ -1332,7 +1336,7 @@ export default function Home() {
           <>
             {/* Company Overview */}
             {companyInfo && (
-              <div className="mb-6">
+              <div className="mb-6" style={fadeIn(0)}>
                 <CompanyInfo
                   symbol={symbol}
                   companyName={companyName}
@@ -1348,16 +1352,18 @@ export default function Home() {
               </div>
             )}
 
-            <FinvizPanel
-              symbol={symbol}
-              onStockData={setFinvizStock}
-              onAnalystTargets={setFinvizAnalystTargets}
-              onNewsData={handleFinvizNews}
-              onChartsData={(charts, links) => { setFinvizCharts(charts); setFinvizLinks(links); }}
-            />
+            <div style={fadeIn(80)}>
+              <FinvizPanel
+                symbol={symbol}
+                onStockData={setFinvizStock}
+                onAnalystTargets={setFinvizAnalystTargets}
+                onNewsData={handleFinvizNews}
+                onChartsData={(charts, links) => { setFinvizCharts(charts); setFinvizLinks(links); }}
+              />
+            </div>
 
             {/* Main Chart with Integrated Controls */}
-            <div className="card mb-4 sm:mb-6">
+            <div className="card mb-4 sm:mb-6" style={fadeIn(160)}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="card-label">Price Chart with Forecast</span>
@@ -1604,7 +1610,7 @@ export default function Home() {
 
             {/* Technical Indicators Charts */}
             {showIndicators && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6" style={fadeIn(240)}>
                 <div className="card">
                   <span className="card-label">RSI (Relative Strength Index)</span>
                   <TechnicalIndicatorsChart data={chartData} indicator="rsi" />
@@ -1617,14 +1623,14 @@ export default function Home() {
             )}
 
             {/* Volume Profile + Daily Return Heatmap */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6" style={fadeIn(320)}>
               <VolumeProfile chartData={chartData} currentPrice={currentPrice} />
               <DailyReturnHeatmap chartData={chartData} />
             </div>
 
             {/* Forecast Insights */}
             {forecastInsights && (
-              <div className="card mb-6">
+              <div className="card mb-6" style={fadeIn(400)}>
                 <span className="card-label">Forecast Insights</span>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 border-2" style={{
@@ -1683,7 +1689,7 @@ export default function Home() {
             )}
 
             {/* AI Analysis - Full Width in Main Content */}
-            <div className="mb-6">
+            <div className="mb-6" style={fadeIn(480)}>
               <AIAnalysis
                 symbol={symbol}
                 companyName={companyName}
@@ -1701,7 +1707,7 @@ export default function Home() {
             </div>
 
             {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6" style={fadeIn(560)}>
               {/* Trading Signals */}
               {tradingSignal && (
                 <TradingSignals signal={tradingSignal} currentPrice={currentPrice} />
@@ -1717,19 +1723,19 @@ export default function Home() {
             </div>
 
             {/* Correlation Heatmap */}
-            <div className="mt-6">
+            <div className="mt-6" style={fadeIn(640)}>
               <CorrelationHeatmap
                 symbol={symbol}
               />
             </div>
 
             {/* Live Prediction Lab */}
-            <div className="mt-6">
+            <div className="mt-6" style={fadeIn(720)}>
               <LivePredictionChart symbol={symbol} />
             </div>
 
             {/* Mobile: stack ML panels below News */}
-            <div className="block xl:hidden mt-6 space-y-4">
+            <div className="block xl:hidden mt-6 space-y-4" style={fadeIn(800)}>
               <MLPredictions
                 currentPrice={currentPrice}
                 predictions={mlPredictions}
@@ -1828,7 +1834,7 @@ export default function Home() {
         {/* Right Sidebar - Desktop */}
         <div className="hidden xl:block flex-shrink-0 w-80">
           {/* Watchlist - Always visible */}
-          <div>
+          <div style={fadeIn(0)}>
             <Watchlist
               currentSymbol={symbol}
               onSymbolClick={(s) => { setInputSymbol(s); fetchData(s); }}
@@ -1836,12 +1842,12 @@ export default function Home() {
           </div>
 
           {/* Fear & Greed Index */}
-          <div className="mt-4">
+          <div className="mt-4" style={fadeIn(100)}>
             <FearGreedIndex />
           </div>
 
           {/* Market Movers */}
-          <div className="mt-4">
+          <div className="mt-4" style={fadeIn(200)}>
             <MarketMovers
               onTickerClick={(ticker) => { setInputSymbol(ticker); fetchData(ticker); }}
             />
@@ -1850,7 +1856,7 @@ export default function Home() {
           {/* Stock-specific panels */}
           {!loading && stockData.length > 0 && (
             <>
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(300)}>
               <MLPredictions
                 currentPrice={currentPrice}
                 predictions={mlPredictions}
@@ -1869,7 +1875,7 @@ export default function Home() {
 
             {/* Pattern Panel - Combined settings + analysis */}
             {showPatterns && (
-              <div className="mt-4">
+              <div className="mt-4" style={fadeIn(350)}>
                 <PatternPanel
                   patterns={chartPatterns}
                   startDate={visibleDateRange?.startDate}
@@ -1885,7 +1891,7 @@ export default function Home() {
             )}
 
             {/* Reddit Sentiment - Desktop Sidebar */}
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(400)}>
               <RedditSentiment
                 onTickerClick={(ticker) => {
                   setInputSymbol(ticker);
@@ -1895,7 +1901,7 @@ export default function Home() {
             </div>
 
             {/* ApeWisdom Mentions - Desktop Sidebar */}
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(450)}>
               <ApeWisdomMentions
                 onTickerClick={(ticker) => {
                   setInputSymbol(ticker);
@@ -1905,23 +1911,23 @@ export default function Home() {
             </div>
 
             {/* FinnHub Features - Desktop Sidebar */}
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(500)}>
               <InsiderTransactions symbol={symbol} />
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(550)}>
               <EarningsCalendar symbol={symbol} />
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(600)}>
               <EarningsHistory symbol={symbol} />
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(650)}>
               <AnalystRecommendations symbol={symbol} finvizTargets={finvizAnalystTargets} />
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(700)}>
               <PeerStocks
                 symbol={symbol}
                 onPeerClick={(peer) => {
@@ -1932,7 +1938,7 @@ export default function Home() {
             </div>
 
             {/* Options Chain */}
-            <div className="mt-4">
+            <div className="mt-4" style={fadeIn(750)}>
               <OptionsChain symbol={symbol} />
             </div>
             </>
