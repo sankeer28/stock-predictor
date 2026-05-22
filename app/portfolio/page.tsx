@@ -23,7 +23,7 @@ interface Quote {
 
 interface Projection {
   cagr: number | null;
-  dataYears: number | null;
+  dataYears?: number | null;
   loading: boolean;
 }
 
@@ -173,6 +173,8 @@ export default function PortfolioPage() {
   const [projLoading,  setProjLoading]  = useState(false);
   const [horizons,     setHorizons]     = useState<number[]>([1, 5, 10]);
   const [posOverrides, setPosOverrides] = useState<Record<string, { ratePct: string; contrib: string; includeDivs: boolean }>>({});
+  const [mktConverted, setMktConverted] = useState<Record<string, boolean>>({});
+  const [fxRate,       setFxRate]       = useState(1.36); // 1 USD = fxRate CAD
 
   const [form,      setForm]      = useState({ symbol: '', quantity: '', avgPrice: '' });
   const [formErr,   setFormErr]   = useState('');
@@ -180,6 +182,16 @@ export default function PortfolioPage() {
   const [editForm,  setEditForm]  = useState({ symbol: '', quantity: '', avgPrice: '' });
 
   useEffect(() => { setHoldings(loadHoldings()); }, []);
+
+  useEffect(() => {
+    fetch('/api/portfolio-quote?symbols=USDCAD%3DX')
+      .then(r => r.json())
+      .then(d => {
+        const q = (d.quotes ?? []).find((q: Quote) => q.symbol === 'USDCAD=X');
+        if (q?.price && q.price > 0) setFxRate(q.price);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchQuotes = useCallback(async (syms: string[]) => {
     if (!syms.length) return;
@@ -281,8 +293,13 @@ export default function PortfolioPage() {
     return { h, q, price, costBasis, mktValue, gl, glPct, annDiv };
   });
 
+  function convertedMktVal(h: Holding, raw: number): number {
+    if (!mktConverted[h.id]) return raw;
+    return h.symbol.endsWith('.TO') ? raw / fxRate : raw * fxRate;
+  }
+
   const totalInvested = rows.reduce((s, r) => s + r.costBasis, 0);
-  const totalValue    = rows.reduce((s, r) => s + (r.mktValue ?? r.costBasis), 0);
+  const totalValue    = rows.reduce((s, r) => s + convertedMktVal(r.h, r.mktValue ?? r.costBasis), 0);
   const totalGL       = totalValue - totalInvested;
   const totalGLPct    = totalInvested > 0 ? (totalGL / totalInvested) * 100 : 0;
   const totalAnnDiv   = rows.reduce((s, r) => s + (r.annDiv ?? 0), 0);
@@ -500,10 +517,49 @@ export default function PortfolioPage() {
                         {price != null ? usd(price) : <span style={{ color: 'var(--text-5)' }}>—</span>}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--text-1)' }}>
-                        {mktValue != null ? usd(mktValue) : usd(costBasis)}
+                        {(() => {
+                          const native  = h.symbol.endsWith('.TO') ? 'CAD' : 'USD';
+                          const other   = native === 'USD' ? 'CAD' : 'USD';
+                          const raw     = mktValue ?? costBasis;
+                          const conv    = mktConverted[h.id];
+                          const display = conv
+                            ? (native === 'USD' ? raw * fxRate : raw / fxRate)
+                            : raw;
+                          const cur     = conv ? other : native;
+                          const formatted = new Intl.NumberFormat('en-US', {
+                            style: 'currency', currency: cur,
+                            minimumFractionDigits: 2, maximumFractionDigits: 2,
+                          }).format(display);
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                              <span>{formatted}</span>
+                              <button
+                                onClick={() => setMktConverted(prev => ({ ...prev, [h.id]: !prev[h.id] }))}
+                                title={`Show in ${conv ? native : other}`}
+                                style={{
+                                  fontSize: 8, padding: '1px 4px', border: '1px solid var(--bg-1)',
+                                  background: conv ? 'var(--accent)' : 'transparent',
+                                  color: conv ? 'var(--text-0)' : 'var(--text-5)',
+                                  cursor: 'pointer', fontFamily: 'inherit', lineHeight: 1.4,
+                                }}
+                              >{conv ? other : `→${other}`}</button>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: glColor(gl) }}>
-                        {gl != null ? (gl >= 0 ? '+' : '') + usd(gl) : '—'}
+                        {gl != null ? (() => {
+                          const conv    = mktConverted[h.id];
+                          const native  = h.symbol.endsWith('.TO') ? 'CAD' : 'USD';
+                          const other   = native === 'USD' ? 'CAD' : 'USD';
+                          const display = convertedMktVal(h, gl);
+                          const cur     = conv ? other : native;
+                          const sign    = gl >= 0 ? '+' : '';
+                          return sign + new Intl.NumberFormat('en-US', {
+                            style: 'currency', currency: cur,
+                            minimumFractionDigits: 2, maximumFractionDigits: 2,
+                          }).format(display);
+                        })() : '—'}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: glColor(glPct) }}>
                         {glPct != null ? pct(glPct) : '—'}
@@ -660,7 +716,7 @@ export default function PortfolioPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {rows.map(({ h, price, mktValue, costBasis, annDiv }) => {
                       const proj      = projections[h.symbol];
-                      const val       = mktValue ?? costBasis;
+                      const val       = convertedMktVal(h, mktValue ?? costBasis);
                       const histCagr  = proj?.cagr ?? null;
                       const isLoading = proj?.loading ?? true;
                       const ov        = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
@@ -790,7 +846,7 @@ export default function PortfolioPage() {
                         <div style={{ width: 100 }} />
                         {horizons.map(yr => {
                           const total = rows.reduce((s, { h, mktValue, costBasis, annDiv }) => {
-                            const val  = mktValue ?? costBasis;
+                            const val  = convertedMktVal(h, mktValue ?? costBasis);
                             const ov   = posOverrides[h.symbol] ?? { ratePct: '', contrib: '', includeDivs: false };
                             const r    = parseFloat(ov.ratePct) / 100;
                             const rate = ov.ratePct !== '' ? (isNaN(r) ? null : r) : (projections[h.symbol]?.cagr ?? null);
