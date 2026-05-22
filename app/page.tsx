@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles, Download, Filter } from 'lucide-react';
+import { Search, TrendingUp, Loader2, AlertCircle, Github, Clock, BarChart2, Brain, Sparkles, Download, Filter, Briefcase } from 'lucide-react';
+import Link from 'next/link';
 import { calculateAllIndicators } from '@/lib/technicalIndicators';
 import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateTradingSignal } from '@/lib/tradingSignals';
@@ -1081,6 +1082,14 @@ export default function Home() {
                 Stock Predictor
               </h1>
             </div>
+            <Link
+              href="/portfolio"
+              className="flex items-center gap-2 transition-colors px-3 py-1 border"
+              style={{ color: 'var(--text-3)', borderColor: 'var(--bg-1)', background: 'var(--bg-2)', textDecoration: 'none' }}
+            >
+              <Briefcase className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm">Portfolio</span>
+            </Link>
             <a
               href="https://github.com/sankeer28/stock-predictor"
               target="_blank"
