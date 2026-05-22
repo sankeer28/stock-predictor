@@ -1076,7 +1076,7 @@ export default function PortfolioPage() {
                             <div style={{ width: 20 }} />
                             <div style={{ minWidth: 70 }}>
                               <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-4)' }}>
-                                Total{projExcluded.size > 0 && <span style={{ color: 'var(--text-5)', fontWeight: 400 }}> (excl. {[...projExcluded].join(', ')})</span>}
+                                Total{projExcluded.size > 0 && <span style={{ color: 'var(--text-5)', fontWeight: 400 }}> (excl. {Array.from(projExcluded).join(', ')})</span>}
                               </span>
                             </div>
                             <div style={{ width: 85 }} />
