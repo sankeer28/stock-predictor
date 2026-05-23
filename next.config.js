@@ -4,8 +4,6 @@ const nextConfig = {
   env: {
     NEWS_API_KEY: process.env.NEWS_API_KEY,
   },
-  // Optimize performance
-  swcMinify: true,
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
