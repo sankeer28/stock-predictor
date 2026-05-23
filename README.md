@@ -2,7 +2,7 @@
 Stock analysis platform with ML forecasting, live AI predictions, technical analysis, sentiment analysis, and a full portfolio tracker.
 
 ![demo](https://github.com/user-attachments/assets/7d1f79fb-8e0d-46c0-9b37-bc4879e283d7)
-
+https://stock-predictor.sankeer28.workers.dev
 ## Features
 
 ### Dashboard
