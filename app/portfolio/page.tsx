@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Trash2, RefreshCw, Pencil, Check, X, Download, Upload } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,20 @@ interface RiskMetrics {
   points: number;
 }
 
+// ─── Benchmark comparison constants ──────────────────────────────────────────
+
+const BENCH_OPTIONS = [
+  { symbol: 'SPY',    label: 'S&P 500' },
+  { symbol: 'QQQ',    label: 'NASDAQ 100' },
+  { symbol: 'DIA',    label: 'Dow Jones' },
+  { symbol: 'XIU.TO', label: 'TSX 60' },
+];
+const BENCH_COLORS: Record<string, string> = {
+  'SPY':    '#60a5fa',
+  'QQQ':    '#a78bfa',
+  'DIA':    '#fb923c',
+  'XIU.TO': '#facc15',
+};
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const LS_KEY = 'portfolio_holdings_v1';
@@ -272,7 +287,10 @@ export default function PortfolioPage() {
   const [isShared,      setIsShared]      = useState(false);
   const [shareMsg,     setShareMsg]     = useState('');
   const [isMobile,     setIsMobile]     = useState(false);
-  const [sort,         setSort]         = useState<{ key: SortKey; dir: SortDir }>({ key: 'mktValue', dir: 'desc' });
+  const [sort,           setSort]           = useState<{ key: SortKey; dir: SortDir }>({ key: 'mktValue', dir: 'desc' });
+  const [activeBench,    setActiveBench]    = useState<string[]>(['SPY']);
+  const [benchChartData, setBenchChartData] = useState<Record<string, number | string>[]>([]);
+  const [benchLoading,   setBenchLoading]   = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form,      setForm]      = useState({ symbol: '', quantity: '', avgPrice: '' });
@@ -400,6 +418,81 @@ export default function PortfolioPage() {
       loadHistoricalData(syms);
     }
   }, [holdings, fetchQuotes, loadProjections, loadHistoricalData]);
+
+  const loadBenchChart = useCallback(async (
+    holdingSymbols: string[],
+    weights: Record<string, number>,
+    benchmarks: string[],
+  ) => {
+    if (!holdingSymbols.length) return;
+    setBenchLoading(true);
+    const days = 365;
+    const allSymbols = Array.from(new Set([...holdingSymbols, ...benchmarks]));
+
+    const results = await Promise.allSettled(
+      allSymbols.map(sym =>
+        fetch(`/api/stock?symbol=${sym}&days=${days}&interval=1mo`)
+          .then(r => r.json())
+          .then(d => ({ symbol: sym, data: (d.data ?? []) as { date: string; close: number }[] }))
+      )
+    );
+
+    const seriesMap: Record<string, { date: string; close: number }[]> = {};
+    results.forEach(r => {
+      if (r.status === 'fulfilled' && r.value.data.length > 1)
+        seriesMap[r.value.symbol] = r.value.data.sort((a, b) => a.date.localeCompare(b.date));
+    });
+
+    const holdingSeries = holdingSymbols.map(s => seriesMap[s]).filter(Boolean);
+    if (!holdingSeries.length) { setBenchLoading(false); return; }
+    const minLen = Math.min(...holdingSeries.map(s => s.length));
+    if (minLen < 2) { setBenchLoading(false); return; }
+
+    const normalized: Record<string, number[]> = {};
+    for (const sym of allSymbols) {
+      const s = seriesMap[sym];
+      if (!s || s.length < minLen) continue;
+      const trimmed = s.slice(-minLen);
+      const base = trimmed[0].close;
+      if (base <= 0) continue;
+      normalized[sym] = trimmed.map(p => (p.close / base) * 100);
+    }
+
+    const refDates = holdingSeries[0].slice(-minLen).map(p => p.date.slice(0, 10));
+    const portfolioSeries = Array.from({ length: minLen }, (_, i) =>
+      holdingSymbols.reduce((sum, sym) => {
+        const w = weights[sym] ?? 0;
+        const n = normalized[sym];
+        return n ? sum + w * n[i] : sum;
+      }, 0)
+    );
+
+    setBenchChartData(refDates.map((date, i) => {
+      const pt: Record<string, number | string> = { date };
+      if (portfolioSeries[i] > 0) pt['Portfolio'] = parseFloat(portfolioSeries[i].toFixed(2));
+      benchmarks.forEach(b => {
+        if (normalized[b]?.[i] != null) pt[b] = parseFloat(normalized[b][i].toFixed(2));
+      });
+      return pt;
+    }));
+    setBenchLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const holdingSymbols = Array.from(new Set(holdings.map(h => h.symbol)));
+    if (!holdingSymbols.length || !Object.keys(quotes).length) return;
+    const totalVal = holdings.reduce((s, h) => {
+      const price = quotes[h.symbol]?.price ?? h.avgPrice;
+      return s + h.quantity * price;
+    }, 0);
+    const weights: Record<string, number> = {};
+    holdings.forEach(h => {
+      const price = quotes[h.symbol]?.price ?? h.avgPrice;
+      const val = h.quantity * price;
+      weights[h.symbol] = (weights[h.symbol] ?? 0) + (totalVal > 0 ? val / totalVal : 1 / holdings.length);
+    });
+    loadBenchChart(holdingSymbols, weights, activeBench);
+  }, [holdings, quotes, activeBench, loadBenchChart]);
 
   function addHolding() {
     const sym   = form.symbol.trim().toUpperCase();
@@ -1100,6 +1193,144 @@ export default function PortfolioPage() {
             </div>
           )}
         </div>
+
+        {/* ── Benchmark Comparison ── */}
+        {holdings.length > 0 && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+              <span className="card-label" style={{ margin: 0 }}>vs. Benchmarks</span>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                {BENCH_OPTIONS.map(b => (
+                  <label key={b.symbol} style={{ display: 'flex', gap: 5, alignItems: 'center', fontSize: 11, cursor: 'pointer',
+                    color: activeBench.includes(b.symbol) ? BENCH_COLORS[b.symbol] : 'var(--text-5)' }}>
+                    <input
+                      type="checkbox"
+                      checked={activeBench.includes(b.symbol)}
+                      onChange={e => setActiveBench(prev => e.target.checked ? [...prev, b.symbol] : prev.filter(s => s !== b.symbol))}
+                      style={{ accentColor: BENCH_COLORS[b.symbol], cursor: 'pointer' }}
+                    />
+                    {b.label}
+                  </label>
+                ))}
+                {benchLoading && <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 220px', gap: 16, alignItems: 'start' }}>
+              {/* Chart */}
+              <div>
+                {benchChartData.length > 1 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <LineChart data={benchChartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10, fill: 'var(--text-5)' }}
+                        tickFormatter={d => {
+                          const dt = new Date(d + 'T00:00:00');
+                          return `${dt.toLocaleString('en-US', { month: 'short' })} '${String(dt.getFullYear()).slice(2)}`;
+                        }}
+                        interval="preserveStartEnd"
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: 'var(--text-5)' }}
+                        tickFormatter={v => `${v.toFixed(0)}`}
+                        width={38}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{ background: 'var(--bg-3)', border: '1px solid var(--bg-1)', fontSize: 11, borderRadius: 0 }}
+                        labelStyle={{ color: 'var(--text-3)', marginBottom: 4 }}
+                        formatter={(value: number, name: string) => {
+                          const label = name === 'Portfolio' ? 'Portfolio' : (BENCH_OPTIONS.find(b => b.symbol === name)?.label ?? name);
+                          const delta = value - 100;
+                          return [`${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`, label];
+                        }}
+                        labelFormatter={d => fmtDate(d + 'T00:00:00')}
+                      />
+                      <ReferenceLine y={100} stroke="rgba(255,255,255,0.15)" strokeDasharray="4 4" />
+                      <Line type="monotone" dataKey="Portfolio" stroke="var(--accent)" strokeWidth={2.5} dot={false} />
+                      {activeBench.map(sym => (
+                        <Line key={sym} type="monotone" dataKey={sym} stroke={BENCH_COLORS[sym]} strokeWidth={1.5} dot={false} strokeOpacity={0.85} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-5)', fontSize: 12 }}>
+                    {benchLoading ? 'Loading…' : 'Not enough data'}
+                  </div>
+                )}
+              </div>
+
+              {/* Stats */}
+              {benchChartData.length > 1 && (() => {
+                const last = benchChartData[benchChartData.length - 1];
+                const portfolioReturn = typeof last['Portfolio'] === 'number' ? (last['Portfolio'] as number) - 100 : null;
+                if (portfolioReturn == null) return null;
+
+                const comparisons = activeBench.map(sym => {
+                  const benchReturn = typeof last[sym] === 'number' ? (last[sym] as number) - 100 : null;
+                  if (benchReturn == null) return null;
+                  return { sym, label: BENCH_OPTIONS.find(b => b.symbol === sym)?.label ?? sym, benchReturn, diff: portfolioReturn - benchReturn };
+                }).filter(Boolean) as { sym: string; label: string; benchReturn: number; diff: number }[];
+
+                const beating = comparisons.filter(c => c.diff > 0);
+                const trailing = comparisons.filter(c => c.diff <= 0);
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: isMobile ? 0 : 4 }}>
+                    {/* Portfolio return */}
+                    <div>
+                      <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Your Portfolio · 1Y</div>
+                      <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1, color: portfolioReturn >= 0 ? 'var(--green-2)' : 'var(--red-2)' }}>
+                        {portfolioReturn >= 0 ? '+' : ''}{portfolioReturn.toFixed(1)}%
+                      </div>
+                    </div>
+
+                    {/* Beating summary */}
+                    {beating.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Beating</div>
+                        {beating.map(c => (
+                          <div key={c.sym} style={{ marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
+                              <span style={{ fontSize: 12, color: BENCH_COLORS[c.sym], fontWeight: 600 }}>{c.label}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{c.benchReturn >= 0 ? '+' : ''}{c.benchReturn.toFixed(1)}%</span>
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-2)' }}>
+                              You&apos;re ahead by +{c.diff.toFixed(1)}%
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Trailing summary */}
+                    {trailing.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 9, color: 'var(--text-5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Trailing</div>
+                        {trailing.map(c => (
+                          <div key={c.sym} style={{ marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
+                              <span style={{ fontSize: 12, color: BENCH_COLORS[c.sym], fontWeight: 600 }}>{c.label}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{c.benchReturn >= 0 ? '+' : ''}{c.benchReturn.toFixed(1)}%</span>
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red-2)' }}>
+                              You&apos;re behind by {c.diff.toFixed(1)}%
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
 
         {/* ── Dividends + Projections ── */}
         {holdings.length > 0 && (
