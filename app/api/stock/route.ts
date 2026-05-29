@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StockData } from '@/types';
+import { fetchWithRetry } from '@/lib/serverFetch';
 
 const ALLOWED_INTERVALS = new Set([
   '1m',
@@ -69,15 +70,18 @@ export async function GET(request: NextRequest) {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${startDate}&period2=${endDate}&interval=${interval}`;
     console.log(`[Stock API] Requesting: ${url}`);
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
+    const response = await fetchWithRetry(
+      url,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        cache: 'no-store', // Disable caching to get fresh data
       },
-      cache: 'no-store', // Disable caching to get fresh data
-      signal: AbortSignal.timeout(10000), // 10 second timeout
-    });
+      { retries: 3, timeoutMs: 10000 } // back off on Yahoo 429/5xx instead of failing
+    );
 
     console.log(`[Stock API] Response status: ${response.status}`);
 

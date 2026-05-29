@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchWithRetry } from '@/lib/serverFetch';
 
 const ENDPOINTS = (symbol: string) => [
   `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`,
@@ -11,13 +12,17 @@ export async function GET(request: NextRequest) {
 
   for (const url of ENDPOINTS(symbol)) {
     try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json',
+      const res = await fetchWithRetry(
+        url,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+          },
+          next: { revalidate: 0 },
         },
-        next: { revalidate: 0 },
-      });
+        { retries: 1, timeoutMs: 8000 } // one backoff retry; falls through to the next endpoint otherwise
+      );
 
       if (!res.ok) continue;
 

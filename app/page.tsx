@@ -9,10 +9,20 @@ import { generateForecast, getForecastInsights } from '@/lib/forecasting';
 import { generateTradingSignal } from '@/lib/tradingSignals';
 import { StockData, NewsArticle, ChartDataPoint, ChartPattern } from '@/types';
 import { getCachedPredictions, savePredictionsToCache, CachedPrediction } from '@/lib/predictionsCache';
+import { logPredictionRun } from '@/lib/predictionLog';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MLSettings, MLPreset, DEFAULT_ML_SETTINGS } from '@/types/mlSettings';
 import { PatternSettings, PatternPreset, DEFAULT_PATTERN_SETTINGS } from '@/types/patternSettings';
 import type { SearchHistoryItem } from '@/components/Sidebar';
 import { exportToCSV } from '@/lib/exportData';
+import { loadMLLibraries } from '@/lib/loadMLLibraries';
+import {
+  DATA_FREQUENCY_OPTIONS,
+  DataFrequencyId,
+  DEFAULT_DATA_FREQUENCY_ID,
+  DEFAULT_FREQUENCY_OPTION,
+  getFrequencyOption,
+} from '@/lib/dataFrequency';
 
 // Lazy load heavy components with dynamic imports
 const LightweightChartWrapper = dynamic(() => import('@/components/LightweightChartWrapper'), { ssr: false });
@@ -55,97 +65,12 @@ const StockScreener       = dynamic(() => import('@/components/StockScreener'), 
 const DailyReturnHeatmap  = dynamic(() => import('@/components/DailyReturnHeatmap'),  { ssr: false });
 const VolumeProfile       = dynamic(() => import('@/components/VolumeProfile'),       { ssr: false });
 const EarningsHistory     = dynamic(() => import('@/components/EarningsHistory'),     { ssr: false });
+const PredictionScorecard = dynamic(() => import('@/components/PredictionScorecard'), { ssr: false });
+const SignalBacktest      = dynamic(() => import('@/components/SignalBacktest'),      { ssr: false });
 
-// Lazy load heavy ML libraries only when needed
-const loadMLLibraries = async () => {
-  const [
-    { generateMLForecast },
-    { generateProphetWithChangepoints },
-    { generateLinearRegression, generateEMAForecast, generateARIMAForecast, generateProphetLiteForecast },
-    { generateGRUForecast, generateCNNLSTMForecast, generateEnsembleFromPredictions },
-    { detectChartPatterns }
-  ] = await Promise.all([
-    import('@/lib/mlForecasting'),
-    import('@/lib/prophetForecast'),
-    import('@/lib/mlAlgorithms'),
-    import('@/lib/advancedMLModels'),
-    import('@/lib/chartPatterns')
-  ]);
+// loadMLLibraries() lives in lib/loadMLLibraries.ts (imported above).
 
-  return {
-    generateMLForecast,
-    generateProphetWithChangepoints,
-    generateLinearRegression,
-    generateEMAForecast,
-    generateARIMAForecast,
-    generateProphetLiteForecast,
-    generateGRUForecast,
-    generateCNNLSTMForecast,
-    generateEnsembleFromPredictions,
-    detectChartPatterns
-  };
-};
-
-const DATA_FREQUENCY_OPTIONS = [
-  {
-    id: '5m' as const,
-    label: '5m',
-    interval: '5m',
-    days: 25,
-    description: '5-minute bars • ~1 month',
-    category: 'intraday' as const,
-  },
-  {
-    id: '15m' as const,
-    label: '15m',
-    interval: '15m',
-    days: 60,
-    description: '15-minute bars • last 3 months',
-    category: 'intraday' as const,
-  },
-  {
-    id: '1h' as const,
-    label: '1H',
-    interval: '60m',
-    days: 365,
-    description: 'Hourly bars • last year',
-    category: 'intraday' as const,
-  },
-  {
-    id: '1d' as const,
-    label: '1D',
-    interval: '1d',
-    days: 1825,
-    description: 'Daily bars • 5 years',
-    category: 'session' as const,
-  },
-  {
-    id: '1wk' as const,
-    label: '1W',
-    interval: '1wk',
-    days: 1825,
-    description: 'Weekly bars • 5 years',
-    category: 'session' as const,
-  },
-  {
-    id: '1mo' as const,
-    label: '1M',
-    interval: '1mo',
-    days: 1825,
-    description: 'Monthly bars • 5 years',
-    category: 'session' as const,
-  },
-] as const;
-
-type DataFrequencyOption = typeof DATA_FREQUENCY_OPTIONS[number];
-type DataFrequencyId = DataFrequencyOption['id'];
-
-const DEFAULT_DATA_FREQUENCY_ID: DataFrequencyId = '1d';
-const DEFAULT_FREQUENCY_OPTION =
-  DATA_FREQUENCY_OPTIONS.find(option => option.id === DEFAULT_DATA_FREQUENCY_ID)!;
-
-const getFrequencyOption = (id?: DataFrequencyId): DataFrequencyOption =>
-  id ? DATA_FREQUENCY_OPTIONS.find(option => option.id === id) ?? DEFAULT_FREQUENCY_OPTION : DEFAULT_FREQUENCY_OPTION;
+// Data-frequency presets + helpers live in lib/dataFrequency.ts (imported above).
 
 type FetchDataOptions = {
   forceRecalc?: boolean;
@@ -501,13 +426,20 @@ export default function Home() {
         const ensemble = mlLibs.generateEnsembleFromPredictions({ gru, cnnLstm, lstm }, horizon);
         if (ensemble) setMlPredictions(prev => ({ ...prev, ensemble }));
 
-        savePredictionsToCache(sym, {
+        const allPredictions = {
           ...basePredictions,
           ...(lstm && { lstm }),
           ...(gru && { gru }),
           ...(cnnLstm && { cnnLstm }),
           ...(ensemble && { ensemble }),
-        }, horizon);
+        };
+        savePredictionsToCache(sym, allPredictions, horizon);
+
+        // Record this run for the Prediction Scorecard. Unlike the 24h cache,
+        // this log persists long enough for each forecast's target date to
+        // arrive so models can be graded on real outcomes.
+        const basePrice = data.length > 0 ? data[data.length - 1].close : 0;
+        logPredictionRun(sym, basePrice, horizon, allPredictions);
 
         setMlTraining(false);
       } catch (mlError) {
@@ -1732,6 +1664,20 @@ export default function Home() {
             {/* Live Prediction Lab */}
             <div className="mt-6" style={fadeIn(720)}>
               <LivePredictionChart symbol={symbol} />
+            </div>
+
+            {/* Prediction Scorecard — grades each model against real outcomes */}
+            <div className="mt-6" style={fadeIn(740)}>
+              <ErrorBoundary label="Prediction Scorecard">
+                <PredictionScorecard symbol={symbol} />
+              </ErrorBoundary>
+            </div>
+
+            {/* Signal Backtester — trading signals vs. buy & hold */}
+            <div className="mt-6" style={fadeIn(760)}>
+              <ErrorBoundary label="Signal Backtest">
+                <SignalBacktest symbol={symbol} />
+              </ErrorBoundary>
             </div>
 
             {/* Mobile: stack ML panels below News */}
