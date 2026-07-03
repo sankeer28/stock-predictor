@@ -213,6 +213,21 @@ npm run dev
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
+## UI Modes
+
+The app ships with two complete interfaces over the exact same features and data:
+
+- **Classic** — the original terminal-style dashboard (green accents, DM Mono, one scrolling page):
+```bash
+npm run dev
+```
+- **Pro** — a from-scratch professional workspace with an entirely different layout: OLED-black theme, sidebar navigation (Overview · AI Lab · Technicals · Market Intel · News & Social · Markets · Watchlist), a command search bar (press `/` anywhere), and a live symbol hero with price streaming. Every classic feature is included, plus congressional trading, the economic calendar and price alerts:
+```bash
+npm run dev:pro
+```
+
+`npm run dev:pro` boots straight into the Pro workspace (it lives at `/pro`); `npm run build:pro` / `npm run start:pro` do the same for production builds. Either way you can jump between the two interfaces at any time with the floating **Pro UI / Classic UI** button in the bottom-right corner.
+
 ## Contributing
 
 Contributions are welcome. Please feel free to submit a pull request.

@@ -10,6 +10,7 @@ nul
 
 # Next.js
 /.next/
+/.next-verify*/
 /out/
 
 # Production

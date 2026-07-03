@@ -1,8 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Overridable so CI/verification builds can run while `next dev` holds .next
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   env: {
     NEWS_API_KEY: process.env.NEWS_API_KEY,
+  },
+  // `npm run dev:pro` / `build:pro` boot the app straight into the redesigned
+  // Pro workspace; the classic UI stays the default otherwise. The `ui=classic`
+  // escape hatch keeps the in-app Classic UI button working in pro mode —
+  // without it the redirect would bounce every visit to / straight back.
+  async redirects() {
+    if (process.env.NEXT_PUBLIC_UI_MODE === 'pro') {
+      return [
+        {
+          source: '/',
+          destination: '/pro',
+          permanent: false,
+          missing: [{ type: 'query', key: 'ui' }],
+        },
+      ];
+    }
+    return [];
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,

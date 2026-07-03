@@ -1,0 +1,1108 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRO UI — the classic terminal theme on OLED black, driving the /pro
+   workspace layout.
+
+   The /pro interface is its own app shell (components/pro/ProDashboard.tsx):
+   sidebar workspaces, command topbar, symbol hero. It deliberately reuses the
+   ORIGINAL design language — square boxes, 2px borders, green terminal accent,
+   DM Mono — so all shared feature components render exactly as they do on the
+   classic page. The only palette change is the background scale: pure #000
+   OLED black instead of the classic grays.
+
+   Every rule is scoped under html[data-ui="pro"], which follows the route —
+   the classic theme on / is completely untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Palette: classic theme, OLED-black backgrounds ───────────────────── */
+
+html[data-ui="pro"] {
+  color-scheme: dark;
+
+  /* Background scale only — text, accents, borders widths and every component
+     style are inherited from the classic theme in globals.css. bg-1 stays a
+     visible gray because it doubles as the app-wide border tone. */
+  --bg-1: #2e2e2e;
+  --bg-2: #111111;
+  --bg-3: #0a0a0a;
+  --bg-4: #000000;
+}
+
+/* Flat black canvas. Pages set an inline background on their root element,
+   so this needs !important to replace it. */
+html[data-ui="pro"] main,
+html[data-ui="pro"] .portfolio-page {
+  background: #000000 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRO SHELL — the /pro layout chrome, styled in the classic terminal language
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html[data-ui="pro"] .pro-shell {
+  display: flex;
+  min-height: 100vh;
+  background: #000000;
+}
+
+/* ── Sidebar ── */
+
+html[data-ui="pro"] .pro-side {
+  width: 248px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 12px 14px;
+  border-right: 2px solid var(--bg-1);
+  background: var(--bg-4);
+  overflow-y: auto;
+}
+
+html[data-ui="pro"] .pro-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 16px;
+}
+
+html[data-ui="pro"] .pro-brand-mark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+html[data-ui="pro"] .pro-brand-mark img {
+  width: 24px;
+  height: 24px;
+}
+
+html[data-ui="pro"] .pro-brand-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  line-height: 1.3;
+}
+
+html[data-ui="pro"] .pro-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+html[data-ui="pro"] .pro-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+  color: var(--text-3);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+}
+
+html[data-ui="pro"] .pro-nav-item:hover {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  color: var(--text-2);
+}
+
+html[data-ui="pro"] .pro-nav-item.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-0);
+}
+
+html[data-ui="pro"] .pro-nav-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+html[data-ui="pro"] .pro-nav-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+html[data-ui="pro"] .pro-nav-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+html[data-ui="pro"] .pro-nav-hint {
+  font-size: 10px;
+  color: var(--text-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-ui="pro"] .pro-nav-item.is-active .pro-nav-hint {
+  color: var(--text-0);
+  opacity: 0.75;
+}
+
+html[data-ui="pro"] .pro-side-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bg-1);
+}
+
+html[data-ui="pro"] .pro-side-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+  color: var(--text-3);
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: border-color var(--transition), color var(--transition), background-color var(--transition);
+}
+
+html[data-ui="pro"] .pro-side-link:hover {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  color: var(--text-2);
+}
+
+html[data-ui="pro"] .pro-side-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Main column ── */
+
+html[data-ui="pro"] .pro-main {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 0 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Topbar: command search ── */
+
+html[data-ui="pro"] .pro-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  margin: 0 -20px;
+  padding: 12px 20px 11px;
+  background: var(--bg-4);
+  border-bottom: 2px solid var(--bg-1);
+}
+
+html[data-ui="pro"] .pro-search {
+  position: relative;
+  flex: 1;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+}
+
+html[data-ui="pro"] .pro-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-4);
+  pointer-events: none;
+  z-index: 1;
+}
+
+html[data-ui="pro"] .pro-search-input {
+  width: 100%;
+  padding: 10px 44px 10px 36px;
+  font-size: 13px;
+}
+
+html[data-ui="pro"] .pro-search-kbd {
+  position: absolute;
+  right: 12px;
+  padding: 1px 6px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-3);
+  color: var(--text-4);
+  font-size: 10px;
+  pointer-events: none;
+}
+
+html[data-ui="pro"] .pro-analyze-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border: 2px solid var(--accent);
+  background: var(--accent);
+  color: var(--text-0);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+html[data-ui="pro"] .pro-analyze-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+html[data-ui="pro"] .pro-analyze-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+html[data-ui="pro"] .pro-analyze-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+html[data-ui="pro"] .pro-icon-btn {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-3);
+  color: var(--text-3);
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+html[data-ui="pro"] .pro-icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+
+html[data-ui="pro"] .pro-icon-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Popovers (suggestions, history) ── */
+
+html[data-ui="pro"] .pro-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 80;
+  min-width: 100%;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 2px solid var(--bg-1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8);
+}
+
+html[data-ui="pro"] .pro-history {
+  position: relative;
+}
+
+html[data-ui="pro"] .pro-history-menu {
+  left: auto;
+  right: 0;
+  width: 300px;
+}
+
+html[data-ui="pro"] .pro-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  border-bottom: 1px solid var(--bg-1);
+}
+
+html[data-ui="pro"] .pro-popover-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-3);
+  color: var(--danger);
+  font-size: 10.5px;
+  font-family: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+html[data-ui="pro"] .pro-popover-clear:hover {
+  border-color: var(--danger);
+}
+
+html[data-ui="pro"] .pro-popover-clear svg {
+  width: 11px;
+  height: 11px;
+}
+
+html[data-ui="pro"] .pro-popover-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--bg-1);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+html[data-ui="pro"] .pro-popover-item:last-child {
+  border-bottom: none;
+}
+
+html[data-ui="pro"] .pro-popover-item:hover {
+  background: var(--bg-3);
+  color: var(--text-1);
+}
+
+html[data-ui="pro"] .pro-popover-item.is-current {
+  background: var(--bg-3);
+}
+
+html[data-ui="pro"] .pro-popover-sym {
+  min-width: 52px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+html[data-ui="pro"] .pro-popover-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-4);
+  font-size: 11px;
+}
+
+html[data-ui="pro"] .pro-popover-date {
+  color: var(--text-5);
+  font-size: 10.5px;
+}
+
+/* ── Mobile workspace nav ── */
+
+html[data-ui="pro"] .pro-mobilenav {
+  display: none;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+html[data-ui="pro"] .pro-mobilenav::-webkit-scrollbar {
+  display: none;
+}
+
+html[data-ui="pro"] .pro-mobilenav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+html[data-ui="pro"] .pro-mobilenav-item svg {
+  width: 13px;
+  height: 13px;
+}
+
+html[data-ui="pro"] .pro-mobilenav-item.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-0);
+}
+
+/* ── Symbol hero: flat data band ── */
+
+html[data-ui="pro"] .pro-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 2px 16px;
+  border-bottom: 2px solid var(--bg-1);
+}
+
+html[data-ui="pro"] .pro-hero-id {
+  min-width: 0;
+}
+
+html[data-ui="pro"] .pro-hero-symbol {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.1;
+}
+
+html[data-ui="pro"] .pro-hero-company {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-4);
+  max-width: 340px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-ui="pro"] .pro-hero-price {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+html[data-ui="pro"] .pro-hero-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+html[data-ui="pro"] .pro-hero-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+html[data-ui="pro"] .pro-hero-change svg {
+  width: 14px;
+  height: 14px;
+}
+
+html[data-ui="pro"] .pro-hero-change.is-up {
+  color: var(--success);
+}
+
+html[data-ui="pro"] .pro-hero-change.is-down {
+  color: var(--danger);
+}
+
+html[data-ui="pro"] .pro-hero-right {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+html[data-ui="pro"] .pro-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: 2px solid var(--text-4);
+  background: var(--bg-3);
+  color: var(--text-4);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+html[data-ui="pro"] .pro-status.is-open {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+html[data-ui="pro"] .pro-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+html[data-ui="pro"] .pro-status.is-open .pro-status-dot {
+  animation: proPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes proPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+html[data-ui="pro"] .pro-status-time {
+  color: var(--text-4);
+  font-weight: 400;
+}
+
+/* ── Segmented controls, checks, small inputs (classic square chips) ── */
+
+html[data-ui="pro"] .pro-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+html[data-ui="pro"] .pro-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+html[data-ui="pro"] .pro-seg-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+html[data-ui="pro"] .pro-seg-btn:hover:not(:disabled):not(.is-active) {
+  border-color: var(--accent);
+  color: var(--text-2);
+}
+
+html[data-ui="pro"] .pro-seg-btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-0);
+}
+
+html[data-ui="pro"] .pro-seg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+html[data-ui="pro"] .pro-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+  color: var(--text-4);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+html[data-ui="pro"] .pro-check input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 8px;
+  height: 8px;
+  margin: 0;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+  box-shadow: none;
+  transition: background-color var(--transition-fast);
+}
+
+html[data-ui="pro"] .pro-check.is-on {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  color: var(--text-2);
+}
+
+html[data-ui="pro"] .pro-check.is-on input {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+html[data-ui="pro"] .pro-days {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-4);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+html[data-ui="pro"] .pro-days input {
+  width: 56px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+/* ── Sections & panels ── */
+
+html[data-ui="pro"] .pro-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+html[data-ui="pro"] .pro-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+html[data-ui="pro"] .pro-section[hidden] {
+  display: none !important;
+}
+
+/* Portfolio page embedded as a workspace: drop its full-page framing */
+html[data-ui="pro"] .pro-section .portfolio-page {
+  min-height: 0 !important;
+}
+
+html[data-ui="pro"] .pro-section .portfolio-page a[href="/"] {
+  display: none;
+}
+
+html[data-ui="pro"] .pro-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+html[data-ui="pro"] .pro-section-head-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+html[data-ui="pro"] .pro-section-title {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+html[data-ui="pro"] .pro-section-sub {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-4);
+}
+
+html[data-ui="pro"] .pro-grid {
+  display: grid;
+  gap: 14px;
+}
+
+/* Grid children may hold wide tables/charts — never let them blow the track */
+html[data-ui="pro"] .pro-grid > * {
+  min-width: 0;
+}
+
+html[data-ui="pro"] .pro-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+
+/* Exact two-column split (stacks on narrow screens) */
+html[data-ui="pro"] .pro-grid-half {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Panels designed for the classic 320px side rail (w-80) fill their grid
+   column when mounted in a pro workspace */
+html[data-ui="pro"] .pro-section .w-80 {
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  html[data-ui="pro"] .pro-grid-half {
+    grid-template-columns: 1fr;
+  }
+}
+
+html[data-ui="pro"] .pro-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: var(--border-thickness) solid var(--accent);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+html[data-ui="pro"] .pro-panel-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ── Chart card ── */
+
+html[data-ui="pro"] .pro-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: var(--border-thickness) solid var(--accent);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+html[data-ui="pro"] .pro-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+html[data-ui="pro"] .pro-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+html[data-ui="pro"] .pro-chart-body {
+  position: relative;
+}
+
+html[data-ui="pro"] .pro-chart-refresh {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+html[data-ui="pro"] .pro-chart-refresh svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+html[data-ui="pro"] .pro-finviz-img {
+  width: 100%;
+  border: 1px solid var(--bg-1);
+  background: var(--bg-4);
+}
+
+/* ── Stat tiles (classic bordered tiles, uniform borders) ── */
+
+html[data-ui="pro"] .pro-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+html[data-ui="pro"] .pro-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 2px solid var(--bg-1);
+  background: var(--bg-2);
+}
+
+html[data-ui="pro"] .pro-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+html[data-ui="pro"] .pro-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+
+html[data-ui="pro"] .pro-stat-cap {
+  text-transform: capitalize;
+}
+
+html[data-ui="pro"] .pro-stat-delta {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-4);
+}
+
+html[data-ui="pro"] .pro-stat-delta.is-up {
+  color: var(--success);
+}
+
+html[data-ui="pro"] .pro-stat-delta.is-down {
+  color: var(--danger);
+}
+
+/* ── Error & loading states ── */
+
+html[data-ui="pro"] .pro-error {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px solid var(--danger);
+  background: var(--bg-2);
+  color: var(--text-2);
+}
+
+html[data-ui="pro"] .pro-error svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--danger);
+  margin-top: 1px;
+}
+
+html[data-ui="pro"] .pro-error strong {
+  display: block;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+html[data-ui="pro"] .pro-error p {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+html[data-ui="pro"] .pro-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+html[data-ui="pro"] .pro-skeleton {
+  min-height: 120px;
+  border: 2px solid var(--bg-1);
+  background: linear-gradient(100deg,
+    var(--bg-3) 40%,
+    var(--bg-2) 50%,
+    var(--bg-3) 60%);
+  background-size: 200% 100%;
+  animation: proShimmer 1.4s linear infinite;
+}
+
+html[data-ui="pro"] .pro-skeleton-chart {
+  min-height: 380px;
+}
+
+html[data-ui="pro"] .pro-skeleton-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@keyframes proShimmer {
+  to { background-position: -200% 0; }
+}
+
+html[data-ui="pro"] .pro-loading-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-4);
+  font-size: 12.5px;
+}
+
+html[data-ui="pro"] .pro-loading-note svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 1023px) {
+  html[data-ui="pro"] .pro-side {
+    display: none;
+  }
+
+  html[data-ui="pro"] .pro-main {
+    padding: 0 12px calc(84px + env(safe-area-inset-bottom));
+  }
+
+  html[data-ui="pro"] .pro-topbar {
+    margin: 0 -12px;
+    padding: 10px 12px 9px;
+  }
+
+  /* Workspace nav becomes a fixed bottom tab bar (thumb-reachable) */
+  html[data-ui="pro"] .pro-mobilenav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 65;
+    margin: 0;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    background: var(--bg-4);
+    border-top: 2px solid var(--bg-1);
+  }
+
+  html[data-ui="pro"] .pro-mobilenav-item {
+    padding: 9px 13px;
+    min-height: 38px;
+  }
+
+  /* Keep the mode switcher clear of the bottom bar (pro pages only) */
+  html[data-ui="pro"] .ui-mode-toggle {
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    right: 12px;
+  }
+
+  /* iOS Safari auto-zooms focused inputs under 16px */
+  html[data-ui="pro"] .pro-search-input,
+  html[data-ui="pro"] .pro-days input {
+    font-size: 16px;
+  }
+
+  /* Comfortable touch targets for the compact controls */
+  html[data-ui="pro"] .pro-seg-btn,
+  html[data-ui="pro"] .pro-check {
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  html[data-ui="pro"] .pro-hero {
+    padding: 12px 0 14px;
+    gap: 10px;
+  }
+
+  html[data-ui="pro"] .pro-hero-symbol {
+    font-size: 19px;
+  }
+
+  html[data-ui="pro"] .pro-hero-value {
+    font-size: 24px;
+  }
+
+  html[data-ui="pro"] .pro-hero-price {
+    margin-left: 0;
+  }
+
+  html[data-ui="pro"] .pro-hero-right {
+    margin-left: 0;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  html[data-ui="pro"] .pro-analyze-btn span {
+    display: none;
+  }
+
+  html[data-ui="pro"] .pro-analyze-btn {
+    padding: 10px 12px;
+  }
+
+  html[data-ui="pro"] .pro-history-menu {
+    width: min(300px, calc(100vw - 24px));
+  }
+}
+
+/* Very narrow phones: single-column grids (340px min tracks would overflow) */
+@media (max-width: 480px) {
+  html[data-ui="pro"] .pro-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-ui="pro"] .pro-main {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  html[data-ui="pro"] .pro-topbar {
+    margin: 0 -8px;
+    padding: 8px 8px 7px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Floating UI-mode switcher (rendered on / and /pro in both modes)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ui-mode-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  color: var(--text-2);
+  border: 1px solid var(--accent);
+  background: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  transition: border-color var(--transition), color var(--transition), box-shadow var(--transition);
+}
+
+.ui-mode-toggle:hover {
+  border-color: var(--accent-hover);
+  color: var(--text-1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 10px var(--accent-glow);
+}
+
+.ui-mode-toggle svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .ui-mode-toggle {
+    right: 12px;
+    bottom: 12px;
+    padding: 8px 10px;
+  }
+
+  .ui-mode-toggle .ui-mode-toggle-label {
+    display: none;
+  }
+}
